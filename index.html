@@ -9,7 +9,10 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   // ══════════════════════════════════════════════════
-  // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
+  // 🔥 CONFIGURACIÓN FIREBASE
+  // SEGURIDAD: estas credenciales son públicas por diseño de Firebase Web SDK.
+  // Protege el acceso configurando Firestore Security Rules en Firebase Console
+  // para que solo usuarios autenticados o con tus reglas puedan leer/escribir.
   // ══════════════════════════════════════════════════
   const firebaseConfig = {
     apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
@@ -42,12 +45,9 @@
 <meta name="theme-color" content="#ff6b35">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Alarmas Reset">
-  <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff6b35">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Alarmas Reset">
+<meta name="description" content="Control de órdenes de servicio — Alarmas y GPS Reset">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
@@ -188,6 +188,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 #cr-iva-row.off{opacity:.35}
 #cr-iva-row.off span:last-child{text-decoration:line-through}
 
+/* FOCUS VISIBLE — accesibilidad teclado */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.btn:focus-visible,.tab-btn:focus-visible,.filter-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* FIELD ERROR */
+.field-error{display:block;font-size:11px;color:var(--red);margin-top:3px}
+
 /* PRINT */
 @media print{
   body > *{display:none !important}
@@ -205,21 +212,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <body>
 
 <!-- HEADER -->
-<header class="app-header">
-  <div class="brand">🔐 Alarmas <span>Reset</span></div>
-  <span class="firebase-badge off" id="fb-badge">● Local</span>
+<header class="app-header" role="banner">
+  <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
+  <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
 </header>
 
 <!-- TABS -->
-<nav class="nav-tabs">
-  <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 Inicio</button>
-  <button class="tab-btn" onclick="showTab('ordenes',this)">📋 Órdenes</button>
-  <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
-  <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
+<nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
+  <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-dashboard" onclick="showTab('dashboard',this)">📊 Inicio</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-ordenes" onclick="showTab('ordenes',this)">📋 Órdenes</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-nueva" onclick="showTab('nueva',this)">➕ Nueva</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cotizaciones" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
 </nav>
 
 <!-- DASHBOARD -->
-<div class="view active" id="tab-dashboard">
+<div class="view active" id="tab-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
   <div class="dash-grid">
     <div class="stat-card green"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
     <div class="stat-card orange"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
@@ -231,8 +238,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- LISTA ÓRDENES -->
-<div class="view" id="tab-ordenes">
-  <input class="search-box" type="text" id="search-input" placeholder="🔍 Buscar cliente, vehículo..." oninput="renderOrdenes()">
+<div class="view" id="tab-ordenes" role="tabpanel" aria-labelledby="tab-ordenes">
+  <input class="search-box" type="search" id="search-input" placeholder="🔍 Buscar cliente, vehículo..." aria-label="Buscar órdenes por cliente o vehículo" oninput="renderOrdenes()">
   <div class="filter-row">
     <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
     <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
@@ -243,24 +250,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- NUEVA ORDEN -->
-<div class="view" id="tab-nueva">
+<div class="view" id="tab-nueva" role="tabpanel" aria-labelledby="tab-nueva">
   <div id="form-nueva-wrapper"></div>
 </div>
 
 <!-- COTIZACIONES -->
-<div class="view" id="tab-cotizaciones">
+<div class="view" id="tab-cotizaciones" role="tabpanel" aria-labelledby="tab-cotizaciones">
   <div id="cot-form-wrapper"></div>
 </div>
 
 <!-- FAB -->
-<button class="fab" onclick="abrirModalNueva()">+</button>
+<button class="fab" onclick="abrirModalNueva()" aria-label="Crear nueva orden de servicio" title="Nueva orden">+</button>
 
 <!-- MODAL ORDEN -->
-<div class="modal-overlay" id="modal-orden">
+<div class="modal-overlay" id="modal-orden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="modal-title">Nueva Orden</div>
-      <button class="modal-close" onclick="cerrarModal()">✕</button>
+      <button class="modal-close" onclick="cerrarModal()" aria-label="Cerrar modal">✕</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
   </div>
@@ -280,7 +287,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- TOAST -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
 <script>
 // ═══════════════════════════════════════
@@ -567,9 +574,11 @@ async function eliminarOrden(id) {
 // ═══════════════════════════════════════
 function showTab(id, btn) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
   document.getElementById('tab-'+id).classList.add('active');
-  if (btn) btn.classList.add('active');
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
+  // URL routing — preserva navegación con botón atrás
+  try { history.replaceState({tab:id}, '', '#'+id); } catch(e) {}
   if (id !== 'nueva') {
     document.getElementById('form-nueva-wrapper').innerHTML = '';
     if (activeFormMount === 'nueva') activeFormMount = null;
@@ -895,12 +904,35 @@ function leerProductos() {
   }).filter(p => p.nombre);
 }
 
+function setFieldError(el, msg) {
+  if (!el) return;
+  el.style.borderColor = msg ? 'var(--red)' : '';
+  let hint = el.parentElement.querySelector('.field-error');
+  if (msg) {
+    if (!hint) { hint = document.createElement('span'); hint.className = 'field-error'; hint.style.cssText = 'font-size:11px;color:var(--red);margin-top:3px'; el.parentElement.appendChild(hint); }
+    hint.textContent = msg;
+    el.setAttribute('aria-invalid', 'true');
+    el.setAttribute('aria-describedby', el.id + '-err');
+    hint.id = el.id + '-err';
+  } else if (hint) {
+    hint.remove();
+    el.removeAttribute('aria-invalid');
+    el.removeAttribute('aria-describedby');
+  }
+}
+
 async function submitOrden() {
   const root = getFormRoot();
   if (!root) { toast('⚠️ Formulario no encontrado'); return; }
-  const vehiculo = root.querySelector('#f-vehiculo')?.value?.trim();
-  const cliente = root.querySelector('#f-cliente')?.value?.trim();
-  if (!vehiculo || !cliente) { toast('⚠️ Vehículo y cliente son obligatorios'); return; }
+  const vEl = root.querySelector('#f-vehiculo');
+  const cEl = root.querySelector('#f-cliente');
+  const vehiculo = vEl?.value?.trim();
+  const cliente = cEl?.value?.trim();
+  let valid = true;
+  setFieldError(vEl, vehiculo ? '' : 'El vehículo es obligatorio');
+  setFieldError(cEl, cliente ? '' : 'El cliente es obligatorio');
+  if (!vehiculo || !cliente) { valid = false; (vEl||cEl).focus(); }
+  if (!valid) { toast('⚠️ Completa los campos requeridos'); return; }
   const prods = leerProductos();
   if (!prods.length) { toast('⚠️ Agrega al menos un servicio'); return; }
   const orden = {
@@ -1185,10 +1217,30 @@ function verCotizacion() {
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
+// Restaurar tab desde URL hash al cargar
+function restoreTabFromHash() {
+  const hash = (location.hash || '').replace('#', '');
+  const valid = ['dashboard','ordenes','nueva','cotizaciones'];
+  if (valid.includes(hash)) {
+    const idx = valid.indexOf(hash);
+    const btn = document.querySelectorAll('.tab-btn')[idx];
+    showTab(hash, btn);
+  }
+}
+
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
+  restoreTabFromHash();
 }
+
+// Registrar Service Worker para soporte offline
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW no registrado:', err));
+  });
+}
+
 window.addEventListener('firebaseReady', () => {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAppData, { once: true });
