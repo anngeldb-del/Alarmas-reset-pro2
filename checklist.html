@@ -6,6 +6,37 @@
 <title>Alarmas Reset — Cotizaciones</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+<!-- FIREBASE SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, doc,
+    onSnapshot, setDoc, deleteDoc,
+    query, orderBy, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+    authDomain: "alarmas-reset-e3484.firebaseapp.com",
+    projectId: "alarmas-reset-e3484",
+    storageBucket: "alarmas-reset-e3484.firebasestorage.app",
+    messagingSenderId: "1096561116547",
+    appId: "1:1096561116547:web:b13df05c092785723aa2b6"
+  };
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window._db = db;
+    window._fs = { collection, doc, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp };
+    window._fbReady = true;
+  } catch(e) {
+    console.warn('Firebase no disponible:', e);
+    window._fbReady = false;
+  }
+  window.dispatchEvent(new Event('fbReady'));
+</script>
 <style>
 :root {
   --bg: #070709;
@@ -363,7 +394,10 @@ body::before{
 
   <!-- HEADER -->
   <div class="header">
-    <div class="header-badge">⚡ Alarmas Reset</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+      <div class="header-badge">⚡ Alarmas Reset</div>
+      <div id="fb-status" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)">● Conectando...</div>
+    </div>
     <div class="header-logo">ALARMAS RESET · <em>SOLO LED AUTO</em></div>
     <div class="header-sub">Ing. Luis Angel Díaz Bernal &nbsp;·&nbsp; Multimedia · Alarmas · LED · GPS · Cámaras</div>
     <div class="header-contact">
@@ -944,9 +978,9 @@ body::before{
   <div class="panel" id="panel-agregar">
     <div class="add-service-panel">
 
-      <div class="firebase-note">
-        <p><strong>💡 Panel de administración</strong><br>
-        Agrega nuevas categorías de servicio que aparecerán en los mensajes de WhatsApp. Los datos se guardan en tu navegador (localStorage). Para sincronización en la nube, conecta Firebase Firestore con las instrucciones al final.</p>
+      <div id="admin-status-note" class="firebase-note">
+        <p><strong>🔄 Conectando con Firebase...</strong><br>
+        Los datos se sincronizarán automáticamente en la nube.</p>
       </div>
 
       <div class="add-form">
@@ -974,13 +1008,9 @@ body::before{
 
       <div id="saved_services_list" class="saved-services"></div>
 
-      <div class="firebase-note" style="margin-top:8px">
-        <p><strong>🔥 Para conectar Firebase:</strong><br>
-        1. Crea proyecto en <em>console.firebase.google.com</em><br>
-        2. Activa Firestore Database<br>
-        3. Copia tu config SDK en la variable <code>firebaseConfig</code><br>
-        4. Reemplaza <code>localStorage</code> por las llamadas Firestore<br><br>
-        El código está listo para el intercambio — solo conecta tus credenciales.</p>
+      <div class="firebase-note" id="sync-info-note" style="margin-top:8px;background:rgba(0,229,200,.05);border-color:rgba(0,229,200,.2)">
+        <p style="color:rgba(0,229,200,.85)"><strong style="color:var(--cyan)">✅ Sincronización en la nube activa</strong><br>
+        Las categorías y los ítems personalizados se guardan en Firebase Firestore y están disponibles en todos tus dispositivos en tiempo real.</p>
       </div>
 
       <div style="height:80px"></div>
@@ -1005,17 +1035,48 @@ let currentTab = 'pantallas';
 let pendingOptions = [];
 const STATIC_TABS = ['pantallas','camaras','alarmas','gps','luces'];
 
-// ── localStorage ──
-function loadServices() {
+// ══════════════════════════════════════════
+// CAPA DE DATOS — Firebase primero, localStorage como fallback
+// ══════════════════════════════════════════
+let _useFirebase = false;
+
+function updateFbBadge(online) {
+  _useFirebase = online;
+  const badge = document.getElementById('fb-status');
+  const note  = document.getElementById('admin-status-note');
+  const sync  = document.getElementById('sync-info-note');
+  if (badge) {
+    badge.textContent = online ? '● Firebase' : '● Local';
+    badge.style.cssText = online
+      ? 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;background:rgba(0,229,200,.1);border:1px solid rgba(0,229,200,.3);color:var(--cyan)'
+      : 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;background:rgba(255,96,48,.08);border:1px solid rgba(255,96,48,.2);color:var(--orange)';
+  }
+  if (note) {
+    note.style.display = online ? 'none' : 'block';
+    if (!online) note.querySelector('p').innerHTML =
+      '<strong>📴 Modo local</strong><br>Firebase no disponible. Los datos se guardan en este dispositivo.';
+  }
+  if (sync) sync.style.display = online ? 'block' : 'none';
+}
+
+// ── localStorage fallback ──
+function loadServicesLocal() {
   try { return JSON.parse(localStorage.getItem('bsla_services')||'[]'); } catch(e){ return []; }
 }
-function saveServices(arr) { localStorage.setItem('bsla_services', JSON.stringify(arr)); }
-
-// Ítems personalizados por panel
-function loadCustomItems(panel) {
+function saveServicesLocal(arr) { localStorage.setItem('bsla_services', JSON.stringify(arr)); }
+function loadCustomItemsLocal(panel) {
   try { return JSON.parse(localStorage.getItem('custom_'+panel)||'[]'); } catch(e){ return []; }
 }
-function saveCustomItems(panel, arr) { localStorage.setItem('custom_'+panel, JSON.stringify(arr)); }
+function saveCustomItemsLocal(panel, arr) { localStorage.setItem('custom_'+panel, JSON.stringify(arr)); }
+
+// Caché en memoria (se llena vía onSnapshot o localStorage)
+let _servicesCache = [];
+let _customCache   = {};  // { panel: [{id, label}] }
+
+function loadServices()              { return _servicesCache; }
+function loadCustomItems(panel)      { return _customCache[panel] || []; }
+function saveServices(arr)           { _servicesCache = arr; if(!_useFirebase) saveServicesLocal(arr); }
+function saveCustomItems(panel, arr) { _customCache[panel] = arr; if(!_useFirebase) saveCustomItemsLocal(panel, arr); }
 
 // ── ÍTEMS PERSONALIZADOS ──
 function toggleAddForm(panel) {
@@ -1027,25 +1088,47 @@ function toggleAddForm(panel) {
   if (open) document.getElementById('custom-input-'+panel)?.focus();
 }
 
-function addCustomItem(panel) {
+async function addCustomItem(panel) {
   const inp = document.getElementById('custom-input-'+panel);
   if (!inp) return;
   const val = inp.value.trim();
   if (!val) { inp.focus(); return; }
-  const items = loadCustomItems(panel);
-  items.push({ id: Date.now(), label: val });
-  saveCustomItems(panel, items);
+  const itemId = Date.now();
+  const newItem = { id: itemId, label: val };
   inp.value = '';
-  renderCustomItems(panel);
-  updateProgress(panel);
+
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, setDoc } = window._fs;
+      const docId = panel + '_' + itemId;
+      await setDoc(doc(window._db, 'checklist_custom_items', docId), { panel, ...newItem, createdAt: itemId });
+      // onSnapshot actualizará _customCache y re-renderizará
+    } catch(e) {
+      console.error(e);
+      const items = loadCustomItems(panel); items.push(newItem); saveCustomItems(panel, items);
+      renderCustomItems(panel); updateProgress(panel);
+    }
+  } else {
+    const items = loadCustomItems(panel); items.push(newItem); saveCustomItems(panel, items);
+    renderCustomItems(panel); updateProgress(panel);
+  }
   inp.focus();
 }
 
-function deleteCustomItem(panel, id) {
-  const items = loadCustomItems(panel).filter(x => x.id !== id);
-  saveCustomItems(panel, items);
-  renderCustomItems(panel);
-  updateProgress(panel);
+async function deleteCustomItem(panel, id) {
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, deleteDoc } = window._fs;
+      await deleteDoc(doc(window._db, 'checklist_custom_items', panel + '_' + id));
+    } catch(e) {
+      console.error(e);
+      saveCustomItems(panel, loadCustomItems(panel).filter(x => x.id !== id));
+      renderCustomItems(panel); updateProgress(panel);
+    }
+  } else {
+    saveCustomItems(panel, loadCustomItems(panel).filter(x => x.id !== id));
+    renderCustomItems(panel); updateProgress(panel);
+  }
 }
 
 function renderCustomItems(panel) {
@@ -1317,31 +1400,54 @@ function renderOptionsPreview() {
   ).join('');
 }
 
-function saveService() {
+async function saveService() {
   const name = document.getElementById('new_service_name').value.trim();
   const icon = document.getElementById('new_service_icon').value.trim() || '🔧';
   if(!name || pendingOptions.length===0){
     alert('Escribe el nombre y agrega al menos una opción.');
     return;
   }
-  const services = loadServices();
   const id = Date.now();
-  services.push({id, name, icon, options:[...pendingOptions]});
-  saveServices(services);
+  const svc = { id, name, icon, options:[...pendingOptions], createdAt: id };
+
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, setDoc } = window._fs;
+      await setDoc(doc(window._db, 'checklist_services', String(id)), svc);
+      // onSnapshot actualizará _servicesCache y re-renderizará
+    } catch(e) {
+      console.error(e);
+      // fallback local
+      const arr = loadServices(); arr.push(svc); saveServices(arr);
+      buildDynamicTabs(); renderSavedList();
+    }
+  } else {
+    const arr = loadServices(); arr.push(svc); saveServices(arr);
+    buildDynamicTabs(); renderSavedList();
+  }
+
   document.getElementById('new_service_name').value='';
   document.getElementById('new_service_icon').value='';
   pendingOptions=[];
   renderOptionsPreview();
-  buildDynamicTabs();
-  renderSavedList();
   showTab('extra-'+id);
 }
 
-function deleteServiceFromTab(id) {
+async function deleteServiceFromTab(id) {
   if(!confirm('¿Eliminar este servicio?')) return;
-  saveServices(loadServices().filter(s=>s.id!==id));
-  buildDynamicTabs();
-  renderSavedList();
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, deleteDoc } = window._fs;
+      await deleteDoc(doc(window._db, 'checklist_services', String(id)));
+    } catch(e) {
+      console.error(e);
+      saveServices(loadServices().filter(s=>s.id!==id));
+      buildDynamicTabs(); renderSavedList();
+    }
+  } else {
+    saveServices(loadServices().filter(s=>s.id!==id));
+    buildDynamicTabs(); renderSavedList();
+  }
   showTab('pantallas');
 }
 function deleteService(id) { deleteServiceFromTab(id); }
@@ -1362,9 +1468,98 @@ function renderSavedList() {
 }
 
 // ── INIT ──
-buildDynamicTabs();
-STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
-renderSavedList();
+function initLocal() {
+  _servicesCache = loadServicesLocal();
+  STATIC_TABS.forEach(t => { _customCache[t] = loadCustomItemsLocal(t); });
+  updateFbBadge(false);
+  buildDynamicTabs();
+  STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
+  renderSavedList();
+}
+
+function initFirebase() {
+  if (!window._fbReady || !window._db) { initLocal(); return; }
+  const { collection, onSnapshot, query, orderBy } = window._fs;
+  const db = window._db;
+
+  let servicesReady = false;
+  let customReady   = false;
+  function checkReady() {
+    if (!servicesReady || !customReady) return;
+    updateFbBadge(true);
+    buildDynamicTabs();
+    STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
+    renderSavedList();
+  }
+
+  // Listener — categorías de servicios
+  onSnapshot(
+    query(collection(db, 'checklist_services'), orderBy('createdAt', 'asc')),
+    snap => {
+      _servicesCache = snap.docs.map(d => d.data());
+      saveServicesLocal(_servicesCache);
+      servicesReady = true;
+      checkReady();
+      // re-render si ya estaba listo (cambio en tiempo real)
+      if (servicesReady && customReady) {
+        buildDynamicTabs();
+        renderSavedList();
+      }
+    },
+    err => {
+      console.warn('Firestore services error:', err);
+      if (!servicesReady) { servicesReady = true; checkReady(); }
+    }
+  );
+
+  // Listener — ítems personalizados
+  onSnapshot(
+    query(collection(db, 'checklist_custom_items'), orderBy('createdAt', 'asc')),
+    snap => {
+      // Rebuild cache por panel
+      const fresh = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (!fresh[data.panel]) fresh[data.panel] = [];
+        fresh[data.panel].push({ id: data.id, label: data.label });
+      });
+      _customCache = fresh;
+      // Sync local
+      STATIC_TABS.forEach(t => saveCustomItemsLocal(t, _customCache[t] || []));
+      customReady = true;
+      checkReady();
+      if (servicesReady && customReady) {
+        STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
+        // También re-render paneles dinámicos si existen
+        _servicesCache.forEach(svc => {
+          const tid = 'extra-' + svc.id;
+          renderCustomItems(tid);
+          updateProgress(tid);
+        });
+      }
+    },
+    err => {
+      console.warn('Firestore custom items error:', err);
+      if (!customReady) { customReady = true; checkReady(); }
+    }
+  );
+}
+
+// Espera Firebase o arranca local si tarda más de 3s
+let fbInitDone = false;
+window.addEventListener('fbReady', () => {
+  if (fbInitDone) return;
+  fbInitDone = true;
+  initFirebase();
+});
+setTimeout(() => {
+  if (!fbInitDone) { fbInitDone = true; initLocal(); }
+}, 3000);
+// Si el DOM ya cargó y fbReady ya disparó antes del listener
+if (window._fbReady !== undefined && !fbInitDone) {
+  fbInitDone = true;
+  initFirebase();
+}
 </script>
 </body>
 </html>
