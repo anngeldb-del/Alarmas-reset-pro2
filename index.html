@@ -43,11 +43,6 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Alarmas Reset">
-  <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff6b35">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Alarmas Reset">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
@@ -101,8 +96,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .search-box:focus{border-color:var(--accent)}
 .search-box::placeholder{color:var(--muted)}
 
-.orden-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;transition:border-color .2s}
-.orden-card:hover{border-color:var(--accent)}
+.orden-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .2s}
+.orden-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 16px rgba(255,107,53,.12)}
 .orden-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;gap:12px}
 .orden-title{font-family:var(--font-display);font-weight:700;font-size:15px}
 .orden-sub{color:var(--muted);font-size:12px;margin-top:3px}
@@ -123,7 +118,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .orden-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
 
 /* BOTONES */
-.btn{padding:9px 16px;border-radius:8px;border:none;font-family:var(--font-display);font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+.btn{padding:9px 16px;border-radius:8px;border:none;font-family:var(--font-display);font-weight:700;font-size:12px;cursor:pointer;transition:all .15s;letter-spacing:.3px;active:scale(.97)}
+.btn:active{transform:scale(.97)}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:#ff8355}
 .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
@@ -534,7 +530,7 @@ async function guardarOrden(orden) {
     if (idx >= 0) ordenes[idx] = orden;
     else ordenes.unshift(orden);
   } else {
-    orden.id = 'local_'+Date.now();
+    orden.id = 'local_'+(crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2));
     orden.fecha_creacion = Date.now();
     ordenes.unshift(orden);
   }
@@ -914,6 +910,8 @@ async function submitOrden() {
     productos: prods
   };
   if (editandoId) orden.id = editandoId;
+  const saveBtn = root.querySelector('[onclick="submitOrden()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Guardando...'; }
   try {
     await guardarOrden(orden);
     if (activeFormMount === 'modal') cerrarModal();
@@ -924,7 +922,9 @@ async function submitOrden() {
     }
     toast('✅ Orden guardada');
     editandoId = null;
-  } catch(e) { /* toast ya mostrado en guardarOrden */ }
+  } catch(e) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Guardar orden'; }
+  }
 }
 
 // MODAL
@@ -1204,6 +1204,9 @@ document.addEventListener('DOMContentLoaded', () => {
       agregarProductoRow();
     }
   });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW:', err));
+  }
 });
 
 // Globales para onclick en HTML dinámico (GitHub Pages / móvil)

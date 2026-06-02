@@ -2,7 +2,7 @@
   "name": "Alarmas Reset",
   "short_name": "Alarmas Reset",
   "description": "Control de Órdenes — Alarmas y GPS Reset",
-  "start_url": "/alarmas-reset/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#ff6b35",
