@@ -214,7 +214,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- HEADER -->
 <header class="app-header" role="banner">
   <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
-  <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="checklist.html" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted);text-decoration:none;font-family:var(--font-display);font-weight:600;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📋 Checklist</a>
+    <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+  </div>
 </header>
 
 <!-- TABS -->
@@ -297,6 +300,7 @@ let ordenes = [];
 let filtroEstado = 'todos';
 let editandoId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
+let cotFolioGenerated = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
@@ -374,13 +378,11 @@ function abrirDoc(titulo, bodyHTML) {
 
   // Mostrar en el overlay dentro de la app
   document.getElementById('doc-frame').innerHTML = bodyHTML;
-  // Aplicar estilos dentro del frame para preview
-  let styleEl = document.getElementById('doc-preview-style');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'doc-preview-style';
-    document.getElementById('doc-frame').appendChild(styleEl);
-  }
+  // Aplicar estilos al preview (siempre recrear porque innerHTML borra el nodo anterior)
+  const styleEl = document.createElement('style');
+  styleEl.id = 'doc-preview-style';
+  styleEl.textContent = DOC_CSS;
+  document.getElementById('doc-frame').appendChild(styleEl);
   document.getElementById('doc-topbar-title').textContent = titulo;
   document.getElementById('doc-overlay').classList.add('open');
 }
@@ -401,12 +403,17 @@ function docImprimir() {
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open(); doc.write(_docHTML); doc.close();
+  let printed = false;
   iframe.onload = function() {
+    if (printed) return;
+    printed = true;
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
   };
-  // Fallback extra por si onload no dispara en algunos móviles
+  // Fallback por si onload no dispara en algunos móviles
   setTimeout(function() {
+    if (printed) return;
+    printed = true;
     try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
   }, 800);
 }
@@ -588,6 +595,7 @@ function showTab(id, btn) {
     mountOrdenForm(null, 'nueva');
   }
   if (id==='cotizaciones') {
+    cotFolioGenerated = false;
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
   }
@@ -624,9 +632,10 @@ function renderDashboard() {
 
 function irAOrden(id) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
   document.getElementById('tab-ordenes').classList.add('active');
-  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  const tabOrdenes = document.querySelector('.tab-btn[aria-controls="tab-ordenes"]');
+  if (tabOrdenes) { tabOrdenes.classList.add('active'); tabOrdenes.setAttribute('aria-selected','true'); }
   filtroEstado='todos'; renderOrdenes();
   setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
 }
@@ -686,18 +695,25 @@ function verBoleta(id) {
   const total=o.total||prods.reduce((s,p)=>s+(parseFloat(p.costo)||0),0);
   const aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
   const folio='AR-'+(o.id||'').slice(-6).toUpperCase();
-  const hoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const fechaDoc = o.fecha_instalacion
+    ? new Date(o.fecha_instalacion+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})
+    : (o.fecha_creacion ? new Date(o.fecha_creacion).toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}) : new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}));
   const garantias=prods.filter(p=>p.garantia).map(p=>'• '+p.nombre+': <strong>'+p.garantia+'</strong>').join('<br>');
 
-  const estadoRow = saldo<=0
+  const estadoOrden=(o.estado||'').toUpperCase();
+  const estadoRow = estadoOrden==='PAGADO' || saldo<=0
     ? '<div class="total-row verde"><span>Estado</span><span>✅ PAGADO</span></div>'
-    : '<div class="total-row rojo"><span>Saldo pendiente</span><span>'+fmt(saldo)+'</span></div>';
+    : estadoOrden==='TERMO'
+      ? '<div class="total-row" style="color:#ffd166"><span>Estado</span><span>⚠️ TERMO</span></div>'
+      : '<div class="total-row rojo"><span>Saldo pendiente</span><span>'+fmt(saldo)+'</span></div>';
 
   const bodyHTML =
-    headerEmpresa('ORDEN DE SERVICIO', folio, hoy)
+    headerEmpresa('ORDEN DE SERVICIO', folio, fechaDoc)
     + '<div class="info-grid">'
     +   '<div><div class="info-label">Cliente</div><div class="info-val">'+esc(o.cliente||'—')+'</div></div>'
     +   '<div><div class="info-label">Vehículo</div><div class="info-val">'+esc(o.vehiculo||'—')+'</div></div>'
+    +   (o.placa?'<div><div class="info-label">Placa</div><div class="info-val">'+esc(o.placa)+'</div></div>':'')
+    +   (o.tel?'<div><div class="info-label">Teléfono</div><div class="info-val">'+esc(o.tel)+'</div></div>':'')
     +   '<div><div class="info-label">Fecha instalación</div><div class="info-val">'+esc(o.fecha_instalacion||'—')+'</div></div>'
     +   '<div><div class="info-label">Fecha pago</div><div class="info-val">'+esc(o.fecha_pago||'—')+'</div></div>'
     + '</div>'
@@ -783,6 +799,12 @@ function buildFormHTML(orden) {
       <input class="form-input" id="f-cliente" placeholder="Nombre del cliente" value="${esc(o.cliente||'')}"></div>
   </div>
   <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Placa</label>
+      <input class="form-input" id="f-placa" placeholder="Ej: ABC-123-0" value="${esc(o.placa||'')}"></div>
+    <div class="form-group"><label class="form-label">Teléfono cliente</label>
+      <input class="form-input" id="f-tel" placeholder="871-000-0000" value="${esc(o.tel||'')}"></div>
+  </div>
+  <div class="form-row cols-2">
     <div class="form-group"><label class="form-label">F. Instalación</label>
       <input class="form-input" type="date" id="f-fecha-inst" value="${esc(o.fecha_instalacion||'')}"></div>
     <div class="form-group"><label class="form-label">F. Pago</label>
@@ -794,7 +816,7 @@ function buildFormHTML(orden) {
   <div class="form-section">Pagos y estado</div>
   <div class="form-row cols-3">
     <div class="form-group"><label class="form-label">Total <span style="color:var(--green);font-size:10px">● AUTO</span></label>
-      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700"></div>
+      <input class="form-input" type="number" id="f-total" readonly placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700;background:var(--surface);cursor:default" tabindex="-1"></div>
     <div class="form-group"><label class="form-label">A cuenta</label>
       <input class="form-input" type="number" id="f-a-cuenta" placeholder="0" value="${o.a_cuenta_total||''}"></div>
     <div class="form-group"><label class="form-label">Estado</label>
@@ -821,9 +843,9 @@ function productoRowHTML(p,i) {
         <input class="form-input prod-nombre" placeholder="Ej: Instalación de alarma" value="${esc(p.nombre||'')}"></div>
     </div>
     <div class="form-row cols-3">
-      <div class="form-group"><label class="form-label">Costo ($)</label>
+      <div class="form-group"><label class="form-label">Precio venta ($)</label>
         <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}" oninput="calcGanancia(this)"></div>
-      <div class="form-group"><label class="form-label">Inversión ($)</label>
+      <div class="form-group"><label class="form-label">Inversión / Costo ($)</label>
         <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}" oninput="calcGanancia(this)"></div>
       <div class="form-group"><label class="form-label">Garantía</label>
         <select class="form-select prod-garantia">
@@ -937,6 +959,8 @@ async function submitOrden() {
   if (!prods.length) { toast('⚠️ Agrega al menos un servicio'); return; }
   const orden = {
     vehiculo, cliente,
+    placa: root.querySelector('#f-placa')?.value?.trim() || '',
+    tel: root.querySelector('#f-tel')?.value?.trim() || '',
     fecha_instalacion: root.querySelector('#f-fecha-inst')?.value || '',
     fecha_pago: root.querySelector('#f-fecha-pago')?.value || '',
     total: parseFloat(root.querySelector('#f-total')?.value) || 0,
@@ -1066,6 +1090,7 @@ function buildCotFormHTML() {
     <input class="form-input" id="c-notas" placeholder="Observaciones o acuerdos especiales"></div>
   <div style="display:flex;gap:10px;padding-top:4px;padding-bottom:40px">
     <button class="btn btn-primary" style="flex:1" onclick="verCotizacion()">🧾 Ver cotización</button>
+    <button class="btn btn-ghost" onclick="limpiarCotizacion()">🔄 Limpiar</button>
   </div>`;
 }
 
@@ -1148,6 +1173,12 @@ function recalcCot() {
 
 function agregarPartida(){ const cont=document.getElementById('cot-partidas'); if(!cont)return; const i=Date.now(); const div=document.createElement('div'); div.innerHTML=cotPartidaHTML({},i); cont.appendChild(div.firstElementChild); }
 function quitarPartida(i){ const r=document.getElementById('cot-p-'+i); if(r){r.remove();recalcCot();} }
+function limpiarCotizacion(){
+  if(!confirm('¿Limpiar el formulario de cotización? Se perderán los datos actuales.'))return;
+  cotFolioGenerated=false;
+  document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
+  setTimeout(recalcCot,0);
+}
 
 function leerPartidas() {
   return Array.from(document.querySelectorAll('#cot-partidas .partida-row')).map(r=>({
@@ -1168,7 +1199,7 @@ function verCotizacion() {
   const folio=document.getElementById('c-folio')?.value||'';
   const fecha=document.getElementById('c-fecha')?.value||'';
   const vigencia=document.getElementById('c-vigencia')?.value||'';
-  cotFolioNum++; localStorage.setItem('cot_folio',cotFolioNum);
+  if (!cotFolioGenerated) { cotFolioGenerated = true; cotFolioNum++; localStorage.setItem('cot_folio',cotFolioNum); }
 
   const bodyHTML =
     headerEmpresa('COTIZACIÓN', folio, fecha)
@@ -1275,6 +1306,7 @@ window.irAOrden = irAOrden;
 window.setIvaCot = setIvaCot;
 window.agregarPartida = agregarPartida;
 window.quitarPartida = quitarPartida;
+window.limpiarCotizacion = limpiarCotizacion;
 window.verCotizacion = verCotizacion;
 window.docImprimir = docImprimir;
 window.docCompartir = docCompartir;
