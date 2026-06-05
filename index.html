@@ -207,6 +207,60 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   .form-row.cols-3{grid-template-columns:1fr 1fr}
   .stat-value{font-size:18px}
 }
+
+/* SORT + EXPORT */
+.sort-export-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.sort-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-display);transition:all .2s;white-space:nowrap}
+.sort-btn.active{background:var(--surface2);border-color:var(--muted);color:var(--text)}
+.export-csv-btn{margin-left:auto;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-display);transition:all .2s;white-space:nowrap}
+.export-csv-btn:hover{border-color:var(--green);color:var(--green)}
+
+/* QUICK STATUS */
+.quick-status-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.btn-estado{padding:5px 11px;border-radius:6px;border:none;font-family:var(--font-display);font-weight:700;font-size:11px;cursor:pointer;transition:all .2s}
+.btn-estado.pagado{background:rgba(6,214,160,.15);color:var(--green)}
+.btn-estado.pendiente{background:rgba(255,107,53,.12);color:var(--accent)}
+.btn-estado.termo{background:rgba(255,209,102,.12);color:var(--accent2)}
+
+/* ABONOS */
+.abonos-section{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.abonos-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px}
+.abono-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
+.abono-item:last-child{border-bottom:none}
+.abono-fecha{color:var(--muted);font-size:11px}
+.abono-monto{font-family:var(--font-display);font-weight:700;color:var(--green)}
+.abono-add-row{display:flex;gap:6px;margin-top:8px}
+.abono-input{flex:1;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;width:0}
+.abono-input:focus{border-color:var(--green)}
+
+/* CHART */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px}
+.chart-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px}
+.chart-bars{display:flex;align-items:flex-end;gap:6px;height:80px}
+.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.chart-bar{width:100%;border-radius:4px 4px 0 0;background:var(--accent);min-height:2px;transition:height .4s}
+.chart-bar-lbl{font-family:var(--font-display);font-size:9px;color:var(--muted);text-align:center;white-space:nowrap}
+.chart-bar-val{font-family:var(--font-display);font-size:9px;color:var(--accent);font-weight:700;text-align:center;white-space:nowrap}
+
+/* VENCIDAS */
+.section-overdue-title{font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--red);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+.overdue-card{background:rgba(239,35,60,.05);border:1px solid rgba(239,35,60,.2);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer}
+.overdue-card:hover{border-color:rgba(239,35,60,.4)}
+.overdue-info{flex:1;min-width:0}
+.overdue-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overdue-detail{font-size:11px;color:var(--muted);margin-top:2px}
+.overdue-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.overdue-days{font-family:var(--font-display);font-size:12px;font-weight:800;color:var(--red)}
+.overdue-wa{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.25);color:#25D366;font-size:11px;font-weight:700;text-decoration:none;font-family:var(--font-display)}
+
+/* TEMPLATES */
+.tpl-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.tpl-btn{padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;font-family:var(--font-display);font-weight:600}
+.tpl-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* VER MÁS */
+.ver-mas-btn{width:100%;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--muted);font-family:var(--font-display);font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;margin-top:8px}
+.ver-mas-btn:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -214,7 +268,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- HEADER -->
 <header class="app-header" role="banner">
   <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
-  <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="checklist.html" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted);text-decoration:none;font-family:var(--font-display);font-weight:600;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📋 Checklist</a>
+    <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+  </div>
 </header>
 
 <!-- TABS -->
@@ -239,12 +296,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
 <!-- LISTA ÓRDENES -->
 <div class="view" id="tab-ordenes" role="tabpanel" aria-labelledby="tab-ordenes">
-  <input class="search-box" type="search" id="search-input" placeholder="🔍 Buscar cliente, vehículo..." aria-label="Buscar órdenes por cliente o vehículo" oninput="renderOrdenes()">
+  <input class="search-box" type="search" id="search-input" placeholder="🔍 Buscar cliente, vehículo, placa..." aria-label="Buscar órdenes" oninput="paginaOrdenes=1;renderOrdenes()">
   <div class="filter-row">
     <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
     <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
     <button class="filter-btn" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
     <button class="filter-btn" onclick="setFilter('TERMO',this)">Termo</button>
+  </div>
+  <div class="sort-export-row">
+    <button class="sort-btn active" id="sort-reciente" onclick="setSort('reciente',this)">↓ Recientes</button>
+    <button class="sort-btn" id="sort-antiguo" onclick="setSort('antiguo',this)">↑ Antiguas</button>
+    <button class="sort-btn" id="sort-mayor" onclick="setSort('mayor',this)">$ Mayor</button>
+    <button class="sort-btn" id="sort-cliente" onclick="setSort('cliente',this)">A–Z</button>
+    <button class="export-csv-btn" onclick="exportarCSV()">⬇ CSV</button>
   </div>
   <div id="ordenes-lista"></div>
 </div>
@@ -277,9 +341,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <div class="doc-overlay" id="doc-overlay">
   <div class="doc-topbar">
     <span class="doc-topbar-title" id="doc-topbar-title">Documento</span>
-    <!-- BOTÓN IMPRIMIR: abre nueva ventana con el doc y llama print() -->
     <button class="btn btn-green btn-sm" onclick="docImprimir()">🖨️ Imprimir / PDF</button>
-    <!-- BOTÓN COMPARTIR: descarga el archivo HTML o usa Web Share -->
+    <button class="btn btn-ghost btn-sm" id="btn-doc-wa" onclick="docWhatsApp()" style="display:none;background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.3);color:#25D366">💬 WhatsApp</button>
     <button class="btn btn-ghost btn-sm" onclick="docCompartir()">📤 Compartir</button>
     <button class="btn btn-ghost btn-sm" onclick="cerrarDoc()">✕</button>
   </div>
@@ -295,11 +358,28 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 // ═══════════════════════════════════════
 let ordenes = [];
 let filtroEstado = 'todos';
+let sortOrden = 'reciente';
+let paginaOrdenes = 1;
+const ORDENES_POR_PAGINA = 20;
 let editandoId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
+let cotFolioGenerated = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
+let _docCurrentOrden = null; // orden activa en overlay de documento
+
+// Plantillas de servicios frecuentes
+const PLANTILLAS = [
+  {nombre:'Alarma básica',        costo:800,   inversion:300},
+  {nombre:'Alarma + seguros',     costo:1500,  inversion:600},
+  {nombre:'GPS con plataforma',   costo:2000,  inversion:900},
+  {nombre:'GPS prepago',          costo:1200,  inversion:500},
+  {nombre:'Pantalla 9"',          costo:3500,  inversion:1800},
+  {nombre:'Cámara reversa HD',    costo:600,   inversion:200},
+  {nombre:'LED alta potencia',    costo:900,   inversion:350},
+  {nombre:'Power Window',         costo:700,   inversion:280},
+];
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
 const EMPRESA = {
@@ -374,19 +454,19 @@ function abrirDoc(titulo, bodyHTML) {
 
   // Mostrar en el overlay dentro de la app
   document.getElementById('doc-frame').innerHTML = bodyHTML;
-  // Aplicar estilos dentro del frame para preview
-  let styleEl = document.getElementById('doc-preview-style');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'doc-preview-style';
-    document.getElementById('doc-frame').appendChild(styleEl);
-  }
+  // Aplicar estilos al preview (siempre recrear porque innerHTML borra el nodo anterior)
+  const styleEl = document.createElement('style');
+  styleEl.id = 'doc-preview-style';
+  styleEl.textContent = DOC_CSS;
+  document.getElementById('doc-frame').appendChild(styleEl);
   document.getElementById('doc-topbar-title').textContent = titulo;
   document.getElementById('doc-overlay').classList.add('open');
 }
 
 function cerrarDoc() {
   document.getElementById('doc-overlay').classList.remove('open');
+  _docCurrentOrden = null;
+  document.getElementById('btn-doc-wa').style.display = 'none';
 }
 
 // 🖨️ IMPRIMIR — inyecta iframe oculto, escribe el doc y llama print()
@@ -401,12 +481,17 @@ function docImprimir() {
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open(); doc.write(_docHTML); doc.close();
+  let printed = false;
   iframe.onload = function() {
+    if (printed) return;
+    printed = true;
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
   };
-  // Fallback extra por si onload no dispara en algunos móviles
+  // Fallback por si onload no dispara en algunos móviles
   setTimeout(function() {
+    if (printed) return;
+    printed = true;
     try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
   }, 800);
 }
@@ -588,6 +673,7 @@ function showTab(id, btn) {
     mountOrdenForm(null, 'nueva');
   }
   if (id==='cotizaciones') {
+    cotFolioGenerated = false;
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
   }
@@ -598,35 +684,110 @@ function showTab(id, btn) {
 // ═══════════════════════════════════════
 function renderDashboard() {
   let gan=0,cob=0,fac=0,pend=0;
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const vencidas=[];
   ordenes.forEach(o=>{
-    const t=o.total||0, a=o.a_cuenta_total||0;
+    const t=o.total||0, a=calcACuenta(o);
     gan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
     fac+=t;
-    if((o.estado||'').toUpperCase()==='PENDIENTE'){cob+=t-a;pend++;}
+    if((o.estado||'').toUpperCase()==='PENDIENTE'){
+      cob+=t-a; pend++;
+      if(o.fecha_pago){
+        const fp=new Date(o.fecha_pago+'T12:00:00');
+        if(fp<hoy) vencidas.push({...o, diasVencida:Math.floor((hoy-fp)/86400000)});
+      }
+    }
   });
   document.getElementById('stat-ganancia').textContent=fmt(gan);
   document.getElementById('stat-pendiente').textContent=fmt(cob);
   document.getElementById('stat-total').textContent=fmt(fac);
   document.getElementById('stat-ordpend').textContent=pend;
+
   const cont=document.getElementById('recientes-lista');
+  let html='';
+
+  // Gráfica mensual
+  html+=renderGraficaMensual();
+
+  // Vencidas
+  if(vencidas.length){
+    html+=`<div class="section-overdue-title">⚠️ Cobros vencidos <span style="background:rgba(239,35,60,.15);color:var(--red);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700">${vencidas.length}</span></div>`;
+    vencidas.sort((a,b)=>b.diasVencida-a.diasVencida).forEach(o=>{
+      const tel=o.tel?o.tel.replace(/\D/g,''):'';
+      const msg=encodeURIComponent(`Hola ${o.cliente}, le recordamos que tiene un saldo pendiente de ${fmt(o.total-(calcACuenta(o)))} por los servicios realizados en su ${o.vehiculo||'vehículo'}. Alarmas y GPS Reset.`);
+      html+=`<div class="overdue-card" onclick="irAOrden('${o.id}')">
+        <div class="overdue-info">
+          <div class="overdue-name">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
+          <div class="overdue-detail">Vencía: ${esc(o.fecha_pago)} · Saldo: ${fmt(o.total-(calcACuenta(o)))}</div>
+        </div>
+        <div class="overdue-right">
+          <div class="overdue-days">+${o.diasVencida}d</div>
+          ${tel?`<a class="overdue-wa" href="https://wa.me/52${tel}?text=${msg}" onclick="event.stopPropagation()" target="_blank">💬 WA</a>`:''}
+        </div>
+      </div>`;
+    });
+  }
+
+  // Últimas órdenes
+  html+='<div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;margin-top:8px">Últimas órdenes</div>';
   const rec=ordenes.slice(0,5);
-  if(!rec.length){cont.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin órdenes aún</div></div>';return;}
-  cont.innerHTML=rec.map(o=>{
-    const est=(o.estado||'PENDIENTE').toUpperCase();
-    return `<div class="orden-card" onclick="irAOrden('${o.id}')">
-      <div class="orden-header">
-        <div><div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
-        <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div></div>
-        <span class="estado-badge ${est.toLowerCase()}">${est}</span>
-      </div></div>`;
+  if(!rec.length){ html+='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin órdenes aún</div></div>'; }
+  else {
+    html+=rec.map(o=>{
+      const est=(o.estado||'PENDIENTE').toUpperCase();
+      return `<div class="orden-card" onclick="irAOrden('${o.id}')">
+        <div class="orden-header">
+          <div><div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
+          <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div></div>
+          <span class="estado-badge ${est.toLowerCase()}">${est}</span>
+        </div></div>`;
+    }).join('');
+  }
+  cont.innerHTML=html;
+}
+
+function renderGraficaMensual(){
+  const meses=[]; const hoy=new Date();
+  for(let i=5;i>=0;i--){
+    const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+    meses.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,lbl:d.toLocaleDateString('es-MX',{month:'short'}),gan:0,fac:0});
+  }
+  ordenes.forEach(o=>{
+    const ts=o.fecha_creacion||0;
+    const d=new Date(ts);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const m=meses.find(x=>x.key===key);
+    if(m){
+      m.gan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
+      m.fac+=o.total||0;
+    }
+  });
+  const maxGan=Math.max(...meses.map(m=>m.gan),1);
+  const bars=meses.map(m=>{
+    const h=Math.max(Math.round((m.gan/maxGan)*76),2);
+    const color=m.gan>0?'var(--green)':'var(--border)';
+    return `<div class="chart-bar-wrap">
+      <div class="chart-bar-val">${m.gan>0?'$'+Math.round(m.gan/1000)+'k':''}</div>
+      <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+        <div class="chart-bar" style="height:${h}px;background:${color};width:100%"></div>
+      </div>
+      <div class="chart-bar-lbl">${m.lbl}</div>
+    </div>`;
   }).join('');
+  return `<div class="chart-card"><div class="chart-card-title">📈 Ganancia últimos 6 meses</div><div class="chart-bars">${bars}</div></div>`;
+}
+
+function calcACuenta(o){
+  if(o.abonos&&o.abonos.length) return o.abonos.reduce((s,a)=>s+(parseFloat(a.monto)||0),0);
+  return o.a_cuenta_total||0;
 }
 
 function irAOrden(id) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
   document.getElementById('tab-ordenes').classList.add('active');
-  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  const tabOrdenes = document.querySelector('.tab-btn[aria-controls="tab-ordenes"]');
+  if (tabOrdenes) { tabOrdenes.classList.add('active'); tabOrdenes.setAttribute('aria-selected','true'); }
   filtroEstado='todos'; renderOrdenes();
   setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
 }
@@ -634,27 +795,52 @@ function irAOrden(id) {
 // ═══════════════════════════════════════
 // LISTA ÓRDENES
 // ═══════════════════════════════════════
-function setFilter(f,btn){ filtroEstado=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
+function setFilter(f,btn){ filtroEstado=f; paginaOrdenes=1; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
+function setSort(s,btn){ sortOrden=s; paginaOrdenes=1; document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
 
 function renderOrdenes() {
   const q=(document.getElementById('search-input')?.value||'').toLowerCase();
-  let lista=ordenes;
+  let lista=[...ordenes];
   if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
-  if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q)));
+  if(q) lista=lista.filter(o=>
+    (o.cliente||'').toLowerCase().includes(q)||
+    (o.vehiculo||'').toLowerCase().includes(q)||
+    (o.placa||'').toLowerCase().includes(q)||
+    (o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q))
+  );
+  // Ordenar
+  if(sortOrden==='reciente') lista.sort((a,b)=>(b.fecha_creacion||0)-(a.fecha_creacion||0));
+  else if(sortOrden==='antiguo') lista.sort((a,b)=>(a.fecha_creacion||0)-(b.fecha_creacion||0));
+  else if(sortOrden==='mayor') lista.sort((a,b)=>(b.total||0)-(a.total||0));
+  else if(sortOrden==='cliente') lista.sort((a,b)=>(a.cliente||'').localeCompare(b.cliente||''));
   const cont=document.getElementById('ordenes-lista');
   if(!lista.length){cont.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';return;}
-  cont.innerHTML=lista.map(o=>ordenCard(o)).join('');
+  const visible=lista.slice(0,paginaOrdenes*ORDENES_POR_PAGINA);
+  const hayMas=lista.length>visible.length;
+  cont.innerHTML=visible.map(o=>ordenCard(o)).join('')
+    +(hayMas?`<button class="ver-mas-btn" onclick="paginaOrdenes++;renderOrdenes()">Ver más (${lista.length-visible.length} restantes)</button>`:'');
 }
 
 function ordenCard(o) {
   const est=(o.estado||'PENDIENTE').toUpperCase();
   const prods=o.productos||[];
-  const total=o.total||0, aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
+  const total=o.total||0, aCuenta=calcACuenta(o), saldo=total-aCuenta;
   const rec=o.recordatorios?`<div style="margin-top:8px;padding:8px 10px;background:rgba(255,209,102,.08);border-left:2px solid var(--accent2);border-radius:4px;font-size:12px;color:var(--accent2)">📌 ${esc(o.recordatorios)}</div>`:'';
+  const abonos=o.abonos&&o.abonos.length?o.abonos:[];
+  const abonosHTML=abonos.length?`<div class="abonos-section">
+    <div class="abonos-title">💰 Historial de pagos</div>
+    ${abonos.map(a=>`<div class="abono-item"><span>${esc(a.nota||'Abono')}</span><span class="abono-fecha">${esc(a.fecha||'')}</span><span class="abono-monto">${fmt(a.monto)}</span></div>`).join('')}
+  </div>`:'';
+  const quickStatus=est!=='PAGADO'?`<div class="quick-status-row">
+    ${est!=='PAGADO'?`<button class="btn-estado pagado" onclick="cambiarEstadoRapido('${o.id}','PAGADO')">✅ Marcar pagado</button>`:''}
+    ${est==='PENDIENTE'?`<button class="btn-estado termo" onclick="cambiarEstadoRapido('${o.id}','TERMO')">⚠️ Marcar termo</button>`:''}
+    ${est==='TERMO'?`<button class="btn-estado pendiente" onclick="cambiarEstadoRapido('${o.id}','PENDIENTE')">🔄 Volver pendiente</button>`:''}
+  </div>`:'';
+  const telLink=o.tel?`<a href="https://wa.me/52${(o.tel||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:11px" onclick="event.stopPropagation()">💬 ${esc(o.tel)}</a>`:'';
   return `<div class="orden-card" id="ord-${o.id}">
     <div class="orden-header" onclick="toggleOrden('${o.id}')">
       <div><div class="orden-title">${esc(o.vehiculo||'—')} · <span style="color:var(--muted)">${esc(o.cliente||'—')}</span></div>
-      <div class="orden-sub">${prods.length} servicio(s) · 📅 ${esc(o.fecha_instalacion||'sin fecha')}</div></div>
+      <div class="orden-sub">${prods.length} servicio(s) · 📅 ${esc(o.fecha_instalacion||'sin fecha')}${o.placa?' · 🔢 '+esc(o.placa):''}</div></div>
       <span class="estado-badge ${est.toLowerCase()}">${est}</span>
     </div>
     <div class="orden-body" id="body-${o.id}">
@@ -666,8 +852,16 @@ function ordenCard(o) {
         <div class="total-item"><div class="total-label">Saldo</div><div class="total-val" style="color:${saldo>0?'var(--red)':'var(--green)'}">${fmt(saldo)}</div></div>
         <div class="total-item"><div class="total-label">F. Pago</div><div class="total-val" style="font-size:13px">${esc(o.fecha_pago||'—')}</div></div>
       </div>
+      ${abonosHTML}
+      <div class="abono-add-row" style="margin-top:8px">
+        <input class="abono-input" type="number" placeholder="Monto abono..." id="abono-monto-${o.id}">
+        <input class="abono-input" placeholder="Nota (opc.)" id="abono-nota-${o.id}" style="flex:1.5">
+        <button class="btn btn-green btn-sm" onclick="agregarAbono('${o.id}')">+ Abono</button>
+      </div>
       ${rec}
-      <div class="orden-actions">
+      ${o.tel?`<div style="margin-top:8px">${telLink}</div>`:''}
+      ${quickStatus}
+      <div class="orden-actions" style="margin-top:8px">
         <button class="btn btn-green btn-sm" onclick="verBoleta('${o.id}')">🧾 Boleta</button>
         <button class="btn btn-ghost btn-sm" onclick="editarOrden('${o.id}')">✏️ Editar</button>
         <button class="btn btn-danger btn-sm" onclick="eliminarOrden('${o.id}')">🗑️ Borrar</button>
@@ -676,6 +870,79 @@ function ordenCard(o) {
 }
 
 function toggleOrden(id){ document.getElementById('body-'+id).classList.toggle('open'); }
+
+async function cambiarEstadoRapido(id, nuevoEstado) {
+  const o=ordenes.find(x=>x.id===id); if(!o) return;
+  if(!confirm(`¿Cambiar estado a ${nuevoEstado}?`)) return;
+  const actualizado={...o, estado:nuevoEstado};
+  try { await guardarOrden(actualizado); toast(`✅ Estado cambiado a ${nuevoEstado}`); } catch(e){}
+}
+
+async function agregarAbono(id) {
+  const montoEl=document.getElementById('abono-monto-'+id);
+  const notaEl=document.getElementById('abono-nota-'+id);
+  if(!montoEl) return;
+  const monto=parseFloat(montoEl.value)||0;
+  if(monto<=0){ toast('⚠️ Ingresa un monto válido'); montoEl.focus(); return; }
+  const o=ordenes.find(x=>x.id===id); if(!o) return;
+  const abonos=[...(o.abonos||[]),{monto, nota:notaEl?.value?.trim()||'Abono', fecha:new Date().toLocaleDateString('es-MX')}];
+  const aCuenta=abonos.reduce((s,a)=>s+(parseFloat(a.monto)||0),0);
+  const actualizado={...o, abonos, a_cuenta_total:aCuenta, estado:aCuenta>=(o.total||0)?'PAGADO':o.estado};
+  try { await guardarOrden(actualizado); toast(`✅ Abono de ${fmt(monto)} registrado`); } catch(e){}
+}
+
+function docWhatsApp() {
+  const o=_docCurrentOrden; if(!o||!o.tel) return;
+  const tel=(o.tel||'').replace(/\D/g,'');
+  const aCuenta=calcACuenta(o), saldo=(o.total||0)-aCuenta;
+  const msg=`Hola ${o.cliente}, le enviamos su *Orden de Servicio* de Alarmas y GPS Reset:\n\n`
+    +`🚗 Vehículo: ${o.vehiculo||'—'}\n`
+    +(o.placa?`🔢 Placa: ${o.placa}\n`:'')
+    +`📋 Servicios: ${(o.productos||[]).map(p=>p.nombre).join(', ')}\n`
+    +`💰 Total: ${fmt(o.total||0)}\n`
+    +(aCuenta>0?`✅ A cuenta: ${fmt(aCuenta)}\n`:'')
+    +(saldo>0?`⚠️ Saldo pendiente: ${fmt(saldo)}\n`:'✅ Pagado completamente\n')
+    +`\nGracias por su preferencia. ${EMPRESA.tel}`;
+  window.open(`https://wa.me/52${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function exportarCSV() {
+  const q=(document.getElementById('search-input')?.value||'').toLowerCase();
+  let lista=[...ordenes];
+  if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
+  if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.placa||'').toLowerCase().includes(q));
+  const cols=['Fecha','Cliente','Vehículo','Placa','Teléfono','Servicios','Total','A cuenta','Saldo','Estado','F.Instalación','F.Pago','Notas'];
+  const rows=lista.map(o=>{
+    const ac=calcACuenta(o);
+    return [
+      o.fecha_creacion?new Date(o.fecha_creacion).toLocaleDateString('es-MX'):'',
+      o.cliente||'',o.vehiculo||'',o.placa||'',o.tel||'',
+      (o.productos||[]).map(p=>p.nombre).join(' | '),
+      o.total||0,ac,(o.total||0)-ac,
+      o.estado||'',o.fecha_instalacion||'',o.fecha_pago||'',o.recordatorios||''
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const csv='﻿'+cols.join(',')+'\n'+rows.join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='ordenes-alarmas-reset.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast(`✅ CSV descargado (${lista.length} órdenes)`);
+}
+
+function usarPlantilla(i) {
+  const tpl=PLANTILLAS[i]; if(!tpl) return;
+  const root=getFormRoot(); if(!root){ toast('⚠️ Abre el formulario primero'); return; }
+  const cont=root.querySelector('#productos-form'); if(!cont) return;
+  const idx=Date.now();
+  const div=document.createElement('div');
+  div.innerHTML=productoRowHTML(tpl,idx);
+  const row=div.firstElementChild; if(!row) return;
+  cont.appendChild(row);
+  recalcTotal();
+  toast(`✅ "${tpl.nombre}" agregado`);
+}
 
 // ═══════════════════════════════════════
 // BOLETA
@@ -686,18 +953,25 @@ function verBoleta(id) {
   const total=o.total||prods.reduce((s,p)=>s+(parseFloat(p.costo)||0),0);
   const aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
   const folio='AR-'+(o.id||'').slice(-6).toUpperCase();
-  const hoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const fechaDoc = o.fecha_instalacion
+    ? new Date(o.fecha_instalacion+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})
+    : (o.fecha_creacion ? new Date(o.fecha_creacion).toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}) : new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}));
   const garantias=prods.filter(p=>p.garantia).map(p=>'• '+p.nombre+': <strong>'+p.garantia+'</strong>').join('<br>');
 
-  const estadoRow = saldo<=0
+  const estadoOrden=(o.estado||'').toUpperCase();
+  const estadoRow = estadoOrden==='PAGADO' || saldo<=0
     ? '<div class="total-row verde"><span>Estado</span><span>✅ PAGADO</span></div>'
-    : '<div class="total-row rojo"><span>Saldo pendiente</span><span>'+fmt(saldo)+'</span></div>';
+    : estadoOrden==='TERMO'
+      ? '<div class="total-row" style="color:#ffd166"><span>Estado</span><span>⚠️ TERMO</span></div>'
+      : '<div class="total-row rojo"><span>Saldo pendiente</span><span>'+fmt(saldo)+'</span></div>';
 
   const bodyHTML =
-    headerEmpresa('ORDEN DE SERVICIO', folio, hoy)
+    headerEmpresa('ORDEN DE SERVICIO', folio, fechaDoc)
     + '<div class="info-grid">'
     +   '<div><div class="info-label">Cliente</div><div class="info-val">'+esc(o.cliente||'—')+'</div></div>'
     +   '<div><div class="info-label">Vehículo</div><div class="info-val">'+esc(o.vehiculo||'—')+'</div></div>'
+    +   (o.placa?'<div><div class="info-label">Placa</div><div class="info-val">'+esc(o.placa)+'</div></div>':'')
+    +   (o.tel?'<div><div class="info-label">Teléfono</div><div class="info-val">'+esc(o.tel)+'</div></div>':'')
     +   '<div><div class="info-label">Fecha instalación</div><div class="info-val">'+esc(o.fecha_instalacion||'—')+'</div></div>'
     +   '<div><div class="info-label">Fecha pago</div><div class="info-val">'+esc(o.fecha_pago||'—')+'</div></div>'
     + '</div>'
@@ -714,7 +988,9 @@ function verBoleta(id) {
     + (o.recordatorios&&o.recordatorios!=='GARANTIA 1 AÑO'&&o.recordatorios!=='GARANTIA 6 MESES'?'<div class="nota-box" style="margin-top:8px"><strong>Nota:</strong> '+esc(o.recordatorios)+'</div>':'')
     + '<div class="footer">Gracias por su preferencia · '+EMPRESA.nombre+' · '+EMPRESA.subtitulo+'<br>Este documento es comprobante de los servicios realizados</div>';
 
+  _docCurrentOrden = o;
   abrirDoc('Orden de Servicio', bodyHTML);
+  document.getElementById('btn-doc-wa').style.display = o.tel ? '' : 'none';
 }
 
 // ═══════════════════════════════════════
@@ -783,18 +1059,26 @@ function buildFormHTML(orden) {
       <input class="form-input" id="f-cliente" placeholder="Nombre del cliente" value="${esc(o.cliente||'')}"></div>
   </div>
   <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Placa</label>
+      <input class="form-input" id="f-placa" placeholder="Ej: ABC-123-0" value="${esc(o.placa||'')}"></div>
+    <div class="form-group"><label class="form-label">Teléfono cliente</label>
+      <input class="form-input" id="f-tel" placeholder="871-000-0000" value="${esc(o.tel||'')}"></div>
+  </div>
+  <div class="form-row cols-2">
     <div class="form-group"><label class="form-label">F. Instalación</label>
       <input class="form-input" type="date" id="f-fecha-inst" value="${esc(o.fecha_instalacion||'')}"></div>
     <div class="form-group"><label class="form-label">F. Pago</label>
       <input class="form-input" type="date" id="f-fecha-pago" value="${esc(o.fecha_pago||'')}"></div>
   </div>
   <div class="form-section">Servicios / Productos</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">Plantillas rápidas:</div>
+  <div class="tpl-row">${PLANTILLAS.map((t,i)=>`<button type="button" class="tpl-btn" onclick="usarPlantilla(${i})">+ ${t.nombre}</button>`).join('')}</div>
   <div id="productos-form">${prods.map((p,i)=>productoRowHTML(p,i)).join('')}</div>
   <button type="button" class="btn btn-ghost" style="width:100%;margin-bottom:4px" data-action="add-servicio">+ Agregar servicio</button>
   <div class="form-section">Pagos y estado</div>
   <div class="form-row cols-3">
     <div class="form-group"><label class="form-label">Total <span style="color:var(--green);font-size:10px">● AUTO</span></label>
-      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700"></div>
+      <input class="form-input" type="number" id="f-total" readonly placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700;background:var(--surface);cursor:default" tabindex="-1"></div>
     <div class="form-group"><label class="form-label">A cuenta</label>
       <input class="form-input" type="number" id="f-a-cuenta" placeholder="0" value="${o.a_cuenta_total||''}"></div>
     <div class="form-group"><label class="form-label">Estado</label>
@@ -821,9 +1105,9 @@ function productoRowHTML(p,i) {
         <input class="form-input prod-nombre" placeholder="Ej: Instalación de alarma" value="${esc(p.nombre||'')}"></div>
     </div>
     <div class="form-row cols-3">
-      <div class="form-group"><label class="form-label">Costo ($)</label>
+      <div class="form-group"><label class="form-label">Precio venta ($)</label>
         <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}" oninput="calcGanancia(this)"></div>
-      <div class="form-group"><label class="form-label">Inversión ($)</label>
+      <div class="form-group"><label class="form-label">Inversión / Costo ($)</label>
         <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}" oninput="calcGanancia(this)"></div>
       <div class="form-group"><label class="form-label">Garantía</label>
         <select class="form-select prod-garantia">
@@ -937,6 +1221,8 @@ async function submitOrden() {
   if (!prods.length) { toast('⚠️ Agrega al menos un servicio'); return; }
   const orden = {
     vehiculo, cliente,
+    placa: root.querySelector('#f-placa')?.value?.trim() || '',
+    tel: root.querySelector('#f-tel')?.value?.trim() || '',
     fecha_instalacion: root.querySelector('#f-fecha-inst')?.value || '',
     fecha_pago: root.querySelector('#f-fecha-pago')?.value || '',
     total: parseFloat(root.querySelector('#f-total')?.value) || 0,
@@ -1066,6 +1352,7 @@ function buildCotFormHTML() {
     <input class="form-input" id="c-notas" placeholder="Observaciones o acuerdos especiales"></div>
   <div style="display:flex;gap:10px;padding-top:4px;padding-bottom:40px">
     <button class="btn btn-primary" style="flex:1" onclick="verCotizacion()">🧾 Ver cotización</button>
+    <button class="btn btn-ghost" onclick="limpiarCotizacion()">🔄 Limpiar</button>
   </div>`;
 }
 
@@ -1148,6 +1435,12 @@ function recalcCot() {
 
 function agregarPartida(){ const cont=document.getElementById('cot-partidas'); if(!cont)return; const i=Date.now(); const div=document.createElement('div'); div.innerHTML=cotPartidaHTML({},i); cont.appendChild(div.firstElementChild); }
 function quitarPartida(i){ const r=document.getElementById('cot-p-'+i); if(r){r.remove();recalcCot();} }
+function limpiarCotizacion(){
+  if(!confirm('¿Limpiar el formulario de cotización? Se perderán los datos actuales.'))return;
+  cotFolioGenerated=false;
+  document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
+  setTimeout(recalcCot,0);
+}
 
 function leerPartidas() {
   return Array.from(document.querySelectorAll('#cot-partidas .partida-row')).map(r=>({
@@ -1168,7 +1461,7 @@ function verCotizacion() {
   const folio=document.getElementById('c-folio')?.value||'';
   const fecha=document.getElementById('c-fecha')?.value||'';
   const vigencia=document.getElementById('c-vigencia')?.value||'';
-  cotFolioNum++; localStorage.setItem('cot_folio',cotFolioNum);
+  if (!cotFolioGenerated) { cotFolioGenerated = true; cotFolioNum++; localStorage.setItem('cot_folio',cotFolioNum); }
 
   const bodyHTML =
     headerEmpresa('COTIZACIÓN', folio, fecha)
@@ -1275,7 +1568,14 @@ window.irAOrden = irAOrden;
 window.setIvaCot = setIvaCot;
 window.agregarPartida = agregarPartida;
 window.quitarPartida = quitarPartida;
+window.limpiarCotizacion = limpiarCotizacion;
 window.verCotizacion = verCotizacion;
+window.setSort = setSort;
+window.exportarCSV = exportarCSV;
+window.cambiarEstadoRapido = cambiarEstadoRapido;
+window.agregarAbono = agregarAbono;
+window.docWhatsApp = docWhatsApp;
+window.usarPlantilla = usarPlantilla;
 window.docImprimir = docImprimir;
 window.docCompartir = docCompartir;
 window.cerrarDoc = cerrarDoc;
