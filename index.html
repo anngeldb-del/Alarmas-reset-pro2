@@ -9,10 +9,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   // ══════════════════════════════════════════════════
-  // 🔥 CONFIGURACIÓN FIREBASE
-  // SEGURIDAD: estas credenciales son públicas por diseño de Firebase Web SDK.
-  // Protege el acceso configurando Firestore Security Rules en Firebase Console
-  // para que solo usuarios autenticados o con tus reglas puedan leer/escribir.
+  // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
   // ══════════════════════════════════════════════════
   const firebaseConfig = {
     apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
@@ -45,9 +42,7 @@
 <meta name="theme-color" content="#ff6b35">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Alarmas Reset">
-<meta name="description" content="Control de órdenes de servicio — Alarmas y GPS Reset">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
@@ -67,10 +62,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .firebase-badge{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
 .firebase-badge.on{background:rgba(6,214,160,.15);color:var(--green);border:1px solid rgba(6,214,160,.3)}
 .firebase-badge.off{background:rgba(255,107,53,.1);color:var(--accent);border:1px solid rgba(255,107,53,.3)}
-.header-right{display:flex;align-items:center;gap:8px}
-.wa-catalog-chip{display:flex;align-items:center;gap:4px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500;color:#25D366;text-decoration:none;transition:background .2s}
-.wa-catalog-chip:hover{background:rgba(37,211,102,.2)}
-.wa-catalog-chip svg{width:13px;height:13px;flex-shrink:0}
 
 /* TABS */
 .nav-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:60px;z-index:99}
@@ -192,13 +183,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 #cr-iva-row.off{opacity:.35}
 #cr-iva-row.off span:last-child{text-decoration:line-through}
 
-/* FOCUS VISIBLE — accesibilidad teclado */
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-.btn:focus-visible,.tab-btn:focus-visible,.filter-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-/* FIELD ERROR */
-.field-error{display:block;font-size:11px;color:var(--red);margin-top:3px}
-
 /* PRINT */
 @media print{
   body > *{display:none !important}
@@ -216,27 +200,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <body>
 
 <!-- HEADER -->
-<header class="app-header" role="banner">
-  <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
-  <div class="header-right">
-    <a class="wa-catalog-chip" href="https://wa.me/c/5218712318050" target="_blank" rel="noopener" aria-label="Ver Catálogo WhatsApp">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-      Catálogo
-    </a>
-    <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
-  </div>
+<header class="app-header">
+  <div class="brand">🔐 Alarmas <span>Reset</span></div>
+  <span class="firebase-badge off" id="fb-badge">● Local</span>
 </header>
 
 <!-- TABS -->
-<nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
-  <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-dashboard" onclick="showTab('dashboard',this)">📊 Inicio</button>
-  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-ordenes" onclick="showTab('ordenes',this)">📋 Órdenes</button>
-  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-nueva" onclick="showTab('nueva',this)">➕ Nueva</button>
-  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cotizaciones" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
+<nav class="nav-tabs">
+  <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 Inicio</button>
+  <button class="tab-btn" onclick="showTab('ordenes',this)">📋 Órdenes</button>
+  <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
+  <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
 </nav>
 
 <!-- DASHBOARD -->
-<div class="view active" id="tab-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
+<div class="view active" id="tab-dashboard">
   <div class="dash-grid">
     <div class="stat-card green"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
     <div class="stat-card orange"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
@@ -248,8 +226,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- LISTA ÓRDENES -->
-<div class="view" id="tab-ordenes" role="tabpanel" aria-labelledby="tab-ordenes">
-  <input class="search-box" type="search" id="search-input" placeholder="🔍 Buscar cliente, vehículo..." aria-label="Buscar órdenes por cliente o vehículo" oninput="renderOrdenes()">
+<div class="view" id="tab-ordenes">
+  <input class="search-box" type="text" id="search-input" placeholder="🔍 Buscar cliente, vehículo..." oninput="renderOrdenes()">
   <div class="filter-row">
     <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
     <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
@@ -260,24 +238,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- NUEVA ORDEN -->
-<div class="view" id="tab-nueva" role="tabpanel" aria-labelledby="tab-nueva">
+<div class="view" id="tab-nueva">
   <div id="form-nueva-wrapper"></div>
 </div>
 
 <!-- COTIZACIONES -->
-<div class="view" id="tab-cotizaciones" role="tabpanel" aria-labelledby="tab-cotizaciones">
+<div class="view" id="tab-cotizaciones">
   <div id="cot-form-wrapper"></div>
 </div>
 
 <!-- FAB -->
-<button class="fab" onclick="abrirModalNueva()" aria-label="Crear nueva orden de servicio" title="Nueva orden">+</button>
+<button class="fab" onclick="abrirModalNueva()">+</button>
 
 <!-- MODAL ORDEN -->
-<div class="modal-overlay" id="modal-orden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+<div class="modal-overlay" id="modal-orden">
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="modal-title">Nueva Orden</div>
-      <button class="modal-close" onclick="cerrarModal()" aria-label="Cerrar modal">✕</button>
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
   </div>
@@ -297,7 +275,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- TOAST -->
-<div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+<div class="toast" id="toast"></div>
 
 <script>
 // ═══════════════════════════════════════
@@ -318,8 +296,7 @@ const EMPRESA = {
   contacto:  'Ing. Luis Ángel Díaz Bernal',
   email:     'anngeldb@gmail.com',
   tel:       '871-231-8050',
-  dir:       'Torreón Gde, 914 Hacienda Santa María',
-  wa:        'https://wa.me/c/5218712318050'
+  dir:       'Torreón Gde, 914 Hacienda Santa María'
 };
 
 // CSS para los documentos impresos
@@ -585,11 +562,9 @@ async function eliminarOrden(id) {
 // ═══════════════════════════════════════
 function showTab(id, btn) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
-  // URL routing — preserva navegación con botón atrás
-  try { history.replaceState({tab:id}, '', '#'+id); } catch(e) {}
+  if (btn) btn.classList.add('active');
   if (id !== 'nueva') {
     document.getElementById('form-nueva-wrapper').innerHTML = '';
     if (activeFormMount === 'nueva') activeFormMount = null;
@@ -723,7 +698,7 @@ function verBoleta(id) {
     + '</div></div>'
     + (garantias?'<div class="nota-box"><strong>Garantías incluidas:</strong><br>'+garantias+'</div>':'')
     + (o.recordatorios&&o.recordatorios!=='GARANTIA 1 AÑO'&&o.recordatorios!=='GARANTIA 6 MESES'?'<div class="nota-box" style="margin-top:8px"><strong>Nota:</strong> '+esc(o.recordatorios)+'</div>':'')
-    + '<div class="footer">Gracias por su preferencia · '+EMPRESA.nombre+' · '+EMPRESA.subtitulo+'<br>📲 '+EMPRESA.wa+' &nbsp;·&nbsp; Este documento es comprobante de los servicios realizados</div>';
+    + '<div class="footer">Gracias por su preferencia · '+EMPRESA.nombre+' · '+EMPRESA.subtitulo+'<br>Este documento es comprobante de los servicios realizados</div>';
 
   abrirDoc('Orden de Servicio', bodyHTML);
 }
@@ -805,7 +780,7 @@ function buildFormHTML(orden) {
   <div class="form-section">Pagos y estado</div>
   <div class="form-row cols-3">
     <div class="form-group"><label class="form-label">Total <span style="color:var(--green);font-size:10px">● AUTO</span></label>
-      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||\'\'}" style="color:var(--accent2);font-weight:700"></div>
+      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700"></div>
     <div class="form-group"><label class="form-label">A cuenta</label>
       <input class="form-input" type="number" id="f-a-cuenta" placeholder="0" value="${o.a_cuenta_total||''}"></div>
     <div class="form-group"><label class="form-label">Estado</label>
@@ -833,9 +808,9 @@ function productoRowHTML(p,i) {
     </div>
     <div class="form-row cols-3">
       <div class="form-group"><label class="form-label">Costo ($)</label>
-        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||\'\'}" oninput="calcGanancia(this)"></div>
+        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}" oninput="calcGanancia(this)"></div>
       <div class="form-group"><label class="form-label">Inversión ($)</label>
-        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||\'\'}" oninput="calcGanancia(this)"></div>
+        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}" oninput="calcGanancia(this)"></div>
       <div class="form-group"><label class="form-label">Garantía</label>
         <select class="form-select prod-garantia">
           <option value="" ${!p.garantia?'selected':''}>Sin garantía</option>
@@ -915,35 +890,12 @@ function leerProductos() {
   }).filter(p => p.nombre);
 }
 
-function setFieldError(el, msg) {
-  if (!el) return;
-  el.style.borderColor = msg ? 'var(--red)' : '';
-  let hint = el.parentElement.querySelector('.field-error');
-  if (msg) {
-    if (!hint) { hint = document.createElement('span'); hint.className = 'field-error'; hint.style.cssText = 'font-size:11px;color:var(--red);margin-top:3px'; el.parentElement.appendChild(hint); }
-    hint.textContent = msg;
-    el.setAttribute('aria-invalid', 'true');
-    el.setAttribute('aria-describedby', el.id + '-err');
-    hint.id = el.id + '-err';
-  } else if (hint) {
-    hint.remove();
-    el.removeAttribute('aria-invalid');
-    el.removeAttribute('aria-describedby');
-  }
-}
-
 async function submitOrden() {
   const root = getFormRoot();
   if (!root) { toast('⚠️ Formulario no encontrado'); return; }
-  const vEl = root.querySelector('#f-vehiculo');
-  const cEl = root.querySelector('#f-cliente');
-  const vehiculo = vEl?.value?.trim();
-  const cliente = cEl?.value?.trim();
-  let valid = true;
-  setFieldError(vEl, vehiculo ? '' : 'El vehículo es obligatorio');
-  setFieldError(cEl, cliente ? '' : 'El cliente es obligatorio');
-  if (!vehiculo || !cliente) { valid = false; (vEl||cEl).focus(); }
-  if (!valid) { toast('⚠️ Completa los campos requeridos'); return; }
+  const vehiculo = root.querySelector('#f-vehiculo')?.value?.trim();
+  const cliente = root.querySelector('#f-cliente')?.value?.trim();
+  if (!vehiculo || !cliente) { toast('⚠️ Vehículo y cliente son obligatorios'); return; }
   const prods = leerProductos();
   if (!prods.length) { toast('⚠️ Agrega al menos un servicio'); return; }
   const orden = {
@@ -1094,13 +1046,13 @@ function cotPartidaHTML(p,i) {
       <div class="form-group"><label class="form-label">Cant.</label>
         <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" oninput="calcPartida(this);recalcCot()"></div>
       <div class="form-group"><label class="form-label">P. Unitario ($)</label>
-        <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||\'\'}" oninput="calcPartida(this);recalcCot()"></div>
+        <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||''}" oninput="calcPartida(this);recalcCot()"></div>
     </div>
     <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">Dscto. %</label>
         <input class="form-input cot-pdescto" type="number" value="${p.descto||0}" min="0" max="100" oninput="calcPartida(this);recalcCot()"></div>
       <div class="form-group"><label class="form-label">Subtotal</label>
-        <input class="form-input cot-psubtotal" type="number" readonly value="${sub||\'\'}" style="color:var(--accent2);font-weight:700;background:var(--surface)"></div>
+        <input class="form-input cot-psubtotal" type="number" readonly value="${sub||''}" style="color:var(--accent2);font-weight:700;background:var(--surface)"></div>
     </div>
   </div>`;
 }
@@ -1217,7 +1169,7 @@ function verCotizacion() {
     +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">'+EMPRESA.contacto+'<br>'+EMPRESA.nombre+' — '+EMPRESA.subtitulo+'</div></div>'
     +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">Nombre y firma del cliente<br>'+esc(cliente)+'</div></div>'
     + '</div>'
-    + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+' &nbsp;·&nbsp; 📲 '+EMPRESA.wa+'</div>';
+    + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+'</div>';
 
   abrirDoc('Cotización '+folio, bodyHTML);
 }
@@ -1228,30 +1180,10 @@ function verCotizacion() {
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
-// Restaurar tab desde URL hash al cargar
-function restoreTabFromHash() {
-  const hash = (location.hash || '').replace('#', '');
-  const valid = ['dashboard','ordenes','nueva','cotizaciones'];
-  if (valid.includes(hash)) {
-    const idx = valid.indexOf(hash);
-    const btn = document.querySelectorAll('.tab-btn')[idx];
-    showTab(hash, btn);
-  }
-}
-
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
-  restoreTabFromHash();
 }
-
-// Registrar Service Worker para soporte offline
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW no registrado:', err));
-  });
-}
-
 window.addEventListener('firebaseReady', () => {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAppData, { once: true });
