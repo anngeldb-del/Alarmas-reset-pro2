@@ -7,8 +7,13 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  // ══════════════════════════════════════════════════
+  // 🔥 CONFIGURACIÓN FIREBASE
+  // SEGURIDAD: estas credenciales son públicas por diseño de Firebase Web SDK.
+  // Protege el acceso configurando Firestore Security Rules en Firebase Console
+  // para que solo usuarios autenticados o con tus reglas puedan leer/escribir.
+  // ══════════════════════════════════════════════════
   const firebaseConfig = {
     apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
     authDomain: "alarmas-reset-e3484.firebaseapp.com",
@@ -18,18 +23,20 @@
     appId: "1:1096561116547:web:b13df05c092785723aa2b6",
     measurementId: "G-TJD208HVFB"
   };
-
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    window._firebaseDb = db;
-    window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, getDoc };
-    window._useFirebase = true;
-    window._currentUid = 'shared';
-  } catch(e) {
-    console.warn('Firebase no inicializado:', e);
-    window._useFirebase = false;
-    window._currentUid = null;
+  const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
+    && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
+  window._useFirebase = false;
+  if (fbConfigured) {
+    try {
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      window._firebaseDb = db;
+      window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query };
+      window._useFirebase = true;
+    } catch(e) {
+      console.warn('Firebase no inicializado:', e);
+      window._useFirebase = false;
+    }
   }
   window.dispatchEvent(new Event('firebaseReady'));
 </script>
@@ -208,8 +215,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </head>
 <body>
 
-<div id="app-content">
-
 <!-- HEADER -->
 <header class="app-header" role="banner">
   <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
@@ -219,7 +224,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       Catálogo
     </a>
     <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
-    <div id="user-info" style="display:flex;align-items:center"></div>
   </div>
 </header>
 
@@ -522,30 +526,6 @@ function updateFirebaseBadge() {
 }
 
 function guardarLocal(){ localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); }
-
-async function syncConfigToFirebase() {
-  if (!window._useFirebase || !window._currentUid || !window._firebaseDb) return;
-  try {
-    const { doc, setDoc } = window._firebaseModules;
-    await setDoc(doc(window._firebaseDb, 'usuarios', window._currentUid, 'config', 'preferencias'), {
-      cot_folio: parseInt(localStorage.getItem('cot_folio') || '1'),
-      cot_iva: localStorage.getItem('cot_iva') !== '0'
-    }, { merge: true });
-  } catch(e) { console.warn('Error sync config:', e); }
-}
-
-async function loadConfigFromFirebase() {
-  if (!window._useFirebase || !window._currentUid || !window._firebaseDb) return;
-  try {
-    const { doc, getDoc } = window._firebaseModules;
-    const snap = await getDoc(doc(window._firebaseDb, 'usuarios', window._currentUid, 'config', 'preferencias'));
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.cot_folio) localStorage.setItem('cot_folio', String(data.cot_folio));
-      if (data.cot_iva !== undefined) localStorage.setItem('cot_iva', data.cot_iva ? '1' : '0');
-    }
-  } catch(e) { console.warn('Error load config:', e); }
-}
 
 async function guardarOrden(orden) {
   if (window._useFirebase && window._firebaseDb) {
@@ -1311,7 +1291,5 @@ window.docImprimir = docImprimir;
 window.docCompartir = docCompartir;
 window.cerrarDoc = cerrarDoc;
 </script>
-
-</div><!-- /app-content -->
 </body>
 </html>

@@ -31,11 +31,9 @@
     window._db = db;
     window._fs = { collection, doc, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp };
     window._fbReady = true;
-    window._currentUid = 'shared';
   } catch(e) {
     console.warn('Firebase no disponible:', e);
     window._fbReady = false;
-    window._currentUid = null;
   }
   window.dispatchEvent(new Event('fbReady'));
 </script>
@@ -392,18 +390,13 @@ body::before{
 </head>
 <body>
 
-<div id="app-content">
-
 <div class="page">
 
   <!-- HEADER -->
   <div class="header">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
       <div class="header-badge">⚡ Alarmas Reset</div>
-      <div style="display:inline-flex;align-items:center">
-        <div id="fb-status" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)">● Conectando...</div>
-        <div id="user-info" style="display:inline-flex;align-items:center;margin-left:12px"></div>
-      </div>
+      <div id="fb-status" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)">● Conectando...</div>
     </div>
     <div class="header-logo">ALARMAS RESET · <em>SOLO LED AUTO</em></div>
     <div class="header-sub">Ing. Luis Angel Díaz Bernal &nbsp;·&nbsp; Multimedia · Alarmas · LED · GPS · Cámaras</div>
@@ -1568,7 +1561,5 @@ if (window._fbReady !== undefined && !fbInitDone) {
   initFirebase();
 }
 </script>
-
-</div><!-- /app-content -->
 </body>
 </html>
