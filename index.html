@@ -520,8 +520,9 @@ async function guardarOrden(orden) {
       return;
     } catch(e) {
       console.error(e);
-      toast('⚠️ Error al guardar en Firebase: ' + (e.message || e));
-      throw e;
+      toast('⚠️ Firebase no disponible — guardando local');
+      window._useFirebase = false;
+      updateFirebaseBadge();
     }
   }
   if (orden.id) {
