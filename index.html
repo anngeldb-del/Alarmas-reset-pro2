@@ -486,7 +486,7 @@ async function cargarOrdenes() {
   if (window._useFirebase && window._firebaseDb && window._firebaseModules) {
     try {
       const { collection, onSnapshot, orderBy, query } = window._firebaseModules;
-      const q = query(collection(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes'), orderBy('fecha_creacion','desc'));
+      const q = query(collection(window._firebaseDb,'ordenes'), orderBy('fecha_creacion','desc'));
       if (!fsListenerStarted) {
         fsListenerStarted = true;
         onSnapshot(q, snap => {
@@ -555,10 +555,10 @@ async function guardarOrden(orden) {
         const id = orden.id;
         const data = {...orden};
         delete data.id;
-        await updateDoc(doc(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes',id), data);
+        await updateDoc(doc(window._firebaseDb,'ordenes',id), data);
       } else {
         orden.fecha_creacion = Date.now();
-        await addDoc(collection(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes'), orden);
+        await addDoc(collection(window._firebaseDb,'ordenes'), orden);
       }
       return;
     } catch(e) {
@@ -585,7 +585,7 @@ async function eliminarOrden(id) {
   if (window._useFirebase && window._firebaseDb) {
     try {
       const { deleteDoc, doc } = window._firebaseModules;
-      await deleteDoc(doc(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes',id));
+      await deleteDoc(doc(window._firebaseDb,'ordenes',id));
       toast('Orden eliminada');
       return;
     } catch(e) {

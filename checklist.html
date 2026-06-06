@@ -1108,7 +1108,7 @@ async function addCustomItem(panel) {
     try {
       const { doc, setDoc } = window._fs;
       const docId = panel + '_' + itemId;
-      await setDoc(doc(window._db, 'usuarios/'+window._currentUid+'/checklist_custom_items', docId), { panel, ...newItem, createdAt: itemId });
+      await setDoc(doc(window._db, 'checklist_custom_items', docId), { panel, ...newItem, createdAt: itemId });
       // onSnapshot actualizará _customCache y re-renderizará
     } catch(e) {
       console.error(e);
@@ -1126,7 +1126,7 @@ async function deleteCustomItem(panel, id) {
   if (_useFirebase && window._db) {
     try {
       const { doc, deleteDoc } = window._fs;
-      await deleteDoc(doc(window._db, 'usuarios/'+window._currentUid+'/checklist_custom_items', panel + '_' + id));
+      await deleteDoc(doc(window._db, 'checklist_custom_items', panel + '_' + id));
     } catch(e) {
       console.error(e);
       saveCustomItems(panel, loadCustomItems(panel).filter(x => x.id !== id));
@@ -1420,7 +1420,7 @@ async function saveService() {
   if (_useFirebase && window._db) {
     try {
       const { doc, setDoc } = window._fs;
-      await setDoc(doc(window._db, 'usuarios/'+window._currentUid+'/checklist_services', String(id)), svc);
+      await setDoc(doc(window._db, 'checklist_services', String(id)), svc);
       // onSnapshot actualizará _servicesCache y re-renderizará
     } catch(e) {
       console.error(e);
@@ -1445,7 +1445,7 @@ async function deleteServiceFromTab(id) {
   if (_useFirebase && window._db) {
     try {
       const { doc, deleteDoc } = window._fs;
-      await deleteDoc(doc(window._db, 'usuarios/'+window._currentUid+'/checklist_services', String(id)));
+      await deleteDoc(doc(window._db, 'checklist_services', String(id)));
     } catch(e) {
       console.error(e);
       saveServices(loadServices().filter(s=>s.id!==id));
@@ -1501,7 +1501,7 @@ function initFirebase() {
 
   // Listener — categorías de servicios
   onSnapshot(
-    query(collection(db, 'usuarios/'+window._currentUid+'/checklist_services'), orderBy('createdAt', 'asc')),
+    query(collection(db, 'checklist_services'), orderBy('createdAt', 'asc')),
     snap => {
       _servicesCache = snap.docs.map(d => d.data());
       saveServicesLocal(_servicesCache);
@@ -1521,7 +1521,7 @@ function initFirebase() {
 
   // Listener — ítems personalizados
   onSnapshot(
-    query(collection(db, 'usuarios/'+window._currentUid+'/checklist_custom_items'), orderBy('createdAt', 'asc')),
+    query(collection(db, 'checklist_custom_items'), orderBy('createdAt', 'asc')),
     snap => {
       // Rebuild cache por panel
       const fresh = {};
