@@ -67,6 +67,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .firebase-badge{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
 .firebase-badge.on{background:rgba(6,214,160,.15);color:var(--green);border:1px solid rgba(6,214,160,.3)}
 .firebase-badge.off{background:rgba(255,107,53,.1);color:var(--accent);border:1px solid rgba(255,107,53,.3)}
+.header-right{display:flex;align-items:center;gap:8px}
+.wa-catalog-chip{display:flex;align-items:center;gap:4px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500;color:#25D366;text-decoration:none;transition:background .2s}
+.wa-catalog-chip:hover{background:rgba(37,211,102,.2)}
+.wa-catalog-chip svg{width:13px;height:13px;flex-shrink:0}
 
 /* TABS */
 .nav-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:60px;z-index:99}
@@ -214,7 +218,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- HEADER -->
 <header class="app-header" role="banner">
   <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
-  <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+  <div class="header-right">
+    <a class="wa-catalog-chip" href="https://wa.me/c/5218712318050" target="_blank" rel="noopener" aria-label="Ver Catálogo WhatsApp">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      Catálogo
+    </a>
+    <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+  </div>
 </header>
 
 <!-- TABS -->
@@ -308,7 +318,8 @@ const EMPRESA = {
   contacto:  'Ing. Luis Ángel Díaz Bernal',
   email:     'anngeldb@gmail.com',
   tel:       '871-231-8050',
-  dir:       'Torreón Gde, 914 Hacienda Santa María'
+  dir:       'Torreón Gde, 914 Hacienda Santa María',
+  wa:        'https://wa.me/c/5218712318050'
 };
 
 // CSS para los documentos impresos
@@ -712,7 +723,7 @@ function verBoleta(id) {
     + '</div></div>'
     + (garantias?'<div class="nota-box"><strong>Garantías incluidas:</strong><br>'+garantias+'</div>':'')
     + (o.recordatorios&&o.recordatorios!=='GARANTIA 1 AÑO'&&o.recordatorios!=='GARANTIA 6 MESES'?'<div class="nota-box" style="margin-top:8px"><strong>Nota:</strong> '+esc(o.recordatorios)+'</div>':'')
-    + '<div class="footer">Gracias por su preferencia · '+EMPRESA.nombre+' · '+EMPRESA.subtitulo+'<br>Este documento es comprobante de los servicios realizados</div>';
+    + '<div class="footer">Gracias por su preferencia · '+EMPRESA.nombre+' · '+EMPRESA.subtitulo+'<br>📲 '+EMPRESA.wa+' &nbsp;·&nbsp; Este documento es comprobante de los servicios realizados</div>';
 
   abrirDoc('Orden de Servicio', bodyHTML);
 }
@@ -794,7 +805,7 @@ function buildFormHTML(orden) {
   <div class="form-section">Pagos y estado</div>
   <div class="form-row cols-3">
     <div class="form-group"><label class="form-label">Total <span style="color:var(--green);font-size:10px">● AUTO</span></label>
-      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700"></div>
+      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||\'\'}" style="color:var(--accent2);font-weight:700"></div>
     <div class="form-group"><label class="form-label">A cuenta</label>
       <input class="form-input" type="number" id="f-a-cuenta" placeholder="0" value="${o.a_cuenta_total||''}"></div>
     <div class="form-group"><label class="form-label">Estado</label>
@@ -822,9 +833,9 @@ function productoRowHTML(p,i) {
     </div>
     <div class="form-row cols-3">
       <div class="form-group"><label class="form-label">Costo ($)</label>
-        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}" oninput="calcGanancia(this)"></div>
+        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||\'\'}" oninput="calcGanancia(this)"></div>
       <div class="form-group"><label class="form-label">Inversión ($)</label>
-        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}" oninput="calcGanancia(this)"></div>
+        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||\'\'}" oninput="calcGanancia(this)"></div>
       <div class="form-group"><label class="form-label">Garantía</label>
         <select class="form-select prod-garantia">
           <option value="" ${!p.garantia?'selected':''}>Sin garantía</option>
@@ -1083,13 +1094,13 @@ function cotPartidaHTML(p,i) {
       <div class="form-group"><label class="form-label">Cant.</label>
         <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" oninput="calcPartida(this);recalcCot()"></div>
       <div class="form-group"><label class="form-label">P. Unitario ($)</label>
-        <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||''}" oninput="calcPartida(this);recalcCot()"></div>
+        <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||\'\'}" oninput="calcPartida(this);recalcCot()"></div>
     </div>
     <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">Dscto. %</label>
         <input class="form-input cot-pdescto" type="number" value="${p.descto||0}" min="0" max="100" oninput="calcPartida(this);recalcCot()"></div>
       <div class="form-group"><label class="form-label">Subtotal</label>
-        <input class="form-input cot-psubtotal" type="number" readonly value="${sub||''}" style="color:var(--accent2);font-weight:700;background:var(--surface)"></div>
+        <input class="form-input cot-psubtotal" type="number" readonly value="${sub||\'\'}" style="color:var(--accent2);font-weight:700;background:var(--surface)"></div>
     </div>
   </div>`;
 }
@@ -1206,7 +1217,7 @@ function verCotizacion() {
     +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">'+EMPRESA.contacto+'<br>'+EMPRESA.nombre+' — '+EMPRESA.subtitulo+'</div></div>'
     +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">Nombre y firma del cliente<br>'+esc(cliente)+'</div></div>'
     + '</div>'
-    + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+'</div>';
+    + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+' &nbsp;·&nbsp; 📲 '+EMPRESA.wa+'</div>';
 
   abrirDoc('Cotización '+folio, bodyHTML);
 }
