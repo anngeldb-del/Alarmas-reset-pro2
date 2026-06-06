@@ -117,6 +117,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .total-val{font-family:var(--font-display);font-weight:700;margin-top:2px}
 .orden-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
 
+/* GRUPOS POR CLIENTE */
+.cliente-group{margin-bottom:16px}
+.cliente-group-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .2s,background .2s;gap:10px;user-select:none}
+.cliente-group-header:hover{border-color:var(--accent);background:#1f1f2d}
+.cliente-group-name{font-family:var(--font-display);font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.cliente-group-name span.icon{font-size:15px;flex-shrink:0}
+.cliente-group-name .nombre{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cliente-group-stats{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.cg-badge{padding:3px 9px;border-radius:20px;font-weight:700;font-size:10px;white-space:nowrap}
+.cg-badge.count{background:rgba(122,122,149,.15);color:var(--muted)}
+.cg-badge.pending{background:rgba(239,35,60,.1);color:var(--red)}
+.cg-badge.ok{background:rgba(6,214,160,.1);color:var(--green)}
+.cg-arrow{color:var(--muted);font-size:12px;flex-shrink:0;transition:transform .2s}
+.cg-arrow.open{transform:rotate(0deg)}
+.cg-arrow.closed{transform:rotate(-90deg)}
+.cliente-group-body{padding-left:0;padding-top:4px}
+.cliente-group-body.collapsed{display:none}
+
+/* VISTA TOGGLE */
+.view-mode-row{display:flex;gap:6px;margin-bottom:10px}
+.view-mode-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;font-family:var(--font-display);letter-spacing:.3px}
+.view-mode-btn.active{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
+
 /* BOTONES */
 .btn{padding:9px 16px;border-radius:8px;border:none;font-family:var(--font-display);font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;letter-spacing:.3px}
 .btn-primary{background:var(--accent);color:#fff}
@@ -227,7 +250,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
 <!-- LISTA ÓRDENES -->
 <div class="view" id="tab-ordenes">
-  <input class="search-box" type="text" id="search-input" placeholder="🔍 Buscar cliente, vehículo..." oninput="renderOrdenes()">
+  <input class="search-box" type="text" id="search-input" placeholder="🔍 Buscar cliente, vehículo, servicio..." oninput="renderOrdenes()">
+  <div class="view-mode-row">
+    <button class="view-mode-btn active" id="btn-vista-cliente" onclick="setVista(true)">👤 Por cliente</button>
+    <button class="view-mode-btn" id="btn-vista-lista" onclick="setVista(false)">📋 Cronológico</button>
+  </div>
   <div class="filter-row">
     <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
     <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
@@ -283,6 +310,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 // ═══════════════════════════════════════
 let ordenes = [];
 let filtroEstado = 'todos';
+let vistaAgrupada = true;
 let editandoId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
@@ -623,14 +651,82 @@ function irAOrden(id) {
 // ═══════════════════════════════════════
 function setFilter(f,btn){ filtroEstado=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
 
-function renderOrdenes() {
+function setVista(agrupada) {
+  vistaAgrupada = agrupada;
+  document.getElementById('btn-vista-cliente').classList.toggle('active', agrupada);
+  document.getElementById('btn-vista-lista').classList.toggle('active', !agrupada);
+  renderOrdenes();
+}
+
+function filtrarLista() {
   const q=(document.getElementById('search-input')?.value||'').toLowerCase();
   let lista=ordenes;
   if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
   if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q)));
+  return lista;
+}
+
+function renderOrdenes() {
+  const lista = filtrarLista();
   const cont=document.getElementById('ordenes-lista');
   if(!lista.length){cont.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';return;}
-  cont.innerHTML=lista.map(o=>ordenCard(o)).join('');
+  if (vistaAgrupada) {
+    cont.innerHTML = renderPorCliente(lista);
+  } else {
+    cont.innerHTML = lista.map(o=>ordenCard(o)).join('');
+  }
+}
+
+function renderPorCliente(lista) {
+  const grupos = {};
+  lista.forEach(o => {
+    const key = (o.cliente||'Sin nombre').trim() || 'Sin nombre';
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(o);
+  });
+
+  const keys = Object.keys(grupos).sort((a, b) => {
+    const aPend = grupos[a].some(o=>(o.estado||'').toUpperCase()==='PENDIENTE');
+    const bPend = grupos[b].some(o=>(o.estado||'').toUpperCase()==='PENDIENTE');
+    if (aPend && !bPend) return -1;
+    if (!aPend && bPend) return 1;
+    return a.localeCompare(b, 'es');
+  });
+
+  return keys.map(nombre => {
+    const ords = grupos[nombre];
+    const saldoPend = ords.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
+      .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0), 0);
+    const groupId = 'cg_' + btoa(nombre).replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
+    const badgePend = saldoPend > 0
+      ? `<span class="cg-badge pending">Por cobrar ${fmt(saldoPend)}</span>`
+      : `<span class="cg-badge ok">✓ Al corriente</span>`;
+    return `<div class="cliente-group">
+      <div class="cliente-group-header" onclick="toggleClienteGroup('${groupId}')">
+        <div class="cliente-group-name"><span class="icon">👤</span><span class="nombre">${esc(nombre)}</span></div>
+        <div class="cliente-group-stats">
+          <span class="cg-badge count">${ords.length} orden${ords.length!==1?'es':''}</span>
+          ${badgePend}
+          <span class="cg-arrow open" id="${groupId}-arrow">▼</span>
+        </div>
+      </div>
+      <div class="cliente-group-body" id="${groupId}-body">
+        ${ords.map(o=>ordenCard(o)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleClienteGroup(id) {
+  const body = document.getElementById(id+'-body');
+  const arrow = document.getElementById(id+'-arrow');
+  if (!body) return;
+  const isCollapsed = body.classList.toggle('collapsed');
+  if (arrow) {
+    arrow.textContent = isCollapsed ? '▶' : '▼';
+    arrow.classList.toggle('open', !isCollapsed);
+    arrow.classList.toggle('closed', isCollapsed);
+  }
 }
 
 function ordenCard(o) {
@@ -1203,6 +1299,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Globales para onclick en HTML dinámico (GitHub Pages / móvil)
+window.setVista = setVista;
+window.toggleClienteGroup = toggleClienteGroup;
 window.agregarProductoRow = agregarProductoRow;
 window.quitarProducto = quitarProducto;
 window.calcGanancia = calcGanancia;
