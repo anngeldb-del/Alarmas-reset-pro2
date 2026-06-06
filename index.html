@@ -7,13 +7,9 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  // ══════════════════════════════════════════════════
-  // 🔥 CONFIGURACIÓN FIREBASE
-  // SEGURIDAD: estas credenciales son públicas por diseño de Firebase Web SDK.
-  // Protege el acceso configurando Firestore Security Rules en Firebase Console
-  // para que solo usuarios autenticados o con tus reglas puedan leer/escribir.
-  // ══════════════════════════════════════════════════
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
   const firebaseConfig = {
     apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
     authDomain: "alarmas-reset-e3484.firebaseapp.com",
@@ -23,22 +19,61 @@
     appId: "1:1096561116547:web:b13df05c092785723aa2b6",
     measurementId: "G-TJD208HVFB"
   };
-  const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
-    && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
-  window._useFirebase = false;
-  if (fbConfigured) {
-    try {
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-      window._firebaseDb = db;
-      window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query };
-      window._useFirebase = true;
-    } catch(e) {
-      console.warn('Firebase no inicializado:', e);
-      window._useFirebase = false;
-    }
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    window._firebaseDb = db;
+    window._firebaseAuth = auth;
+    window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, getDoc };
+    window._useFirebase = true;
+    window._currentUid = null;
+
+    window.loginGoogle = async function() {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch(e) {
+        console.error('Login error:', e);
+        alert('Error al iniciar sesión: ' + e.message);
+      }
+    };
+
+    window.logoutUser = async function() {
+      if (!confirm('¿Cerrar sesión?')) return;
+      await signOut(auth);
+    };
+
+    onAuthStateChanged(auth, user => {
+      const overlay = document.getElementById('login-overlay');
+      const appContent = document.getElementById('app-content');
+      const userInfo = document.getElementById('user-info');
+
+      if (user) {
+        window._currentUid = user.uid;
+        window._useFirebase = true;
+        if (overlay) overlay.style.display = 'none';
+        if (appContent) appContent.style.display = '';
+        if (userInfo) {
+          userInfo.innerHTML = `<img src="${user.photoURL||''}" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;margin-right:6px;vertical-align:middle"><span style="font-size:12px;color:#aaa">${user.displayName||user.email}</span> <button onclick="logoutUser()" style="margin-left:8px;background:rgba(255,107,53,0.15);border:1px solid rgba(255,107,53,0.3);color:#ff6b35;border-radius:12px;padding:2px 10px;font-size:11px;cursor:pointer">Salir</button>`;
+        }
+        window.dispatchEvent(new Event('firebaseReady'));
+      } else {
+        window._currentUid = null;
+        window._useFirebase = false;
+        if (overlay) overlay.style.display = 'flex';
+        if (appContent) appContent.style.display = 'none';
+      }
+    });
+
+  } catch(e) {
+    console.warn('Firebase no inicializado:', e);
+    window._useFirebase = false;
+    window._currentUid = null;
+    window.dispatchEvent(new Event('firebaseReady'));
   }
-  window.dispatchEvent(new Event('firebaseReady'));
 </script>
 
 <link rel="manifest" href="manifest.json">
@@ -215,6 +250,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </head>
 <body>
 
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#0a0a0f;align-items:center;justify-content:center;flex-direction:column">
+  <div style="text-align:center;padding:40px;max-width:320px">
+    <div style="font-size:48px;margin-bottom:16px">🔥</div>
+    <h2 style="color:#ff6b35;font-size:28px;margin:0 0 8px;font-weight:900">Alarmas Reset</h2>
+    <p style="color:#888;font-size:14px;margin:0 0 32px">Control de Órdenes de Servicio</p>
+    <button onclick="loginGoogle()" style="display:flex;align-items:center;gap:12px;background:#fff;color:#333;border:none;border-radius:12px;padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;width:100%;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continuar con Google
+    </button>
+    <p style="color:#555;font-size:11px;margin-top:20px">Tus datos se guardan de forma segura en la nube</p>
+  </div>
+</div>
+
+<div id="app-content" style="display:none">
+
 <!-- HEADER -->
 <header class="app-header" role="banner">
   <div class="brand" aria-label="Alarmas Reset — Control de Órdenes">🔐 Alarmas <span>Reset</span></div>
@@ -224,6 +275,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       Catálogo
     </a>
     <span class="firebase-badge off" id="fb-badge" role="status" aria-live="polite">● Local</span>
+    <div id="user-info" style="display:flex;align-items:center"></div>
   </div>
 </header>
 
@@ -490,7 +542,7 @@ async function cargarOrdenes() {
   if (window._useFirebase && window._firebaseDb && window._firebaseModules) {
     try {
       const { collection, onSnapshot, orderBy, query } = window._firebaseModules;
-      const q = query(collection(window._firebaseDb,'ordenes'), orderBy('fecha_creacion','desc'));
+      const q = query(collection(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes'), orderBy('fecha_creacion','desc'));
       if (!fsListenerStarted) {
         fsListenerStarted = true;
         onSnapshot(q, snap => {
@@ -527,6 +579,30 @@ function updateFirebaseBadge() {
 
 function guardarLocal(){ localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); }
 
+async function syncConfigToFirebase() {
+  if (!window._useFirebase || !window._currentUid || !window._firebaseDb) return;
+  try {
+    const { doc, setDoc } = window._firebaseModules;
+    await setDoc(doc(window._firebaseDb, 'usuarios', window._currentUid, 'config', 'preferencias'), {
+      cot_folio: parseInt(localStorage.getItem('cot_folio') || '1'),
+      cot_iva: localStorage.getItem('cot_iva') !== '0'
+    }, { merge: true });
+  } catch(e) { console.warn('Error sync config:', e); }
+}
+
+async function loadConfigFromFirebase() {
+  if (!window._useFirebase || !window._currentUid || !window._firebaseDb) return;
+  try {
+    const { doc, getDoc } = window._firebaseModules;
+    const snap = await getDoc(doc(window._firebaseDb, 'usuarios', window._currentUid, 'config', 'preferencias'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.cot_folio) localStorage.setItem('cot_folio', String(data.cot_folio));
+      if (data.cot_iva !== undefined) localStorage.setItem('cot_iva', data.cot_iva ? '1' : '0');
+    }
+  } catch(e) { console.warn('Error load config:', e); }
+}
+
 async function guardarOrden(orden) {
   if (window._useFirebase && window._firebaseDb) {
     try {
@@ -535,10 +611,10 @@ async function guardarOrden(orden) {
         const id = orden.id;
         const data = {...orden};
         delete data.id;
-        await updateDoc(doc(window._firebaseDb,'ordenes',id), data);
+        await updateDoc(doc(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes',id), data);
       } else {
         orden.fecha_creacion = Date.now();
-        await addDoc(collection(window._firebaseDb,'ordenes'), orden);
+        await addDoc(collection(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes'), orden);
       }
       return;
     } catch(e) {
@@ -565,7 +641,7 @@ async function eliminarOrden(id) {
   if (window._useFirebase && window._firebaseDb) {
     try {
       const { deleteDoc, doc } = window._firebaseModules;
-      await deleteDoc(doc(window._firebaseDb,'ordenes',id));
+      await deleteDoc(doc(window._firebaseDb,'usuarios/'+window._currentUid+'/ordenes',id));
       toast('Orden eliminada');
       return;
     } catch(e) {
@@ -1240,6 +1316,7 @@ function restoreTabFromHash() {
 }
 
 function initAppData() {
+  loadConfigFromFirebase();
   updateFirebaseBadge();
   cargarOrdenes();
   restoreTabFromHash();
@@ -1291,5 +1368,7 @@ window.docImprimir = docImprimir;
 window.docCompartir = docCompartir;
 window.cerrarDoc = cerrarDoc;
 </script>
+
+</div><!-- /app-content -->
 </body>
 </html>
