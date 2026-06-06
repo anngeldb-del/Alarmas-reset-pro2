@@ -1,4 +1,4 @@
-const CACHE = 'alarmas-reset-v1';
+const CACHE = 'alarmas-reset-v4';
 const OFFLINE_ASSETS = [
   './',
   './index.html',
