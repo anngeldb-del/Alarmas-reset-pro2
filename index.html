@@ -72,6 +72,8 @@
     console.warn('Firebase no inicializado:', e);
     window._useFirebase = false;
     window._currentUid = null;
+    const ov = document.getElementById('login-overlay');
+    if (ov) ov.style.display = 'flex';
     window.dispatchEvent(new Event('firebaseReady'));
   }
 </script>
@@ -251,7 +253,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <body>
 
 <!-- LOGIN OVERLAY -->
-<div id="login-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#0a0a0f;align-items:center;justify-content:center;flex-direction:column">
+<div id="login-overlay" style="display:flex;position:fixed;inset:0;z-index:9999;background:#0a0a0f;align-items:center;justify-content:center;flex-direction:column">
   <div style="text-align:center;padding:40px;max-width:320px">
     <div style="font-size:48px;margin-bottom:16px">🔥</div>
     <h2 style="color:#ff6b35;font-size:28px;margin:0 0 8px;font-weight:900">Alarmas Reset</h2>
