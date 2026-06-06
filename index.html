@@ -1273,14 +1273,9 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-window.addEventListener('firebaseReady', () => {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAppData, { once: true });
-  } else {
-    initAppData();
-  }
-});
+// Firebase module ya disparó firebaseReady antes — iniciamos directo
 document.addEventListener('DOMContentLoaded', () => {
+  initAppData();
   if (!window._useFirebase) cargarOrdenesLocal();
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
