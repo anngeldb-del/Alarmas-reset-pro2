@@ -1273,13 +1273,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Firebase module ya disparó firebaseReady antes — iniciamos directo
-document.addEventListener('DOMContentLoaded', () => {
-  // Pequeño delay para asegurar que el módulo Firebase terminó
-  setTimeout(() => {
+window.addEventListener('firebaseReady', () => {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAppData, { once: true });
+  } else {
     initAppData();
-    if (!window._useFirebase) cargarOrdenesLocal();
-  }, 100);
+  }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window._useFirebase) cargarOrdenesLocal();
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
