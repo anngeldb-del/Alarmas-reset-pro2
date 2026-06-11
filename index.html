@@ -206,6 +206,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 #cr-iva-row.off{opacity:.35}
 #cr-iva-row.off span:last-child{text-decoration:line-through}
 
+/* HAMBURGER */
+.hamburger-btn{background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;padding:6px 8px;border-radius:6px;display:flex;align-items:center;line-height:1;transition:background .2s}
+.hamburger-btn:hover{background:var(--surface2)}
+
+/* SIDEBAR */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500}
+.sidebar-overlay.open{display:block}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:280px;background:#111118;border-right:1px solid var(--border);z-index:501;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column}
+.sidebar.open{transform:translateX(0)}
+.sidebar-top{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-top-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;border-radius:6px;line-height:1;margin-right:4px}
+.sidebar-brand{font-family:var(--font-display);font-weight:800;font-size:16px}
+.sidebar-brand span{color:var(--accent)}
+.sidebar-version{font-size:10px;color:var(--muted);margin-top:3px}
+.sidebar-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);padding:14px 20px 5px}
+.sidebar-item{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;background:none;border:none;width:100%;text-align:left;color:var(--text);font-size:14px;font-family:var(--font-body);transition:background .15s}
+.sidebar-item:hover{background:rgba(255,255,255,.05)}
+.sidebar-item.active{color:var(--accent);background:rgba(255,107,53,.1)}
+.si-icon{width:22px;text-align:center;flex-shrink:0;font-size:15px}
+.si-label{flex:1}
+.si-badge{background:var(--red);color:#fff;border-radius:20px;font-size:10px;font-weight:700;padding:2px 7px}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.sb-avatar{width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
+.sb-user-name{font-family:var(--font-display);font-weight:700;font-size:13px}
+.sb-user-status{font-size:11px;color:var(--muted);margin-top:2px}
+.sb-user-status.connected{color:var(--green)}
+
 /* PRINT */
 @media print{
   body > *{display:none !important}
@@ -222,8 +249,68 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </head>
 <body>
 
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-top">
+    <button class="sidebar-top-close" onclick="closeSidebar()">☰</button>
+    <div>
+      <div class="sidebar-brand">🔐 Alarmas <span>Reset</span></div>
+      <div class="sidebar-version">Control de Órdenes v2.0</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section-label">PRINCIPAL</div>
+  <button class="sidebar-item active" id="si-dashboard" onclick="navTo('dashboard')">
+    <span class="si-icon">📊</span><span class="si-label">Inicio</span>
+  </button>
+
+  <div class="sidebar-section-label">GESTIÓN</div>
+  <button class="sidebar-item" id="si-ordenes" onclick="navTo('ordenes')">
+    <span class="si-icon">📋</span><span class="si-label">Órdenes</span>
+    <span class="si-badge" id="si-pend-badge" style="display:none">0</span>
+  </button>
+  <button class="sidebar-item" id="si-nueva" onclick="navTo('nueva')">
+    <span class="si-icon">➕</span><span class="si-label">Nueva Orden</span>
+  </button>
+  <button class="sidebar-item" id="si-cotizaciones" onclick="navTo('cotizaciones')">
+    <span class="si-icon">📄</span><span class="si-label">Cotizar</span>
+  </button>
+
+  <div class="sidebar-section-label">HERRAMIENTAS</div>
+  <button class="sidebar-item" onclick="exportarExcel()">
+    <span class="si-icon">📊</span><span class="si-label">Exportar Excel</span>
+  </button>
+  <button class="sidebar-item" onclick="respaldoJSON()">
+    <span class="si-icon">📥</span><span class="si-label">Respaldo JSON</span>
+  </button>
+  <button class="sidebar-item" onclick="restaurarJSON()">
+    <span class="si-icon">📤</span><span class="si-label">Restaurar JSON</span>
+  </button>
+
+  <div class="sidebar-section-label">CONFIG</div>
+  <button class="sidebar-item" onclick="mostrarInfoFirebase()">
+    <span class="si-icon">🔥</span><span class="si-label">Firebase</span>
+    <span id="si-fb-dot" style="font-size:10px;color:var(--muted)">●</span>
+  </button>
+
+  <div class="sidebar-footer">
+    <div class="sb-avatar">AR</div>
+    <div>
+      <div class="sb-user-name">Alarmas y GPS Reset</div>
+      <div class="sb-user-status" id="sb-user-status">● Local</div>
+    </div>
+  </div>
+</nav>
+
+<!-- FILE INPUT para Restaurar JSON -->
+<input type="file" id="json-restore-input" accept=".json" style="display:none" onchange="procesarRestaurarJSON(event)">
+
 <!-- HEADER -->
 <header class="app-header">
+  <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menú">☰</button>
   <div class="brand">🔐 Alarmas <span>Reset</span></div>
   <span class="firebase-badge off" id="fb-badge">● Local</span>
 </header>
@@ -373,7 +460,7 @@ const DOC_CSS = `
 function fmt(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
-function renderAll(){ renderDashboard(); renderOrdenes(); }
+function renderAll(){ renderDashboard(); renderOrdenes(); updateSidebarStatus(); }
 
 // ═══════════════════════════════════════
 // DOCUMENTO OVERLAY — imprimir / compartir
@@ -528,6 +615,7 @@ function updateFirebaseBadge() {
     badge.classList.remove('on');
     badge.classList.add('off');
   }
+  updateSidebarStatus();
 }
 
 function guardarLocal(){ localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); }
@@ -1274,7 +1362,7 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
 function initAppData() {
@@ -1297,6 +1385,172 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen = sidebar.classList.toggle('open');
+  overlay.classList.toggle('open', isOpen);
+  if (isOpen) updateSidebarStatus();
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('open');
+}
+
+function navTo(tab) {
+  closeSidebar();
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3 };
+  showTab(tab, tabBtns[tabMap[tab]]);
+  document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
+  const si = document.getElementById('si-' + tab);
+  if (si) si.classList.add('active');
+}
+
+function updateSidebarStatus() {
+  const status = document.getElementById('sb-user-status');
+  const dot = document.getElementById('si-fb-dot');
+  if (status) {
+    if (window._useFirebase) {
+      status.textContent = '● Firebase';
+      status.className = 'sb-user-status connected';
+    } else {
+      status.textContent = '● Local';
+      status.className = 'sb-user-status';
+    }
+  }
+  if (dot) dot.style.color = window._useFirebase ? 'var(--green)' : 'var(--muted)';
+  const pend = ordenes.filter(o => (o.estado || '').toUpperCase() === 'PENDIENTE').length;
+  const badge = document.getElementById('si-pend-badge');
+  if (badge) {
+    badge.textContent = pend;
+    badge.style.display = pend > 0 ? '' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════
+// EXPORTAR EXCEL
+// ═══════════════════════════════════════
+function exportarExcel() {
+  closeSidebar();
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
+  if (typeof XLSX === 'undefined') {
+    toast('⏳ Cargando librería...');
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = _doExportExcel;
+    document.head.appendChild(s);
+  } else {
+    _doExportExcel();
+  }
+}
+
+function _doExportExcel() {
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Resumen de órdenes
+  const h1 = [['ID','Cliente','Vehículo','F. Instalación','F. Pago','Estado','Total','A Cuenta','Saldo','Notas']];
+  ordenes.forEach(o => {
+    const t = o.total||0, a = o.a_cuenta_total||0;
+    h1.push([o.id||'', o.cliente||'', o.vehiculo||'', o.fecha_instalacion||'', o.fecha_pago||'',
+      o.estado||'PENDIENTE', t, a, t-a, o.recordatorios||'']);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(h1);
+  ws1['!cols'] = [{wch:20},{wch:22},{wch:22},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:32}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Órdenes');
+
+  // Hoja 2: Detalle de servicios
+  const h2 = [['ID Orden','Cliente','Vehículo','Estado','Servicio','Costo','Inversión','Ganancia','Garantía']];
+  ordenes.forEach(o => {
+    (o.productos||[]).forEach(p => {
+      const c = parseFloat(p.costo)||0, inv = parseFloat(p.inversion)||0;
+      h2.push([o.id||'', o.cliente||'', o.vehiculo||'', o.estado||'PENDIENTE',
+        p.nombre||'', c, inv, c-inv, p.garantia||'Sin garantía']);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(h2);
+  ws2['!cols'] = [{wch:20},{wch:22},{wch:22},{wch:12},{wch:30},{wch:12},{wch:12},{wch:12},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
+
+  // Hoja 3: Resumen financiero
+  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
+  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[]).reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
+  const porCobrar = ordenes.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
+    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const h3 = [
+    ['Resumen Financiero — Alarmas y GPS Reset'],
+    ['Generado:', new Date().toLocaleDateString('es-MX',{dateStyle:'long'})],
+    [],
+    ['Indicador','Valor'],
+    ['Total facturado', totalFac],
+    ['Ganancia estimada', totalGan],
+    ['Por cobrar', porCobrar],
+    ['Total órdenes', ordenes.length],
+    ['Órdenes pendientes', ordenes.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE').length],
+    ['Órdenes pagadas', ordenes.filter(o=>(o.estado||'').toUpperCase()==='PAGADO').length],
+    ['Órdenes termo', ordenes.filter(o=>(o.estado||'').toUpperCase()==='TERMO').length],
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(h3);
+  ws3['!cols'] = [{wch:26},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen');
+
+  XLSX.writeFile(wb, 'AlarmasReset-' + new Date().toISOString().split('T')[0] + '.xlsx');
+  toast('✅ Excel generado y descargado');
+}
+
+// ═══════════════════════════════════════
+// RESPALDO / RESTAURAR JSON
+// ═══════════════════════════════════════
+function respaldoJSON() {
+  closeSidebar();
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para respaldar'); return; }
+  const data = JSON.stringify({ fecha: new Date().toISOString(), version: '2.0', ordenes }, null, 2);
+  const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'AlarmasReset-Respaldo-' + new Date().toISOString().split('T')[0] + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('✅ Respaldo JSON descargado');
+}
+
+function restaurarJSON() {
+  closeSidebar();
+  document.getElementById('json-restore-input').click();
+}
+
+function procesarRestaurarJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const nuevas = data.ordenes || (Array.isArray(data) ? data : null);
+      if (!nuevas || !Array.isArray(nuevas)) { toast('⚠️ Formato de archivo inválido'); return; }
+      if (!confirm('¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales actuales.')) return;
+      ordenes = nuevas;
+      guardarLocal();
+      renderAll();
+      toast('✅ ' + nuevas.length + ' órdenes restauradas');
+    } catch(err) {
+      toast('⚠️ Error al leer el archivo: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function mostrarInfoFirebase() {
+  closeSidebar();
+  toast(window._useFirebase ? '🔥 Firebase activo — alarmas-reset-e3484' : '💾 Modo local activo');
+}
 
 // Globales para onclick en HTML dinámico (GitHub Pages / móvil)
 window.setVista = setVista;
@@ -1321,6 +1575,14 @@ window.verCotizacion = verCotizacion;
 window.docImprimir = docImprimir;
 window.docCompartir = docCompartir;
 window.cerrarDoc = cerrarDoc;
+window.toggleSidebar = toggleSidebar;
+window.closeSidebar = closeSidebar;
+window.navTo = navTo;
+window.exportarExcel = exportarExcel;
+window.respaldoJSON = respaldoJSON;
+window.restaurarJSON = restaurarJSON;
+window.procesarRestaurarJSON = procesarRestaurarJSON;
+window.mostrarInfoFirebase = mostrarInfoFirebase;
 </script>
 </body>
 </html>
