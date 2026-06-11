@@ -233,6 +233,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .sb-user-status{font-size:11px;color:var(--muted);margin-top:2px}
 .sb-user-status.connected{color:var(--green)}
 
+/* ESTADO EN PROCESO */
+.estado-badge.en_proceso{background:rgba(67,97,238,.15);color:#4361ee}
+
+/* INLINE STATUS PICKER */
+.estado-picker{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.estado-opt{padding:5px 13px;border-radius:20px;border:none;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;opacity:.45;font-family:var(--font-display);letter-spacing:.3px}
+.estado-opt:hover{opacity:.75}
+.estado-opt.sel{opacity:1;box-shadow:0 0 0 2px currentColor}
+.estado-opt.pagado{background:rgba(6,214,160,.15);color:var(--green)}
+.estado-opt.pendiente{background:rgba(255,107,53,.15);color:var(--accent)}
+.estado-opt.en_proceso{background:rgba(67,97,238,.15);color:#4361ee}
+.estado-opt.termo{background:rgba(255,209,102,.15);color:var(--accent2)}
+
+/* CONFIRM MODAL */
+.confirm-body{text-align:center;padding:24px 20px}
+.confirm-icon{font-size:40px;margin-bottom:12px}
+.confirm-msg{color:var(--muted);font-size:14px;line-height:1.55;margin-bottom:24px}
+.confirm-btns{display:flex;gap:10px}
+
+/* ONBOARDING */
+.onboard-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:700;align-items:center;justify-content:center;padding:20px}
+.onboard-overlay.open{display:flex}
+.onboard-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:100%;max-width:340px;padding:28px 24px;text-align:center;animation:slideUp .3s ease}
+.onboard-ico{font-size:52px;margin-bottom:16px}
+.onboard-title{font-family:var(--font-display);font-weight:800;font-size:20px;margin-bottom:8px}
+.onboard-desc{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px}
+.onboard-dots{display:flex;gap:6px;justify-content:center;margin-bottom:20px}
+.onboard-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .3s}
+.onboard-dot.on{background:var(--accent)}
+
 /* PRINT */
 @media print{
   body > *{display:none !important}
@@ -347,6 +377,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
     <button class="filter-btn" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
     <button class="filter-btn" onclick="setFilter('TERMO',this)">Termo</button>
+    <button class="filter-btn" onclick="setFilter('EN_PROCESO',this)">En proceso</button>
   </div>
   <div id="ordenes-lista"></div>
 </div>
@@ -388,6 +419,35 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <div class="doc-frame" id="doc-frame"></div>
 </div>
 
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:360px">
+    <div class="confirm-body">
+      <div class="confirm-icon" id="confirm-icon">⚠️</div>
+      <div class="modal-title" id="confirm-title" style="margin-bottom:8px">¿Confirmar?</div>
+      <div class="confirm-msg" id="confirm-msg"></div>
+      <div class="confirm-btns">
+        <button class="btn btn-danger" style="flex:1" id="confirm-ok-btn">Confirmar</button>
+        <button class="btn btn-ghost" style="flex:1" id="confirm-cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div class="onboard-overlay" id="onboard-overlay">
+  <div class="onboard-card">
+    <div class="onboard-ico" id="onboard-ico">🔐</div>
+    <div class="onboard-title" id="onboard-title">Bienvenido</div>
+    <div class="onboard-desc" id="onboard-desc"></div>
+    <div class="onboard-dots" id="onboard-dots"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-sm" onclick="skipOnboarding()">Omitir</button>
+      <button class="btn btn-primary" style="flex:1" id="onboard-next-btn" onclick="nextOnboardStep()">Siguiente →</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -403,6 +463,7 @@ let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
+const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
 const EMPRESA = {
@@ -453,6 +514,48 @@ const DOC_CSS = `
   .footer{margin-top:20px;padding-top:12px;border-top:1px dashed #ccc;text-align:center;font-size:10px;color:#aaa}
   @media print{body{padding:10px}}
 `;
+
+// ═══════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════
+const IDB = {
+  db: null,
+  _p: null,
+  init() {
+    if (this._p) return this._p;
+    this._p = new Promise(resolve => {
+      if (!window.indexedDB) { resolve(false); return; }
+      const req = indexedDB.open('alarmas_reset_db', 1);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('ordenes'))
+          d.createObjectStore('ordenes', { keyPath: 'id' });
+      };
+      req.onsuccess = e => { this.db = e.target.result; resolve(true); };
+      req.onerror = () => resolve(false);
+    });
+    return this._p;
+  },
+  getAll() {
+    if (!this.db) return Promise.resolve([]);
+    return new Promise((res, rej) => {
+      const req = this.db.transaction('ordenes','readonly').objectStore('ordenes').getAll();
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  },
+  putAll(items) {
+    if (!this.db) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction('ordenes','readwrite');
+      const store = tx.objectStore('ordenes');
+      store.clear();
+      items.forEach(item => { if (item.id) store.put(item); });
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+};
 
 // ═══════════════════════════════════════
 // HELPERS
@@ -567,8 +670,21 @@ function headerEmpresa(tipoDoc, folio, fecha) {
 // ═══════════════════════════════════════
 // FIREBASE / LOCALSTORAGE
 // ═══════════════════════════════════════
-function cargarOrdenesLocal() {
+async function cargarOrdenesLocal() {
+  await IDB.init();
   try {
+    if (IDB.db) {
+      const data = await IDB.getAll();
+      if (data && data.length > 0) {
+        ordenes = data.sort((a,b)=>(b.fecha_creacion||0)-(a.fecha_creacion||0));
+        renderAll(); return;
+      }
+      const ls = localStorage.getItem('alarmas_ordenes');
+      if (ls) {
+        try { ordenes = JSON.parse(ls); await IDB.putAll(ordenes); } catch(e) { ordenes = []; }
+        renderAll(); return;
+      }
+    }
     const data = localStorage.getItem('alarmas_ordenes');
     ordenes = data ? JSON.parse(data) : [];
   } catch(e) {
@@ -618,7 +734,14 @@ function updateFirebaseBadge() {
   updateSidebarStatus();
 }
 
-function guardarLocal(){ localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); }
+async function guardarLocal() {
+  try {
+    if (IDB.db) await IDB.putAll(ordenes);
+    localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes));
+  } catch(e) {
+    try { localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); } catch(e2) {}
+  }
+}
 
 async function guardarOrden(orden) {
   if (window._useFirebase && window._firebaseDb) {
@@ -655,7 +778,8 @@ async function guardarOrden(orden) {
 }
 
 async function eliminarOrden(id) {
-  if (!confirm('¿Eliminar esta orden? No se puede deshacer.')) return;
+  const ok = await confirmarAccion('Eliminar orden', '¿Eliminar esta orden? Esta acción no se puede deshacer.', '🗑️', 'Eliminar');
+  if (!ok) return;
   if (window._useFirebase && window._firebaseDb) {
     try {
       const { deleteDoc, doc } = window._firebaseModules;
@@ -705,7 +829,8 @@ function renderDashboard() {
     const t=o.total||0, a=o.a_cuenta_total||0;
     gan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
     fac+=t;
-    if((o.estado||'').toUpperCase()==='PENDIENTE'){cob+=t-a;pend++;}
+    const _est=(o.estado||'').toUpperCase();
+    if(_est==='PENDIENTE'||_est==='EN_PROCESO'){cob+=t-a;pend++;}
   });
   document.getElementById('stat-ganancia').textContent=fmt(gan);
   document.getElementById('stat-pendiente').textContent=fmt(cob);
@@ -720,7 +845,7 @@ function renderDashboard() {
       <div class="orden-header">
         <div><div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
         <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div></div>
-        <span class="estado-badge ${est.toLowerCase()}">${est}</span>
+        <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
       </div></div>`;
   }).join('');
 }
@@ -826,7 +951,7 @@ function ordenCard(o) {
     <div class="orden-header" onclick="toggleOrden('${o.id}')">
       <div><div class="orden-title">${esc(o.vehiculo||'—')} · <span style="color:var(--muted)">${esc(o.cliente||'—')}</span></div>
       <div class="orden-sub">${prods.length} servicio(s) · 📅 ${esc(o.fecha_instalacion||'sin fecha')}</div></div>
-      <span class="estado-badge ${est.toLowerCase()}">${est}</span>
+      <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
     </div>
     <div class="orden-body" id="body-${o.id}">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Servicios</div>
@@ -838,6 +963,13 @@ function ordenCard(o) {
         <div class="total-item"><div class="total-label">F. Pago</div><div class="total-val" style="font-size:13px">${esc(o.fecha_pago||'—')}</div></div>
       </div>
       ${rec}
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;margin-top:12px">Cambiar estado</div>
+      <div class="estado-picker">
+        <button class="estado-opt pendiente ${est==='PENDIENTE'?'sel':''}" onclick="cambiarEstado('${o.id}','PENDIENTE')">Pendiente</button>
+        <button class="estado-opt en_proceso ${est==='EN_PROCESO'?'sel':''}" onclick="cambiarEstado('${o.id}','EN_PROCESO')">En proceso</button>
+        <button class="estado-opt pagado ${est==='PAGADO'?'sel':''}" onclick="cambiarEstado('${o.id}','PAGADO')">Pagado</button>
+        <button class="estado-opt termo ${est==='TERMO'?'sel':''}" onclick="cambiarEstado('${o.id}','TERMO')">Termo</button>
+      </div>
       <div class="orden-actions">
         <button class="btn btn-green btn-sm" onclick="verBoleta('${o.id}')">🧾 Boleta</button>
         <button class="btn btn-ghost btn-sm" onclick="editarOrden('${o.id}')">✏️ Editar</button>
@@ -971,6 +1103,7 @@ function buildFormHTML(orden) {
     <div class="form-group"><label class="form-label">Estado</label>
       <select class="form-select" id="f-estado">
         <option value="PENDIENTE" ${(o.estado||'PENDIENTE')==='PENDIENTE'?'selected':''}>Pendiente</option>
+        <option value="EN_PROCESO" ${(o.estado||'')==='EN_PROCESO'?'selected':''}>En proceso</option>
         <option value="PAGADO" ${(o.estado||'')==='PAGADO'?'selected':''}>Pagado</option>
         <option value="TERMO" ${(o.estado||'')==='TERMO'?'selected':''}>Termo</option>
       </select></div>
@@ -1362,12 +1495,13 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();_confirmCancel();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
+  setTimeout(initOnboarding, 800);
 }
 window.addEventListener('firebaseReady', () => {
   if (document.readyState === 'loading') {
@@ -1384,7 +1518,99 @@ document.addEventListener('DOMContentLoaded', () => {
       agregarProductoRow();
     }
   });
+  document.getElementById('confirm-ok-btn').addEventListener('click', _confirmOk);
+  document.getElementById('confirm-cancel-btn').addEventListener('click', _confirmCancel);
+  document.getElementById('modal-confirm').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-confirm')) _confirmCancel();
+  });
 });
+
+// ═══════════════════════════════════════
+// CONFIRM MODAL
+// ═══════════════════════════════════════
+let _confirmResolve = null;
+function confirmarAccion(titulo, msg, icono = '⚠️', textoOk = 'Confirmar') {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = titulo;
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('confirm-icon').textContent = icono;
+    document.getElementById('confirm-ok-btn').textContent = textoOk;
+    document.getElementById('modal-confirm').classList.add('open');
+  });
+}
+function _confirmOk() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+}
+function _confirmCancel() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+}
+
+// ═══════════════════════════════════════
+// CAMBIAR ESTADO INLINE
+// ═══════════════════════════════════════
+async function cambiarEstado(id, nuevoEstado) {
+  const orden = ordenes.find(o => o.id === id);
+  if (!orden || (orden.estado||'PENDIENTE').toUpperCase() === nuevoEstado) return;
+  orden.estado = nuevoEstado;
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { updateDoc, doc } = window._firebaseModules;
+      await updateDoc(doc(window._firebaseDb, 'ordenes', id), { estado: nuevoEstado });
+      toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
+      return;
+    } catch(e) { console.error(e); }
+  }
+  await guardarLocal();
+  renderAll();
+  toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
+  setTimeout(() => {
+    const body = document.getElementById('body-' + id);
+    if (body) body.classList.add('open');
+  }, 40);
+}
+
+// ═══════════════════════════════════════
+// ONBOARDING
+// ═══════════════════════════════════════
+const ONBOARD_STEPS = [
+  { ico:'🔐', title:'¡Bienvenido a Alarmas Reset!', desc:'Tu app de gestión de órdenes de servicio. Organiza clientes, vehículos y cobros en un solo lugar — con o sin internet.' },
+  { ico:'📊', title:'Dashboard de inicio', desc:'Aquí ves tu resumen financiero: ganancias, por cobrar y facturado. Las últimas 5 órdenes aparecen abajo para acceso rápido.' },
+  { ico:'📋', title:'Gestión de órdenes', desc:'Crea, edita y rastrea cada orden. Cambia el estado con un toque directo: Pendiente → En proceso → Pagado.' },
+  { ico:'☰', title:'Menú lateral', desc:'Accede a herramientas: exportar Excel con 3 hojas, respaldo JSON, restaurar datos y configuración de Firebase.' },
+];
+let _onboardStep = 0;
+
+function initOnboarding() {
+  if (localStorage.getItem('alarmas_onboarded')) return;
+  _onboardStep = 0;
+  _renderOnboardStep();
+  document.getElementById('onboard-overlay').classList.add('open');
+}
+
+function _renderOnboardStep() {
+  const s = ONBOARD_STEPS[_onboardStep];
+  document.getElementById('onboard-ico').textContent = s.ico;
+  document.getElementById('onboard-title').textContent = s.title;
+  document.getElementById('onboard-desc').textContent = s.desc;
+  document.getElementById('onboard-dots').innerHTML =
+    ONBOARD_STEPS.map((_,i) => `<div class="onboard-dot ${i===_onboardStep?'on':''}"></div>`).join('');
+  document.getElementById('onboard-next-btn').textContent =
+    _onboardStep < ONBOARD_STEPS.length - 1 ? 'Siguiente →' : '¡Empezar!';
+}
+
+function nextOnboardStep() {
+  _onboardStep++;
+  if (_onboardStep >= ONBOARD_STEPS.length) skipOnboarding();
+  else _renderOnboardStep();
+}
+
+function skipOnboarding() {
+  localStorage.setItem('alarmas_onboarded', '1');
+  document.getElementById('onboard-overlay').classList.remove('open');
+}
 
 // ═══════════════════════════════════════
 // SIDEBAR
@@ -1583,6 +1809,10 @@ window.respaldoJSON = respaldoJSON;
 window.restaurarJSON = restaurarJSON;
 window.procesarRestaurarJSON = procesarRestaurarJSON;
 window.mostrarInfoFirebase = mostrarInfoFirebase;
+window.cambiarEstado = cambiarEstado;
+window.confirmarAccion = confirmarAccion;
+window.nextOnboardStep = nextOnboardStep;
+window.skipOnboarding = skipOnboarding;
 </script>
 </body>
 </html>
