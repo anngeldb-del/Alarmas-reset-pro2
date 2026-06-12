@@ -386,6 +386,113 @@ body::before{
   .header-logo{font-size:30px;}
   .tab{padding:7px 10px;font-size:10px;}
 }
+
+/* ── AJUSTES / FINANZAS ── */
+.finance-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.finance-box{
+  background:var(--bg);border:1px solid var(--border2);
+  border-radius:10px;padding:12px;text-align:center;
+}
+.finance-box.full{grid-column:1/-1;}
+.finance-box-label{
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1.5px;
+  color:var(--muted);text-transform:uppercase;margin-bottom:6px;
+}
+.finance-box-amount{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;line-height:1;}
+.finance-box-amount.green{color:#25D366;}
+.finance-box-amount.red{color:var(--orange);}
+.finance-box-amount.gold{color:var(--gold);}
+.finance-mes-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.finance-mes-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--cyan);text-transform:uppercase;}
+.finance-dias-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);}
+.finance-input-group{margin-bottom:10px;}
+.finance-input-group input{
+  width:100%;background:var(--bg);border:1px solid var(--border2);
+  border-radius:7px;padding:9px 11px;
+  color:var(--text);font-family:'Syne',sans-serif;font-size:12px;
+  outline:none;transition:border-color .2s;margin-bottom:8px;
+}
+.finance-input-group input:focus{border-color:var(--cyan);}
+.finance-input-group input::placeholder{color:var(--muted);font-size:11px;}
+.finance-btn-row{display:flex;gap:8px;}
+.btn-fin{
+  flex:1;padding:10px;border-radius:8px;
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .2s;
+}
+.btn-fin.g{background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25D366;}
+.btn-fin.g:active{background:rgba(37,211,102,.2);}
+.btn-fin.i{background:var(--orange2);border:1px solid rgba(255,96,48,.3);color:var(--orange);}
+.btn-fin.i:active{background:rgba(255,96,48,.2);}
+.btn-historico{
+  width:100%;padding:13px;margin-bottom:8px;
+  background:rgba(144,96,255,.1);border:1px solid rgba(144,96,255,.25);
+  border-radius:10px;color:var(--purple);
+  font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1.5px;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.btn-historico:hover{background:rgba(144,96,255,.18);}
+.mov-list{margin-top:10px;}
+.mov-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.mov-item:last-child{border-bottom:none;}
+.mov-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.mov-dot.g{background:#25D366;}
+.mov-dot.i{background:var(--orange);}
+.mov-info{flex:1;min-width:0;}
+.mov-desc{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mov-fecha{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);}
+.mov-monto{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;flex-shrink:0;}
+.mov-monto.g{color:#25D366;}
+.mov-monto.i{color:var(--orange);}
+/* ── MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:200;display:flex;align-items:flex-end;justify-content:center;
+}
+.modal-overlay.hidden{display:none;}
+.modal-sheet{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px 20px 0 0;width:100%;max-width:480px;
+  max-height:88vh;overflow-y:auto;padding:20px 16px 48px;
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-bar{width:40px;height:4px;border-radius:2px;background:var(--border2);margin:0 auto 16px;}
+.modal-title{
+  font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;
+  color:var(--text);margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-close{
+  background:none;border:none;color:var(--muted);font-size:20px;
+  cursor:pointer;padding:2px 6px;transition:color .2s;line-height:1;
+}
+.modal-close:hover{color:var(--text);}
+.hist-month{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-bottom:8px;
+}
+.hist-month-title{
+  font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1.5px;
+  color:var(--cyan);margin-bottom:10px;text-transform:uppercase;
+}
+.hist-month-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.hist-col-label{
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1px;
+  color:var(--muted);text-transform:uppercase;margin-bottom:4px;
+}
+.hist-col-val{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px;}
+.hist-col-val.green{color:#25D366;}
+.hist-col-val.red{color:var(--orange);}
+.hist-col-val.gold{color:var(--gold);}
+.hist-empty{text-align:center;padding:32px;color:var(--muted);font-size:12px;line-height:1.8;}
 </style>
 </head>
 <body>
@@ -432,6 +539,9 @@ body::before{
       </div>
       <div class="tab" onclick="showTab('agregar')" id="tab-agregar">
         <span class="tab-icon">＋</span> Agregar
+      </div>
+      <div class="tab" onclick="showTab('ajustes')" id="tab-ajustes">
+        <span class="tab-icon">⚙️</span> Ajustes
       </div>
     </div>
   </div>
@@ -1017,7 +1127,77 @@ body::before{
     </div>
   </div>
 
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: AJUSTES / FINANZAS       -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-ajustes">
+    <div style="padding:4px 0;">
+
+      <!-- Finanzas del mes actual -->
+      <div class="client-card">
+        <div class="section-label">Finanzas del mes</div>
+        <div class="finance-mes-row">
+          <div class="finance-mes-label" id="fin-mes-label">—</div>
+          <div class="finance-dias-label" id="fin-dias-label"></div>
+        </div>
+        <div class="finance-totals">
+          <div class="finance-box">
+            <div class="finance-box-label">Ganancias</div>
+            <div class="finance-box-amount green" id="fin-ganancia-total">$0.00</div>
+          </div>
+          <div class="finance-box">
+            <div class="finance-box-label">Inversiones</div>
+            <div class="finance-box-amount red" id="fin-inversion-total">$0.00</div>
+          </div>
+          <div class="finance-box full">
+            <div class="finance-box-label">Balance neto del mes</div>
+            <div class="finance-box-amount gold" id="fin-balance-total">$0.00</div>
+          </div>
+        </div>
+
+        <div class="finance-input-group">
+          <input id="fin-monto" type="number" step="0.01" min="0" placeholder="Monto (ej. 1500.00)">
+          <input id="fin-desc" type="text" placeholder="Descripción (ej. Instalación pantalla)" maxlength="60">
+          <div class="finance-btn-row">
+            <button class="btn-fin g" onclick="registrarMovimiento('ganancia')">+ Ganancia</button>
+            <button class="btn-fin i" onclick="registrarMovimiento('inversion')">– Inversión</button>
+          </div>
+        </div>
+
+        <div id="fin-mov-list" class="mov-list"></div>
+      </div>
+
+      <!-- Botón histórico -->
+      <button class="btn-historico" onclick="showHistorico()">
+        📊 Ver histórico de ganancias e inversiones
+      </button>
+
+      <!-- Info cierre automático -->
+      <div class="firebase-note" style="background:rgba(144,96,255,.06);border-color:rgba(144,96,255,.2);">
+        <p style="color:rgba(144,96,255,.85)">
+          <strong style="color:var(--purple)">📅 Cierre automático mensual</strong><br>
+          Al abrir la app en un nuevo mes, el mes anterior se archiva automáticamente en el histórico y los contadores se reinician a cero.
+        </p>
+      </div>
+
+      <div style="height:80px"></div>
+    </div>
+  </div>
+
 </div><!-- /page -->
+
+<!-- MODAL HISTÓRICO DE FINANZAS -->
+<div class="modal-overlay hidden" id="modal-historico" onclick="closeHistoricoOverlay(event)">
+  <div class="modal-sheet">
+    <div class="modal-bar"></div>
+    <div class="modal-title">
+      <span>📊 Histórico Mensual</span>
+      <button class="modal-close" onclick="closeHistorico()">✕</button>
+    </div>
+    <div id="hist-list"></div>
+  </div>
+</div>
 
 <!-- FIXED SEND -->
 <div class="send-fixed" id="sendBar">
@@ -1250,7 +1430,7 @@ function buildDynamicTabs() {
 
 // ── TAB SWITCHING ──
 function allTabIds() {
-  return STATIC_TABS.concat(loadServices().map(s => 'extra-'+s.id)).concat(['agregar']);
+  return STATIC_TABS.concat(loadServices().map(s => 'extra-'+s.id)).concat(['agregar','ajustes']);
 }
 function showTab(name) {
   currentTab = name;
@@ -1260,7 +1440,9 @@ function showTab(name) {
     if(panel) panel.classList.toggle('active', t===name);
     if(tab)   tab.classList.toggle('active', t===name);
   });
-  document.getElementById('sendBar').style.display = (name==='agregar') ? 'none' : 'block';
+  const hideSend = name==='agregar' || name==='ajustes';
+  document.getElementById('sendBar').style.display = hideSend ? 'none' : 'block';
+  if (name==='ajustes') renderFinanceDashboard();
 }
 
 // ── CHECKBOX (ítems estáticos) ──
@@ -1313,7 +1495,7 @@ function getField(id) { const el=document.getElementById(id); return el?el.value
 // ── WHATSAPP ──
 function enviarWA() {
   const tab = currentTab;
-  if(tab==='agregar') return;
+  if(tab==='agregar' || tab==='ajustes') return;
 
   let nombre='', tel='', vehiculo='', notas='', panelLabel='';
 
@@ -1388,6 +1570,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if(inp) inp.addEventListener('keydown', e=>{
       if(e.key==='Enter'){ e.preventDefault(); addCustomItem(panel); }
     });
+  });
+  // Enter en monto finanzas → foco a descripción, Enter en desc → registrar ganancia
+  const finMonto = document.getElementById('fin-monto');
+  const finDesc  = document.getElementById('fin-desc');
+  if(finMonto) finMonto.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); finDesc && finDesc.focus(); }
+  });
+  if(finDesc) finDesc.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); registrarMovimiento('ganancia'); }
   });
 });
 
@@ -1467,6 +1658,176 @@ function renderSavedList() {
       </div>`).join('');
 }
 
+// ══════════════════════════════════════════
+// FINANZAS MENSUALES
+// ══════════════════════════════════════════
+const MONTH_NAMES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function getCurrentMonthKey() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+function formatMes(key) {
+  const parts = key.split('-');
+  return MONTH_NAMES_ES[parseInt(parts[1],10)-1]+' '+parts[0];
+}
+
+function formatMXN(n) {
+  return '$'+Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function loadFinCurrent() {
+  try { return JSON.parse(localStorage.getItem('fin_current')||'null'); } catch(e){ return null; }
+}
+function saveFinCurrent(obj) { localStorage.setItem('fin_current', JSON.stringify(obj)); }
+function loadFinHistorial() {
+  try { return JSON.parse(localStorage.getItem('fin_historial')||'[]'); } catch(e){ return []; }
+}
+function saveFinHistorial(arr) { localStorage.setItem('fin_historial', JSON.stringify(arr)); }
+
+function checkAndRotateMonth() {
+  const currentKey = getCurrentMonthKey();
+  let current = loadFinCurrent();
+  if (!current) {
+    current = {mes:currentKey,ganancia:0,inversion:0,movimientos:[]};
+    saveFinCurrent(current);
+  } else if (current.mes !== currentKey) {
+    // Mes anterior → archivar automáticamente
+    const hist = loadFinHistorial();
+    if (!hist.some(h=>h.mes===current.mes)) {
+      hist.unshift({
+        mes: current.mes,
+        ganancia: current.ganancia||0,
+        inversion: current.inversion||0,
+        cerradoEn: new Date().toISOString()
+      });
+      saveFinHistorial(hist);
+    }
+    current = {mes:currentKey,ganancia:0,inversion:0,movimientos:[]};
+    saveFinCurrent(current);
+  }
+  return current;
+}
+
+function getDiasLabel() {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const remain = lastDay - now.getDate();
+  if (remain === 0) return '🔴 Cierre hoy';
+  if (remain === 1) return '⚠️ Cierre mañana';
+  return remain+' días para cierre';
+}
+
+function registrarMovimiento(tipo) {
+  const montoEl = document.getElementById('fin-monto');
+  const descEl  = document.getElementById('fin-desc');
+  const monto = parseFloat(montoEl.value);
+  if (!monto || monto <= 0) { montoEl.focus(); return; }
+  const desc = descEl.value.trim() || (tipo==='ganancia'?'Ganancia':'Inversión');
+
+  let current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  current.movimientos = current.movimientos || [];
+  current.movimientos.unshift({
+    id: Date.now(), tipo, monto, desc,
+    fecha: new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+  });
+  if (tipo==='ganancia') current.ganancia = (current.ganancia||0)+monto;
+  else current.inversion = (current.inversion||0)+monto;
+  saveFinCurrent(current);
+
+  montoEl.value='';
+  descEl.value='';
+  renderFinanceDashboard();
+}
+
+function renderFinanceDashboard() {
+  const current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  const g = current.ganancia||0;
+  const i = current.inversion||0;
+  const b = g-i;
+
+  const mesEl = document.getElementById('fin-mes-label');
+  const diasEl = document.getElementById('fin-dias-label');
+  const ganEl  = document.getElementById('fin-ganancia-total');
+  const invEl  = document.getElementById('fin-inversion-total');
+  const balEl  = document.getElementById('fin-balance-total');
+  if (mesEl)  mesEl.textContent  = formatMes(current.mes).toUpperCase();
+  if (diasEl) diasEl.textContent = getDiasLabel();
+  if (ganEl)  ganEl.textContent  = formatMXN(g);
+  if (invEl)  invEl.textContent  = formatMXN(i);
+  if (balEl) {
+    balEl.textContent  = formatMXN(b);
+    balEl.className = 'finance-box-amount '+(b>=0?'gold':'red');
+  }
+
+  const movs = (current.movimientos||[]).slice(0,10);
+  const listEl = document.getElementById('fin-mov-list');
+  if (!listEl) return;
+  if (movs.length===0) {
+    listEl.innerHTML='<div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0">Sin movimientos este mes</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="section-label" style="margin-bottom:6px">Movimientos recientes</div>'+
+    movs.map(m=>`
+      <div class="mov-item">
+        <div class="mov-dot ${m.tipo==='ganancia'?'g':'i'}"></div>
+        <div class="mov-info">
+          <div class="mov-desc">${esc(m.desc)}</div>
+          <div class="mov-fecha">${m.fecha||''}</div>
+        </div>
+        <div class="mov-monto ${m.tipo==='ganancia'?'g':'i'}">${formatMXN(m.monto)}</div>
+      </div>`).join('');
+}
+
+function showHistorico() {
+  renderHistorico();
+  document.getElementById('modal-historico').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function closeHistorico() {
+  document.getElementById('modal-historico').classList.add('hidden');
+  document.body.style.overflow='';
+}
+function closeHistoricoOverlay(e) {
+  if (e.target === document.getElementById('modal-historico')) closeHistorico();
+}
+function renderHistorico() {
+  const hist = loadFinHistorial();
+  const el = document.getElementById('hist-list');
+  if (!el) return;
+  if (hist.length===0) {
+    el.innerHTML='<div class="hist-empty">Aún no hay meses cerrados.<br>Al abrir la app en un mes nuevo,<br>el anterior se archiva automáticamente.</div>';
+    return;
+  }
+  el.innerHTML = hist.map(h=>{
+    const g=h.ganancia||0, i=h.inversion||0, b=g-i;
+    return `
+      <div class="hist-month">
+        <div class="hist-month-title">${formatMes(h.mes)}</div>
+        <div class="hist-month-grid">
+          <div>
+            <div class="hist-col-label">Ganancias</div>
+            <div class="hist-col-val green">${formatMXN(g)}</div>
+          </div>
+          <div>
+            <div class="hist-col-label">Inversiones</div>
+            <div class="hist-col-val red">${formatMXN(i)}</div>
+          </div>
+          <div>
+            <div class="hist-col-label">Balance</div>
+            <div class="hist-col-val ${b>=0?'gold':'red'}">${formatMXN(b)}</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function initFinances() {
+  checkAndRotateMonth();
+  renderFinanceDashboard();
+}
+
 // ── INIT ──
 function initLocal() {
   _servicesCache = loadServicesLocal();
@@ -1475,6 +1836,7 @@ function initLocal() {
   buildDynamicTabs();
   STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
   renderSavedList();
+  initFinances();
 }
 
 function initFirebase() {
@@ -1484,12 +1846,16 @@ function initFirebase() {
 
   let servicesReady = false;
   let customReady   = false;
+  let initialRenderDone = false;
+
   function checkReady() {
     if (!servicesReady || !customReady) return;
     updateFbBadge(true);
     buildDynamicTabs();
     STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
     renderSavedList();
+    initFinances();
+    initialRenderDone = true;
   }
 
   // Listener — categorías de servicios
@@ -1499,11 +1865,11 @@ function initFirebase() {
       _servicesCache = snap.docs.map(d => d.data());
       saveServicesLocal(_servicesCache);
       servicesReady = true;
-      checkReady();
-      // re-render si ya estaba listo (cambio en tiempo real)
-      if (servicesReady && customReady) {
+      if (initialRenderDone) {
         buildDynamicTabs();
         renderSavedList();
+      } else {
+        checkReady();
       }
     },
     err => {
@@ -1516,7 +1882,6 @@ function initFirebase() {
   onSnapshot(
     query(collection(db, 'checklist_custom_items'), orderBy('createdAt', 'asc')),
     snap => {
-      // Rebuild cache por panel
       const fresh = {};
       snap.docs.forEach(d => {
         const data = d.data();
@@ -1524,18 +1889,17 @@ function initFirebase() {
         fresh[data.panel].push({ id: data.id, label: data.label });
       });
       _customCache = fresh;
-      // Sync local
       STATIC_TABS.forEach(t => saveCustomItemsLocal(t, _customCache[t] || []));
       customReady = true;
-      checkReady();
-      if (servicesReady && customReady) {
+      if (initialRenderDone) {
         STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
-        // También re-render paneles dinámicos si existen
         _servicesCache.forEach(svc => {
           const tid = 'extra-' + svc.id;
           renderCustomItems(tid);
           updateProgress(tid);
         });
+      } else {
+        checkReady();
       }
     },
     err => {
