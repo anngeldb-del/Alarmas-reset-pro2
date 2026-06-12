@@ -1732,7 +1732,7 @@ function registrarMovimiento(tipo) {
   current.movimientos = current.movimientos || [];
   current.movimientos.unshift({
     id: Date.now(), tipo, monto, desc,
-    fecha: new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+    fecha: new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
   });
   if (tipo==='ganancia') current.ganancia = (current.ganancia||0)+monto;
   else current.inversion = (current.inversion||0)+monto;

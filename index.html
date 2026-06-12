@@ -460,6 +460,7 @@ let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
+let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
@@ -607,14 +608,15 @@ function docImprimir() {
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open(); doc.write(_docHTML); doc.close();
-  iframe.onload = function() {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  };
-  // Fallback extra por si onload no dispara en algunos móviles
-  setTimeout(function() {
+  let _printed = false;
+  function _doPrint() {
+    if (_printed) return;
+    _printed = true;
     try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
-  }, 800);
+  }
+  iframe.onload = _doPrint;
+  // Fallback si onload no dispara en algunos móviles
+  setTimeout(_doPrint, 800);
 }
 
 // 📤 COMPARTIR
@@ -1264,6 +1266,7 @@ function cerrarModal() {
 // COTIZACIONES
 // ═══════════════════════════════════════
 function buildCotFormHTML() {
+  cotFolioRegistrado = false;
   const folio='COT-'+new Date().getFullYear()+'-'+String(cotFolioNum).padStart(3,'0');
   const hoy=new Date().toISOString().split('T')[0];
   const vigencia=new Date(Date.now()+15*24*60*60*1000).toISOString().split('T')[0];
@@ -1362,7 +1365,7 @@ function cotPartidaHTML(p,i) {
       <div class="form-group"><label class="form-label">Marca / Modelo</label>
         <input class="form-input cot-pmarca" placeholder="Marca" value="${esc(p.marca||'')}"></div>
       <div class="form-group"><label class="form-label">Cant.</label>
-        <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" oninput="calcPartida(this);recalcCot()"></div>
+        <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" step="1" oninput="calcPartida(this);recalcCot()"></div>
       <div class="form-group"><label class="form-label">P. Unitario ($)</label>
         <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||''}" oninput="calcPartida(this);recalcCot()"></div>
     </div>
@@ -1438,7 +1441,7 @@ function leerPartidas() {
     precio:parseFloat(r.querySelector('.cot-pprecio')?.value)||0,
     descto:parseFloat(r.querySelector('.cot-pdescto')?.value)||0,
     subtotal:parseFloat(r.querySelector('.cot-psubtotal')?.value)||0
-  })).filter(p=>p.nombre||p.precio);
+  })).filter(p=>p.nombre && (p.precio > 0));
 }
 
 function verCotizacion() {
@@ -1449,7 +1452,10 @@ function verCotizacion() {
   const folio=document.getElementById('c-folio')?.value||'';
   const fecha=document.getElementById('c-fecha')?.value||'';
   const vigencia=document.getElementById('c-vigencia')?.value||'';
-  cotFolioNum++; localStorage.setItem('cot_folio',cotFolioNum);
+  if (!cotFolioRegistrado) {
+    cotFolioRegistrado = true;
+    cotFolioNum++; localStorage.setItem('cot_folio', cotFolioNum);
+  }
 
   const bodyHTML =
     headerEmpresa('COTIZACIÓN', folio, fecha)
