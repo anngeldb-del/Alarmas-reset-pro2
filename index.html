@@ -662,9 +662,9 @@ function headerEmpresa(tipoDoc, folio, fecha) {
     +   '</div>'
     + '</div>'
     + '<div class="doc-badge">'
-    +   '<div class="doc-badge-title">' + tipoDoc + '</div>'
-    +   '<div class="doc-badge-num">' + folio + '</div>'
-    +   '<div class="doc-badge-date">Emitida: ' + fecha + '</div>'
+    +   '<div class="doc-badge-title">' + esc(tipoDoc) + '</div>'
+    +   '<div class="doc-badge-num">' + esc(folio) + '</div>'
+    +   '<div class="doc-badge-date">Emitida: ' + esc(fecha) + '</div>'
     + '</div>'
     + '</div>';
 }
@@ -912,7 +912,7 @@ function renderPorCliente(lista) {
     const ords = grupos[nombre];
     const saldoPend = ords.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
       .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0), 0);
-    const groupId = 'cg_' + btoa(nombre).replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
+    const groupId = 'cg_' + btoa(unescape(encodeURIComponent(nombre))).replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
     const badgePend = saldoPend > 0
       ? `<span class="cg-badge pending">Por cobrar ${fmt(saldoPend)}</span>`
       : `<span class="cg-badge ok">✓ Al corriente</span>`;
@@ -980,7 +980,7 @@ function ordenCard(o) {
     </div></div>`;
 }
 
-function toggleOrden(id){ document.getElementById('body-'+id).classList.toggle('open'); }
+function toggleOrden(id){ const el=document.getElementById('body-'+id); if(el) el.classList.toggle('open'); }
 
 // ═══════════════════════════════════════
 // BOLETA
@@ -1380,10 +1380,11 @@ function cotPartidaHTML(p,i) {
 
 function calcPartida(input) {
   const row=input.closest('.partida-row');
-  const cant=parseFloat(row.querySelector('.cot-pcant').value)||1;
-  const precio=parseFloat(row.querySelector('.cot-pprecio').value)||0;
-  const descto=parseFloat(row.querySelector('.cot-pdescto').value)||0;
-  row.querySelector('.cot-psubtotal').value=(precio*cant*(1-descto/100)).toFixed(2)||'';
+  if (!row) return;
+  const cant=parseFloat(row.querySelector('.cot-pcant')?.value)||1;
+  const precio=parseFloat(row.querySelector('.cot-pprecio')?.value)||0;
+  const descto=parseFloat(row.querySelector('.cot-pdescto')?.value)||0;
+  const sub=row.querySelector('.cot-psubtotal'); if(sub) sub.value=(precio*cant*(1-descto/100)).toFixed(2)||'';
 }
 
 function cotIvaActivo() {
@@ -1517,7 +1518,9 @@ window.addEventListener('firebaseReady', () => {
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window._useFirebase) cargarOrdenesLocal();
+  // Note: ES modules execute before DOMContentLoaded per spec, so firebaseReady always
+  // fires first and initAppData handles both Firebase and local modes via cargarOrdenes().
+  // No redundant cargarOrdenesLocal() call here to avoid double-loading data.
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
