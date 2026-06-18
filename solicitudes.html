@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alarmas Reset — Solicitudes Bot</title>
+<meta name="theme-color" content="#ff6b35">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<!-- Misma Firebase que index.html -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, query, orderBy, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  const cfg={
+    apiKey:"AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+    authDomain:"alarmas-reset-e3484.firebaseapp.com",
+    projectId:"alarmas-reset-e3484",
+    storageBucket:"alarmas-reset-e3484.firebasestorage.app",
+    messagingSenderId:"1096561116547",
+    appId:"1:1096561116547:web:b13df05c092785723aa2b6"
+  };
+  try {
+    const app=initializeApp(cfg);
+    const db=getFirestore(app);
+    window._FB={ db, collection, query, orderBy, onSnapshot, doc, updateDoc, ok:true };
+  } catch(e){ window._FB={ ok:false }; }
+  window.dispatchEvent(new Event('fbReady'));
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c26;--border:#2a2a38;
+  --accent:#ff6b35;--accent2:#ffd166;--green:#06d6a0;--red:#ef233c;
+  --text:#f0f0f5;--muted:#7a7a95;--radius:12px;
+  --font-d:'Syne',sans-serif;--font-b:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;min-height:100vh;overflow-x:hidden}
+
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+.brand{font-family:var(--font-d);font-weight:800;font-size:18px;letter-spacing:-0.5px}
+.brand span{color:var(--accent)}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+.hdr-btn{padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-d);text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .2s}
+.hdr-btn:hover{border-color:var(--accent);color:var(--accent)}
+.hdr-btn.back{border-color:rgba(6,214,160,.3);color:var(--green)}
+
+.page{max-width:680px;margin:0 auto;padding:20px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat.orange::before{background:var(--accent)}
+.stat.green::before{background:var(--green)}
+.stat.yellow::before{background:var(--accent2)}
+.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.stat-value{font-family:var(--font-d);font-size:22px;font-weight:800;line-height:1}
+.stat.orange .stat-value{color:var(--accent)}
+.stat.green .stat-value{color:var(--green)}
+.stat.yellow .stat-value{color:var(--accent2)}
+
+/* FILTROS */
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font-d)}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.search{flex:1;min-width:160px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-b);font-size:13px;outline:none}
+.search:focus{border-color:var(--accent)}
+.search::placeholder{color:var(--muted)}
+
+/* SOLICITUD CARD */
+.sol-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;transition:border-color .2s}
+.sol-card:hover{border-color:rgba(255,107,53,.4)}
+.sol-hdr{padding:12px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer}
+.sol-main{flex:1;min-width:0}
+.sol-folio{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1.5px;margin-bottom:2px}
+.sol-cliente{font-family:var(--font-d);font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sol-sub{color:var(--muted);font-size:12px;margin-top:2px}
+.sol-badges{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.badge{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.badge.new{background:rgba(6,214,160,.15);color:var(--green);border:1px solid rgba(6,214,160,.3)}
+.badge.visto{background:rgba(255,107,53,.1);color:var(--accent);border:1px solid rgba(255,107,53,.2)}
+.badge.cotizado{background:rgba(255,209,102,.15);color:var(--accent2);border:1px solid rgba(255,209,102,.3)}
+.total-badge{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2);font-weight:700}
+
+.sol-body{display:none;border-top:1px solid var(--border);padding:14px 16px}
+.sol-body.open{display:block}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.info-item{font-size:12px}
+.info-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.info-val{font-weight:500}
+.prods-title{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px}
+.prod-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:8px;font-size:12px}
+.prod-row:last-child{border-bottom:none}
+.prod-nom{flex:1}
+.prod-costo{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2);white-space:nowrap}
+.sol-total{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sol-total-lbl{color:var(--muted);font-size:12px}
+.sol-total-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--green)}
+
+.sol-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:8px 14px;border-radius:8px;font-family:var(--font-d);font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;letter-spacing:.3px}
+.btn-wa{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff}
+.btn-marcar{background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.3);color:var(--accent2)}
+.btn-cotizar{background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.3);color:var(--green)}
+.btn-ver{background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.25);color:var(--accent)}
+
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:48px;margin-bottom:12px;display:block}
+.empty-title{font-family:var(--font-d);font-size:18px;margin-bottom:6px;color:var(--text)}
+.empty-sub{font-size:13px;line-height:1.6}
+
+/* NOTAS */
+.nota-box{background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:8px 12px;font-size:12px;margin-top:8px;color:var(--muted);line-height:1.6}
+.nota-box strong{color:var(--accent)}
+
+/* LOADER */
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;color:var(--muted)}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:30px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;z-index:999}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">Alarmas <span>Reset</span> · Solicitudes Bot</div>
+  <div class="hdr-actions">
+    <a href="index.html" class="hdr-btn back">← App principal</a>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat orange">
+      <div class="stat-label">Total solicitudes</div>
+      <div class="stat-value" id="st-total">—</div>
+    </div>
+    <div class="stat green">
+      <div class="stat-label">Nuevas hoy</div>
+      <div class="stat-value" id="st-hoy">—</div>
+    </div>
+    <div class="stat yellow">
+      <div class="stat-label">Valor estimado</div>
+      <div class="stat-value" id="st-valor">—</div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="setFiltro('todos',this)">Todas</button>
+    <button class="filter-btn" onclick="setFiltro('NUEVA',this)">Nuevas</button>
+    <button class="filter-btn" onclick="setFiltro('VISTO',this)">Vistas</button>
+    <button class="filter-btn" onclick="setFiltro('COTIZADO',this)">Cotizadas</button>
+    <input class="search" id="search" placeholder="Buscar cliente, vehículo..." oninput="renderLista()">
+  </div>
+
+  <!-- LISTA -->
+  <div id="lista">
+    <div class="loader"><div class="spinner"></div><span>Cargando solicitudes...</span></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let solicitudes = [];
+let filtro = 'todos';
+
+function fmt(n){ return '$'+(+n||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function esc(s){ return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''; }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function fechaStr(ts){ return ts?new Date(ts).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'; }
+function setFiltro(f,btn){ filtro=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderLista(); }
+
+function renderStats(){
+  const sol=solicitudes;
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const hoyCount=sol.filter(s=>(s.fecha_creacion||0)>=hoy.getTime()).length;
+  const valor=sol.reduce((a,s)=>a+(+s._total_estimado||+s.total||0),0);
+  document.getElementById('st-total').textContent=sol.length;
+  document.getElementById('st-hoy').textContent=hoyCount;
+  document.getElementById('st-valor').textContent=valor>0?fmt(valor).replace('$',''):'—';
+}
+
+function renderLista(){
+  const busq=(document.getElementById('search').value||'').toLowerCase();
+  let lista=solicitudes;
+
+  if(filtro!=='todos'){
+    lista=lista.filter(s=>{
+      const est=(s._estado_bot||'NUEVA').toUpperCase();
+      return est===filtro;
+    });
+  }
+  if(busq){
+    lista=lista.filter(s=>{
+      const hay=[s.cliente,s.vehiculo,s._categoria,s._folio,s._tel].join(' ').toLowerCase();
+      return hay.includes(busq);
+    });
+  }
+
+  const cont=document.getElementById('lista');
+  if(!lista.length){
+    cont.innerHTML=`<div class="empty">
+      <span class="empty-icon">🤖</span>
+      <div class="empty-title">${filtro==='todos'?'Sin solicitudes aún':'Sin solicitudes con ese filtro'}</div>
+      <div class="empty-sub">Las solicitudes del chatbot aparecerán aquí en tiempo real.<br>Comparte el bot con tus clientes para empezar.</div>
+    </div>`;
+    return;
+  }
+
+  cont.innerHTML=lista.map(s=>cardHTML(s)).join('');
+}
+
+function cardHTML(s){
+  const estado=(s._estado_bot||'NUEVA').toUpperCase();
+  const estMap={NUEVA:'new',VISTO:'visto',COTIZADO:'cotizado'};
+  const estLabel={NUEVA:'Nueva',VISTO:'Vista',COTIZADO:'Cotizada'};
+  const total=s._total_estimado||s.total||0;
+  const prods=(s.productos||[]).map(p=>`<div class="prod-row"><span class="prod-nom">${esc(p.nombre)}</span><span class="prod-costo">${p.costo?fmt(p.costo):'A definir'}</span></div>`).join('')||'<div style="color:var(--muted);font-size:12px">Sin detalle de productos</div>';
+  const notaRaw=(s.recordatorios||'').replace(/^🤖 SOL-\d{4}-\d+ \| /,'');
+  const folio=s._folio||s.recordatorios?.match(/SOL-\d{4}-\d+/)?.[0]||'—';
+
+  return `<div class="sol-card" id="card-${s.id}">
+  <div class="sol-hdr" onclick="toggleCard('${s.id}')">
+    <div class="sol-main">
+      <div class="sol-folio">${esc(folio)}</div>
+      <div class="sol-cliente">${esc(s.cliente||'Sin nombre')}</div>
+      <div class="sol-sub">🚗 ${esc(s.vehiculo||'Vehículo no especificado')} &nbsp;·&nbsp; ${fechaStr(s.fecha_creacion)}</div>
+    </div>
+    <div class="sol-badges">
+      <span class="badge ${estMap[estado]||'new'}">${estLabel[estado]||estado}</span>
+      ${total>0?`<span class="total-badge">${fmt(total)}</span>`:''}
+    </div>
+  </div>
+  <div class="sol-body" id="body-${s.id}">
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">👤 Cliente</div>
+        <div class="info-val">${esc(s.cliente||'—')}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📱 WhatsApp</div>
+        <div class="info-val">${s._tel?`<a href="https://wa.me/52${s._tel.replace(/\D/g,'')}" target="_blank" style="color:var(--green);text-decoration:none">${esc(s._tel)}</a>`:'No proporcionado'}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">🚗 Vehículo</div>
+        <div class="info-val">${esc(s.vehiculo||'—')}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">🔧 Categoría</div>
+        <div class="info-val">${esc(s._categoria||'—')}</div>
+      </div>
+    </div>
+    <div class="prods-title">Servicios solicitados</div>
+    ${prods}
+    ${total>0?`<div class="sol-total"><span class="sol-total-lbl">Total estimado</span><span class="sol-total-val">${fmt(total)}</span></div>`:''}
+    ${notaRaw?`<div class="nota-box"><strong>Nota:</strong> ${esc(notaRaw)}</div>`:''}
+    <div class="sol-actions">
+      ${s._tel?`<button class="btn btn-wa" onclick="abrirWA('${s._tel}','${esc(folio)}')">&#x1F4F1; WhatsApp</button>`:''}
+      <button class="btn btn-marcar" onclick="marcarEstado('${s.id}','VISTO')">👁 Marcar vista</button>
+      <button class="btn btn-cotizar" onclick="marcarEstado('${s.id}','COTIZADO')">✅ Cotizado</button>
+      <button class="btn btn-ver" onclick="verEnApp('${s.id}')">→ Ver en app</button>
+    </div>
+  </div>
+</div>`;
+}
+
+function toggleCard(id){
+  const body=document.getElementById('body-'+id);
+  if(body) body.classList.toggle('open');
+  // Marcar como vista
+  const s=solicitudes.find(x=>x.id===id);
+  if(s&&(s._estado_bot||'NUEVA')==='NUEVA') marcarEstado(id,'VISTO',true);
+}
+
+async function marcarEstado(id,estado,silencioso=false){
+  const s=solicitudes.find(x=>x.id===id);
+  if(!s) return;
+  s._estado_bot=estado;
+  if(!silencioso) toast(`Solicitud marcada como ${estado.toLowerCase()}`);
+  // Actualizar en Firebase
+  if(window._FB?.ok){
+    try {
+      const {db,doc,updateDoc}=window._FB;
+      await updateDoc(doc(db,'ordenes',id),{_estado_bot:estado});
+    } catch(e){}
+  }
+  renderLista();
+}
+
+function abrirWA(tel,folio){
+  const num='52'+tel.replace(/\D/g,'');
+  const msg=encodeURIComponent(`Hola, te contacto por tu solicitud *${folio}* de Alarmas Reset. 🚗`);
+  window.open(`https://wa.me/${num}?text=${msg}`,'_blank');
+}
+
+function verEnApp(id){
+  window.location.href=`index.html`;
+  toast('Busca la solicitud en la app principal por el folio o cliente');
+}
+
+// Cargar datos
+function cargar(){
+  if(window._FB?.ok){
+    try {
+      const {db,collection,query,orderBy,onSnapshot}=window._FB;
+      const q=query(collection(db,'ordenes'),orderBy('fecha_creacion','desc'));
+      onSnapshot(q,snap=>{
+        solicitudes=snap.docs
+          .map(d=>({id:d.id,...d.data()}))
+          .filter(d=>d._bot===true);
+        renderStats();
+        renderLista();
+      },err=>{
+        console.warn('Firebase error:',err);
+        cargarLocal();
+      });
+    } catch(e){ cargarLocal(); }
+  } else {
+    cargarLocal();
+  }
+}
+
+function cargarLocal(){
+  try {
+    const data=JSON.parse(localStorage.getItem('bot_solicitudes')||'[]');
+    solicitudes=data;
+    renderStats();
+    renderLista();
+  } catch(e){
+    document.getElementById('lista').innerHTML='<div class="empty"><span class="empty-icon">⚠️</span><div class="empty-title">Sin conexión</div><div class="empty-sub">No se pudo conectar a Firebase. Verifica tu conexión.</div></div>';
+  }
+}
+
+window.addEventListener('fbReady',()=>setTimeout(cargar,100));
+if(document.readyState!=='loading') setTimeout(cargar,300);
+</script>
+</body>
+</html>
