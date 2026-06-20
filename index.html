@@ -581,15 +581,9 @@ function abrirDoc(titulo, bodyHTML) {
     + '<style>' + DOC_CSS + '</style>'
     + '</head><body>' + bodyHTML + '</body></html>';
 
-  // Mostrar en el overlay dentro de la app
-  document.getElementById('doc-frame').innerHTML = bodyHTML;
-  // Aplicar estilos dentro del frame para preview
-  let styleEl = document.getElementById('doc-preview-style');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'doc-preview-style';
-    document.getElementById('doc-frame').appendChild(styleEl);
-  }
+  // Mostrar en el overlay dentro de la app con estilos aplicados
+  const frame = document.getElementById('doc-frame');
+  frame.innerHTML = '<style>' + DOC_CSS + '</style>' + bodyHTML;
   document.getElementById('doc-topbar-title').textContent = titulo;
   document.getElementById('doc-overlay').classList.add('open');
 }
@@ -777,7 +771,7 @@ async function guardarOrden(orden) {
     orden.fecha_creacion = Date.now();
     ordenes.unshift(orden);
   }
-  guardarLocal();
+  await guardarLocal();
   renderAll();
 }
 
@@ -797,7 +791,7 @@ async function eliminarOrden(id) {
     }
   }
   ordenes = ordenes.filter(o => o.id !== id);
-  guardarLocal();
+  await guardarLocal();
   renderAll();
   toast('Orden eliminada');
 }
@@ -822,6 +816,9 @@ function showTab(id, btn) {
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
   }
+  // FAB solo visible donde aplica crear una orden
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.display = (id === 'cotizaciones' || id === 'nueva') ? 'none' : '';
 }
 
 // ═══════════════════════════════════════
@@ -1245,7 +1242,7 @@ async function submitOrden() {
     else {
       document.getElementById('form-nueva-wrapper').innerHTML = '';
       activeFormMount = null;
-      showTab('ordenes', document.querySelectorAll('.tab-btn')[1]);
+      showTab('ordenes', document.querySelector('.tab-btn[onclick*="ordenes"]'));
     }
     toast('✅ Orden guardada');
     editandoId = null;
@@ -1523,7 +1520,14 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();_confirmCancel();} });
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape') return;
+  // Cierra solo el overlay de mayor z-index que esté abierto
+  if(document.getElementById('modal-confirm').classList.contains('open')){ _confirmCancel(); return; }
+  if(document.getElementById('doc-overlay').classList.contains('open')){ cerrarDoc(); return; }
+  if(document.getElementById('modal-orden').classList.contains('open')){ cerrarModal(); return; }
+  if(document.getElementById('sidebar').classList.contains('open')){ closeSidebar(); return; }
+});
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
 function initAppData() {
@@ -1665,9 +1669,8 @@ function closeSidebar() {
 
 function navTo(tab) {
   closeSidebar();
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3 };
-  showTab(tab, tabBtns[tabMap[tab]]);
+  const tabBtn = document.querySelector(`.tab-btn[onclick*="'${tab}'"]`);
+  showTab(tab, tabBtn);
   document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
   const si = document.getElementById('si-' + tab);
   if (si) si.classList.add('active');
@@ -1792,17 +1795,18 @@ function procesarRestaurarJSON(event) {
   if (!file) return;
   event.target.value = '';
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
       const nuevas = data.ordenes || (Array.isArray(data) ? data : null);
       if (!nuevas || !Array.isArray(nuevas)) { toast('⚠️ Formato de archivo inválido'); return; }
       const aviso = window._useFirebase
-        ? '¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales. Los datos en Firebase NO se modifican — usa esto solo en modo local.'
-        : '¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales actuales.';
-      if (!confirm(aviso)) return;
+        ? 'Se restaurarán ' + nuevas.length + ' órdenes. Los datos locales actuales se reemplazarán. Los datos en Firebase NO se modifican.'
+        : 'Se restaurarán ' + nuevas.length + ' órdenes. Los datos locales actuales se reemplazarán.';
+      const ok = await confirmarAccion('Restaurar respaldo', aviso, '📤', 'Restaurar');
+      if (!ok) return;
       ordenes = nuevas;
-      guardarLocal();
+      await guardarLocal();
       renderAll();
       toast('✅ ' + nuevas.length + ' órdenes restauradas');
     } catch(err) {
