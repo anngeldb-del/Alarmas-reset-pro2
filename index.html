@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alarmas Reset — Control de Órdenes</title>
 
 <script type="module">
@@ -265,9 +265,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
 /* PRINT */
 @media print{
-  body > *{display:none !important}
-  #doc-print-frame{display:block !important;position:static !important;background:#fff !important}
-  #doc-print-frame *{display:revert !important}
+  body > *:not(.doc-overlay){display:none !important}
+  .doc-overlay{display:block !important;position:static !important;background:#fff !important;overflow:visible !important}
+  .doc-topbar{display:none !important}
+  .doc-frame{min-height:unset !important}
 }
 
 @media(max-width:380px){
@@ -346,11 +347,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </header>
 
 <!-- TABS -->
-<nav class="nav-tabs">
-  <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 Inicio</button>
-  <button class="tab-btn" onclick="showTab('ordenes',this)">📋 Órdenes</button>
-  <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
-  <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
+<nav class="nav-tabs" role="tablist">
+  <button class="tab-btn active" role="tab" aria-selected="true" onclick="showTab('dashboard',this)">📊 Inicio</button>
+  <button class="tab-btn" role="tab" aria-selected="false" onclick="showTab('ordenes',this)">📋 Órdenes</button>
+  <button class="tab-btn" role="tab" aria-selected="false" onclick="showTab('nueva',this)">➕ Nueva</button>
+  <button class="tab-btn" role="tab" aria-selected="false" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
 </nav>
 
 <!-- DASHBOARD -->
@@ -396,7 +397,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <button class="fab" onclick="abrirModalNueva()">+</button>
 
 <!-- MODAL ORDEN -->
-<div class="modal-overlay" id="modal-orden">
+<div class="modal-overlay" id="modal-orden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="modal-title">Nueva Orden</div>
@@ -420,7 +421,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </div>
 
 <!-- CONFIRM MODAL -->
-<div class="modal-overlay" id="modal-confirm">
+<div class="modal-overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
   <div class="modal" style="max-width:360px">
     <div class="confirm-body">
       <div class="confirm-icon" id="confirm-icon">⚠️</div>
@@ -563,7 +564,8 @@ const IDB = {
 // ═══════════════════════════════════════
 function fmt(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+let _toastTimer=null;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); if(_toastTimer)clearTimeout(_toastTimer); _toastTimer=setTimeout(()=>{t.classList.remove('show');_toastTimer=null;},2800); }
 function renderAll(){ renderDashboard(); renderOrdenes(); updateSidebarStatus(); }
 
 // ═══════════════════════════════════════
@@ -579,15 +581,9 @@ function abrirDoc(titulo, bodyHTML) {
     + '<style>' + DOC_CSS + '</style>'
     + '</head><body>' + bodyHTML + '</body></html>';
 
-  // Mostrar en el overlay dentro de la app
-  document.getElementById('doc-frame').innerHTML = bodyHTML;
-  // Aplicar estilos dentro del frame para preview
-  let styleEl = document.getElementById('doc-preview-style');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'doc-preview-style';
-    document.getElementById('doc-frame').appendChild(styleEl);
-  }
+  // Mostrar en el overlay dentro de la app con estilos aplicados
+  const frame = document.getElementById('doc-frame');
+  frame.innerHTML = '<style>' + DOC_CSS + '</style>' + bodyHTML;
   document.getElementById('doc-topbar-title').textContent = titulo;
   document.getElementById('doc-overlay').classList.add('open');
 }
@@ -662,9 +658,9 @@ function headerEmpresa(tipoDoc, folio, fecha) {
     +   '</div>'
     + '</div>'
     + '<div class="doc-badge">'
-    +   '<div class="doc-badge-title">' + tipoDoc + '</div>'
-    +   '<div class="doc-badge-num">' + folio + '</div>'
-    +   '<div class="doc-badge-date">Emitida: ' + fecha + '</div>'
+    +   '<div class="doc-badge-title">' + esc(tipoDoc) + '</div>'
+    +   '<div class="doc-badge-num">' + esc(folio) + '</div>'
+    +   '<div class="doc-badge-date">Emitida: ' + esc(fecha) + '</div>'
     + '</div>'
     + '</div>';
 }
@@ -775,7 +771,7 @@ async function guardarOrden(orden) {
     orden.fecha_creacion = Date.now();
     ordenes.unshift(orden);
   }
-  guardarLocal();
+  await guardarLocal();
   renderAll();
 }
 
@@ -795,7 +791,7 @@ async function eliminarOrden(id) {
     }
   }
   ordenes = ordenes.filter(o => o.id !== id);
-  guardarLocal();
+  await guardarLocal();
   renderAll();
   toast('Orden eliminada');
 }
@@ -805,9 +801,9 @@ async function eliminarOrden(id) {
 // ═══════════════════════════════════════
 function showTab(id, btn) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
   document.getElementById('tab-'+id).classList.add('active');
-  if (btn) btn.classList.add('active');
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
   if (id !== 'nueva') {
     document.getElementById('form-nueva-wrapper').innerHTML = '';
     if (activeFormMount === 'nueva') activeFormMount = null;
@@ -820,6 +816,9 @@ function showTab(id, btn) {
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
   }
+  // FAB solo visible donde aplica crear una orden
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.display = (id === 'cotizaciones' || id === 'nueva') ? 'none' : '';
 }
 
 // ═══════════════════════════════════════
@@ -856,9 +855,17 @@ function irAOrden(id) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-ordenes').classList.add('active');
-  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  const tabOrdenes = document.querySelector('.tab-btn[onclick*="ordenes"]');
+  if (tabOrdenes) tabOrdenes.classList.add('active');
   filtroEstado='todos'; renderOrdenes();
-  setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
+  setTimeout(()=>{
+    const el=document.getElementById('ord-'+id);
+    if(el){
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      el.style.borderColor='var(--accent)';
+      setTimeout(()=>{ el.style.borderColor=''; }, 2000);
+    }
+  },100);
 }
 
 // ═══════════════════════════════════════
@@ -912,7 +919,7 @@ function renderPorCliente(lista) {
     const ords = grupos[nombre];
     const saldoPend = ords.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
       .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0), 0);
-    const groupId = 'cg_' + btoa(nombre).replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
+    const groupId = 'cg_' + btoa(unescape(encodeURIComponent(nombre))).replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
     const badgePend = saldoPend > 0
       ? `<span class="cg-badge pending">Por cobrar ${fmt(saldoPend)}</span>`
       : `<span class="cg-badge ok">✓ Al corriente</span>`;
@@ -980,7 +987,7 @@ function ordenCard(o) {
     </div></div>`;
 }
 
-function toggleOrden(id){ document.getElementById('body-'+id).classList.toggle('open'); }
+function toggleOrden(id){ const el=document.getElementById('body-'+id); if(el) el.classList.toggle('open'); }
 
 // ═══════════════════════════════════════
 // BOLETA
@@ -1114,7 +1121,7 @@ function buildFormHTML(orden) {
     <input class="form-input" id="f-recordatorios" placeholder="Garantía, cobrar quincena..." value="${esc(o.recordatorios||'')}"></div>
   <div style="display:flex;gap:10px;padding-top:4px">
     <button class="btn btn-primary" style="flex:1" onclick="submitOrden()">💾 Guardar orden</button>
-    <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+    <button class="btn btn-ghost" onclick="cancelarFormOrden()">Cancelar</button>
   </div>`;
 }
 
@@ -1128,9 +1135,9 @@ function productoRowHTML(p,i) {
     </div>
     <div class="form-row cols-3">
       <div class="form-group"><label class="form-label">Costo ($)</label>
-        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}" oninput="calcGanancia(this)"></div>
+        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}"></div>
       <div class="form-group"><label class="form-label">Inversión ($)</label>
-        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}" oninput="calcGanancia(this)"></div>
+        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}"></div>
       <div class="form-group"><label class="form-label">Garantía</label>
         <select class="form-select prod-garantia">
           <option value="" ${!p.garantia?'selected':''}>Sin garantía</option>
@@ -1162,7 +1169,7 @@ function recalcTotal() {
   if (el) {
     el.value = suma || '';
     el.style.borderColor = 'var(--green)';
-    setTimeout(() => { el.style.borderColor = ''; }, 800);
+    setTimeout(() => { if(el.isConnected) el.style.borderColor = ''; }, 800);
   }
 }
 
@@ -1235,11 +1242,22 @@ async function submitOrden() {
     else {
       document.getElementById('form-nueva-wrapper').innerHTML = '';
       activeFormMount = null;
-      showTab('ordenes', document.querySelectorAll('.tab-btn')[1]);
+      showTab('ordenes', document.querySelector('.tab-btn[onclick*="ordenes"]'));
     }
     toast('✅ Orden guardada');
     editandoId = null;
   } catch(e) { /* toast ya mostrado en guardarOrden */ }
+}
+
+function cancelarFormOrden() {
+  if (activeFormMount === 'modal') {
+    cerrarModal();
+  } else {
+    document.getElementById('form-nueva-wrapper').innerHTML = '';
+    activeFormMount = null;
+    editandoId = null;
+    showTab('ordenes', document.querySelector('.tab-btn[onclick*="ordenes"]'));
+  }
 }
 
 // MODAL
@@ -1380,10 +1398,11 @@ function cotPartidaHTML(p,i) {
 
 function calcPartida(input) {
   const row=input.closest('.partida-row');
-  const cant=parseFloat(row.querySelector('.cot-pcant').value)||1;
-  const precio=parseFloat(row.querySelector('.cot-pprecio').value)||0;
-  const descto=parseFloat(row.querySelector('.cot-pdescto').value)||0;
-  row.querySelector('.cot-psubtotal').value=(precio*cant*(1-descto/100)).toFixed(2)||'';
+  if (!row) return;
+  const cant=parseFloat(row.querySelector('.cot-pcant')?.value)||1;
+  const precio=parseFloat(row.querySelector('.cot-pprecio')?.value)||0;
+  const descto=parseFloat(row.querySelector('.cot-pdescto')?.value)||0;
+  const sub=row.querySelector('.cot-psubtotal'); if(sub) sub.value=(precio*cant*(1-descto/100)).toFixed(2)||'';
 }
 
 function cotIvaActivo() {
@@ -1501,7 +1520,14 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();_confirmCancel();} });
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape') return;
+  // Cierra solo el overlay de mayor z-index que esté abierto
+  if(document.getElementById('modal-confirm').classList.contains('open')){ _confirmCancel(); return; }
+  if(document.getElementById('doc-overlay').classList.contains('open')){ cerrarDoc(); return; }
+  if(document.getElementById('modal-orden').classList.contains('open')){ cerrarModal(); return; }
+  if(document.getElementById('sidebar').classList.contains('open')){ closeSidebar(); return; }
+});
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
 function initAppData() {
@@ -1517,7 +1543,9 @@ window.addEventListener('firebaseReady', () => {
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window._useFirebase) cargarOrdenesLocal();
+  // Note: ES modules execute before DOMContentLoaded per spec, so firebaseReady always
+  // fires first and initAppData handles both Firebase and local modes via cargarOrdenes().
+  // No redundant cargarOrdenesLocal() call here to avoid double-loading data.
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
@@ -1567,7 +1595,12 @@ async function cambiarEstado(id, nuevoEstado) {
       await updateDoc(doc(window._firebaseDb, 'ordenes', id), { estado: nuevoEstado });
       toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
       return;
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Firebase no disponible — guardando local');
+      window._useFirebase = false;
+      updateFirebaseBadge();
+    }
   }
   await guardarLocal();
   renderAll();
@@ -1636,9 +1669,8 @@ function closeSidebar() {
 
 function navTo(tab) {
   closeSidebar();
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3 };
-  showTab(tab, tabBtns[tabMap[tab]]);
+  const tabBtn = document.querySelector(`.tab-btn[onclick*="'${tab}'"]`);
+  showTab(tab, tabBtn);
   document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
   const si = document.getElementById('si-' + tab);
   if (si) si.classList.add('active');
@@ -1676,6 +1708,7 @@ function exportarExcel() {
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     s.onload = _doExportExcel;
+    s.onerror = () => toast('⚠️ Error al cargar la librería de Excel. Verifica tu conexión.');
     document.head.appendChild(s);
   } else {
     _doExportExcel();
@@ -1762,14 +1795,18 @@ function procesarRestaurarJSON(event) {
   if (!file) return;
   event.target.value = '';
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
       const nuevas = data.ordenes || (Array.isArray(data) ? data : null);
       if (!nuevas || !Array.isArray(nuevas)) { toast('⚠️ Formato de archivo inválido'); return; }
-      if (!confirm('¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales actuales.')) return;
+      const aviso = window._useFirebase
+        ? 'Se restaurarán ' + nuevas.length + ' órdenes. Los datos locales actuales se reemplazarán. Los datos en Firebase NO se modifican.'
+        : 'Se restaurarán ' + nuevas.length + ' órdenes. Los datos locales actuales se reemplazarán.';
+      const ok = await confirmarAccion('Restaurar respaldo', aviso, '📤', 'Restaurar');
+      if (!ok) return;
       ordenes = nuevas;
-      guardarLocal();
+      await guardarLocal();
       renderAll();
       toast('✅ ' + nuevas.length + ' órdenes restauradas');
     } catch(err) {
@@ -1792,6 +1829,7 @@ window.quitarProducto = quitarProducto;
 window.calcGanancia = calcGanancia;
 window.submitOrden = submitOrden;
 window.abrirModalNueva = abrirModalNueva;
+window.cancelarFormOrden = cancelarFormOrden;
 window.editarOrden = editarOrden;
 window.cerrarModal = cerrarModal;
 window.eliminarOrden = eliminarOrden;
