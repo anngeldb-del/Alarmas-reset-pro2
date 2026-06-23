@@ -541,6 +541,7 @@ let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
+let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
@@ -641,7 +642,13 @@ const IDB = {
 function fmt(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
-function renderAll(){ renderDashboard(); renderOrdenes(); updateSidebarStatus(); }
+function renderAll(){
+  renderDashboard(); renderOrdenes(); updateSidebarStatus();
+  if (!_autoExportChecked && ordenes.length > 0) {
+    _autoExportChecked = true;
+    setTimeout(intentarAutoExportM365, 800);
+  }
+}
 
 // ═══════════════════════════════════════
 // DOCUMENTO OVERLAY — imprimir / compartir
@@ -1585,7 +1592,6 @@ function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   setTimeout(initOnboarding, 800);
-  setTimeout(checkBannerExport, 1200);
 }
 window.addEventListener('firebaseReady', () => {
   if (document.readyState === 'loading') {
@@ -1934,6 +1940,63 @@ function cargarLogsExport() {
   }).join('');
 }
 
+// ── Auto-exportación día 30 (sin intervención si ya hay sesión) ──
+async function intentarAutoExportM365() {
+  const hoy = new Date();
+  const mes = hoy.toISOString().slice(0,7);
+  const ultimoExport = localStorage.getItem('m365_ultimo_export');
+  const clientId = localStorage.getItem('m365_client_id');
+  const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate();
+  const diaExport = Math.min(30, ultimoDia);
+
+  // Si no es el día de exportación, ya se exportó, o no hay configuración → solo revisar banner
+  if (hoy.getDate() !== diaExport || ultimoExport === mes || !clientId) {
+    checkBannerExport(); return;
+  }
+
+  try {
+    const inst = await M365.getInstance();
+    const accounts = inst.getAllAccounts();
+
+    if (!accounts.length) {
+      // Sin sesión guardada → mostrar banner para que el usuario haga clic
+      checkBannerExport(); return;
+    }
+
+    M365._account = accounts[0];
+    actualizarUIm365();
+
+    // Intentar token silencioso — si la sesión sigue viva, funciona sin popup
+    const resp = await inst.acquireTokenSilent({ scopes: M365.SCOPES, account: accounts[0] });
+
+    // ¡Sesión activa! Exportar sin que el usuario haga nada
+    toast('📅 Día ' + diaExport + ' — Exportando respaldo mensual a OneDrive...');
+
+    if (typeof XLSX === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const buffer = _buildExcelBuffer();
+    const filename = `AlarmasReset-${mes}.xlsx`;
+    const fileData = await M365.uploadExcel(resp.accessToken, buffer, filename);
+
+    await _logExportM365(filename, fileData?.webUrl || '');
+    localStorage.setItem('m365_ultimo_export', mes);
+    cerrarBannerExport();
+    toast('✅ Respaldo mensual guardado en OneDrive: ' + filename);
+
+  } catch(e) {
+    // Sesión expirada o token inválido → mostrar banner para login manual (un clic)
+    console.log('Auto-export silencioso:', e.message);
+    checkBannerExport();
+  }
+}
+
 // ── Banner día 30 ─────────────────────────────────────
 function checkBannerExport() {
   const hoy = new Date();
@@ -2243,6 +2306,7 @@ window.iniciarSesionM365 = iniciarSesionM365;
 window.cerrarSesionM365 = cerrarSesionM365;
 window.exportarM365 = exportarM365;
 window.cerrarBannerExport = cerrarBannerExport;
+window.intentarAutoExportM365 = intentarAutoExportM365;
 window.cambiarEstado = cambiarEstado;
 window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;
