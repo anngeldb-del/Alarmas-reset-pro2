@@ -233,6 +233,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .sb-user-status{font-size:11px;color:var(--muted);margin-top:2px}
 .sb-user-status.connected{color:var(--green)}
 
+/* BANNER DÍA 30 */
+.export-banner{display:none;background:linear-gradient(135deg,rgba(255,107,53,.15),rgba(255,209,102,.1));border:1px solid rgba(255,107,53,.35);border-radius:var(--radius);padding:14px 16px;margin:16px 20px 0;gap:12px;align-items:center}
+.export-banner.show{display:flex}
+.export-banner-text{flex:1;font-size:13px;font-family:var(--font-display);font-weight:700}
+.export-banner-sub{font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+
+/* M365 MODAL */
+.m365-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:12px;font-size:13px}
+.m365-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.m365-dot.on{background:var(--green)}
+.m365-dot.err{background:var(--red)}
+.export-log-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+.export-log-row:last-child{border-bottom:none}
+
 /* ESTADO EN PROCESO */
 .estado-badge.en_proceso{background:rgba(67,97,238,.15);color:#4361ee}
 
@@ -311,7 +325,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
   <div class="sidebar-section-label">HERRAMIENTAS</div>
   <button class="sidebar-item" onclick="exportarExcel()">
-    <span class="si-icon">📊</span><span class="si-label">Exportar Excel</span>
+    <span class="si-icon">📊</span><span class="si-label">Exportar Excel local</span>
+  </button>
+  <button class="sidebar-item" onclick="abrirModalM365()">
+    <span class="si-icon" style="font-size:13px">🔷</span><span class="si-label">Microsoft 365</span>
+    <span id="si-m365-dot" style="font-size:10px;color:var(--muted)">●</span>
   </button>
   <button class="sidebar-item" onclick="respaldoJSON()">
     <span class="si-icon">📥</span><span class="si-label">Respaldo JSON</span>
@@ -352,6 +370,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
   <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
 </nav>
+
+<!-- BANNER DÍA 30 -->
+<div class="export-banner" id="export-banner">
+  <span style="font-size:24px">🔷</span>
+  <div>
+    <div class="export-banner-text">Exportación mensual Microsoft 365</div>
+    <div class="export-banner-sub">Hoy es día 30 — ¿Exportar respaldo a OneDrive?</div>
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="abrirModalM365()">Exportar</button>
+  <button class="btn btn-ghost btn-sm" onclick="cerrarBannerExport()" style="padding:6px 8px">✕</button>
+</div>
 
 <!-- DASHBOARD -->
 <div class="view active" id="tab-dashboard">
@@ -417,6 +446,54 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <button class="btn btn-ghost btn-sm" onclick="cerrarDoc()">✕</button>
   </div>
   <div class="doc-frame" id="doc-frame"></div>
+</div>
+
+<!-- MODAL MICROSOFT 365 -->
+<div class="modal-overlay" id="modal-m365">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">🔷 Microsoft 365 — OneDrive</div>
+      <button class="modal-close" onclick="cerrarModalM365()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Estado de conexión -->
+      <div class="m365-status" id="m365-conn-status">
+        <div class="m365-dot" id="m365-dot"></div>
+        <span id="m365-conn-text">Sin sesión iniciada</span>
+      </div>
+
+      <!-- Configuración -->
+      <div class="form-section">Configuración Azure AD</div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Client ID (Azure App Registration)</label>
+        <input class="form-input" id="m365-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          value="" style="font-family:monospace;font-size:12px">
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        ℹ️ Registra tu app en <strong>portal.azure.com</strong> → Azure AD → App registrations.<br>
+        Permisos necesarios: <code>Files.ReadWrite</code> · <code>User.Read</code><br>
+        Redirect URI: <code id="m365-redirect-hint" style="color:var(--accent)">cargando...</code>
+      </div>
+
+      <!-- Acciones -->
+      <div class="form-section">Acciones</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="iniciarSesionM365()" id="btn-m365-login">
+          🔷 Iniciar sesión con Microsoft
+        </button>
+        <button class="btn btn-ghost" id="btn-m365-export" onclick="exportarM365()" disabled style="opacity:.5">
+          📊 Exportar ahora a OneDrive
+        </button>
+        <button class="btn btn-ghost" onclick="cerrarSesionM365()" id="btn-m365-logout" style="display:none">
+          Cerrar sesión Microsoft
+        </button>
+      </div>
+
+      <!-- Historial de exportaciones -->
+      <div class="form-section">Historial de exportaciones</div>
+      <div id="m365-log-lista" style="font-size:12px;color:var(--muted)">Sin exportaciones registradas.</div>
+    </div>
+  </div>
 </div>
 
 <!-- CONFIRM MODAL -->
@@ -1501,13 +1578,14 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();_confirmCancel();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();_confirmCancel();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   setTimeout(initOnboarding, 800);
+  setTimeout(checkBannerExport, 1200);
 }
 window.addEventListener('firebaseReady', () => {
   if (document.readyState === 'loading') {
@@ -1530,6 +1608,350 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('modal-confirm')) _confirmCancel();
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// MICROSOFT 365 — INTEGRACIÓN GRAPH API (FASE 1)
+// ═══════════════════════════════════════════════════════
+
+const M365 = {
+  _instance: null,
+  _account: null,
+  SCOPES: ['Files.ReadWrite', 'User.Read'],
+
+  get clientId() {
+    return localStorage.getItem('m365_client_id') || '';
+  },
+
+  async loadMSAL() {
+    if (window.msal) return true;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+      s.onload = () => resolve(true);
+      s.onerror = () => reject(new Error('No se pudo cargar MSAL.js'));
+      document.head.appendChild(s);
+    });
+  },
+
+  async getInstance() {
+    if (this._instance) return this._instance;
+    if (!this.clientId) throw new Error('Configura tu Client ID de Azure primero.');
+    await this.loadMSAL();
+    this._instance = new msal.PublicClientApplication({
+      auth: {
+        clientId: this.clientId,
+        authority: 'https://login.microsoftonline.com/common',
+        redirectUri: window.location.origin + window.location.pathname
+      },
+      cache: {
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: false
+      }
+    });
+    await this._instance.initialize();
+    // Restaurar cuenta activa si hay
+    const accounts = this._instance.getAllAccounts();
+    if (accounts.length > 0) this._account = accounts[0];
+    return this._instance;
+  },
+
+  async login() {
+    const inst = await this.getInstance();
+    const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES });
+    this._account = resp.account;
+    return resp.accessToken;
+  },
+
+  async getToken() {
+    const inst = await this.getInstance();
+    if (!this._account) throw new Error('Inicia sesión con Microsoft primero.');
+    try {
+      const resp = await inst.acquireTokenSilent({ scopes: this.SCOPES, account: this._account });
+      return resp.accessToken;
+    } catch(e) {
+      // Token expirado — pedir interactivo
+      const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES, account: this._account });
+      this._account = resp.account;
+      return resp.accessToken;
+    }
+  },
+
+  logout() {
+    this._account = null;
+    this._instance = null;
+    localStorage.removeItem('m365_client_id');
+  },
+
+  isLoggedIn() {
+    return !!this._account;
+  },
+
+  async graphFetch(token, path, method = 'GET', body = null, contentType = 'application/json') {
+    const opts = {
+      method,
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': contentType }
+    };
+    if (body) opts.body = body;
+    const resp = await fetch(`https://graph.microsoft.com/v1.0${path}`, opts);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: { message: resp.statusText } }));
+      throw new Error(err.error?.message || `Graph API ${resp.status}`);
+    }
+    return method === 'PUT' ? resp.json() : resp.json().catch(() => ({}));
+  },
+
+  async uploadExcel(token, buffer, filename) {
+    // Crear carpeta /AlarmasReset en OneDrive raíz
+    try {
+      await this.graphFetch(token, '/me/drive/root/children', 'POST', JSON.stringify({
+        name: 'AlarmasReset', folder: {},
+        '@microsoft.graph.conflictBehavior': 'replace'
+      }));
+    } catch(e) { /* carpeta ya existe */ }
+
+    // Subir archivo (replace si existe)
+    const uint8 = new Uint8Array(buffer);
+    const blob = new Blob([uint8], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const resp = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/AlarmasReset/${filename}:/content`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        },
+        body: blob
+      }
+    );
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Upload error ${resp.status}`);
+    }
+    return resp.json();
+  }
+};
+
+// ── UI: Modal M365 ────────────────────────────────────
+function abrirModalM365() {
+  closeSidebar();
+  const clientIdEl = document.getElementById('m365-client-id');
+  if (clientIdEl) clientIdEl.value = localStorage.getItem('m365_client_id') || '';
+  const hint = document.getElementById('m365-redirect-hint');
+  if (hint) hint.textContent = window.location.origin + window.location.pathname;
+  actualizarUIm365();
+  cargarLogsExport();
+  document.getElementById('modal-m365').classList.add('open');
+}
+
+function cerrarModalM365() {
+  document.getElementById('modal-m365').classList.remove('open');
+}
+
+function actualizarUIm365() {
+  const isOn = M365.isLoggedIn();
+  const dot = document.getElementById('m365-dot');
+  const txt = document.getElementById('m365-conn-text');
+  const btnExport = document.getElementById('btn-m365-export');
+  const btnLogout = document.getElementById('btn-m365-logout');
+  const sidebarDot = document.getElementById('si-m365-dot');
+
+  if (dot) { dot.className = 'm365-dot' + (isOn ? ' on' : ''); }
+  if (txt) txt.textContent = isOn
+    ? `Conectado: ${M365._account?.username || M365._account?.name || 'cuenta Microsoft'}`
+    : 'Sin sesión iniciada';
+  if (btnExport) { btnExport.disabled = !isOn; btnExport.style.opacity = isOn ? '1' : '.5'; }
+  if (btnLogout) btnLogout.style.display = isOn ? '' : 'none';
+  if (sidebarDot) sidebarDot.style.color = isOn ? 'var(--green)' : 'var(--muted)';
+}
+
+async function iniciarSesionM365() {
+  const clientId = document.getElementById('m365-client-id')?.value?.trim();
+  if (!clientId) { toast('⚠️ Ingresa tu Client ID de Azure'); return; }
+  localStorage.setItem('m365_client_id', clientId);
+  M365._instance = null; // Forzar reinicio con nuevo client ID
+  toast('⏳ Abriendo ventana de Microsoft...');
+  try {
+    await M365.login();
+    actualizarUIm365();
+    toast('✅ Sesión iniciada con Microsoft');
+  } catch(e) {
+    if (e.name === 'BrowserAuthError' && e.errorCode === 'user_cancelled') {
+      toast('Inicio de sesión cancelado');
+    } else {
+      toast('⚠️ Error: ' + e.message);
+    }
+  }
+}
+
+function cerrarSesionM365() {
+  M365.logout();
+  actualizarUIm365();
+  toast('Sesión de Microsoft cerrada');
+}
+
+async function exportarM365() {
+  if (!M365.isLoggedIn()) { toast('⚠️ Inicia sesión con Microsoft primero'); return; }
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
+
+  const btnExport = document.getElementById('btn-m365-export');
+  if (btnExport) { btnExport.disabled = true; btnExport.textContent = '⏳ Exportando...'; }
+
+  try {
+    toast('⏳ Generando Excel...');
+    if (typeof XLSX === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const buffer = _buildExcelBuffer();
+    const mes = new Date().toISOString().slice(0, 7);
+    const filename = `AlarmasReset-${mes}.xlsx`;
+
+    toast('⏳ Subiendo a OneDrive...');
+    const token = await M365.getToken();
+    const fileData = await M365.uploadExcel(token, buffer, filename);
+
+    // Registrar exportación
+    await _logExportM365(filename, fileData.webUrl || '');
+    cargarLogsExport();
+    actualizarUIm365();
+
+    const mesLabel = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    toast(`✅ Exportado a OneDrive: ${filename}`);
+
+    // Marcar para no volver a mostrar banner este mes
+    localStorage.setItem('m365_ultimo_export', mes);
+    cerrarBannerExport();
+
+  } catch(e) {
+    console.error('Error exportar M365:', e);
+    toast('⚠️ Error: ' + e.message);
+  } finally {
+    if (btnExport) { btnExport.disabled = false; btnExport.textContent = '📊 Exportar ahora a OneDrive'; }
+  }
+}
+
+function _buildExcelBuffer() {
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Órdenes
+  const h1 = [['ID','Cliente','Vehículo','F. Instalación','F. Pago','Estado','Total','A Cuenta','Saldo','Notas']];
+  ordenes.forEach(o => {
+    const t = o.total||0, a = o.a_cuenta_total||0;
+    const est = (o.estado||'PENDIENTE').toUpperCase();
+    h1.push([o.id||'', o.cliente||'', o.vehiculo||'', o.fecha_instalacion||'', o.fecha_pago||'',
+      ESTADO_LABELS[est]||est, t, a, t-a, o.recordatorios||'']);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(h1);
+  ws1['!cols'] = [{wch:20},{wch:24},{wch:24},{wch:15},{wch:15},{wch:14},{wch:13},{wch:13},{wch:13},{wch:34}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Órdenes');
+
+  // Hoja 2: Servicios detallados
+  const h2 = [['ID Orden','Cliente','Vehículo','Estado','Servicio','Costo','Inversión','Ganancia','Garantía']];
+  ordenes.forEach(o => {
+    const est = (o.estado||'PENDIENTE').toUpperCase();
+    (o.productos||[]).forEach(p => {
+      const c = parseFloat(p.costo)||0, inv = parseFloat(p.inversion)||0;
+      h2.push([o.id||'', o.cliente||'', o.vehiculo||'', ESTADO_LABELS[est]||est,
+        p.nombre||'', c, inv, c-inv, p.garantia||'Sin garantía']);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(h2);
+  ws2['!cols'] = [{wch:20},{wch:24},{wch:24},{wch:14},{wch:32},{wch:13},{wch:13},{wch:13},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
+
+  // Hoja 3: Resumen financiero
+  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
+  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[])
+    .reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
+  const porCobrar = ordenes.filter(o=>['PENDIENTE','EN_PROCESO']
+    .includes((o.estado||'').toUpperCase()))
+    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const mes = new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  const h3 = [
+    ['RESUMEN FINANCIERO MENSUAL — ALARMAS Y GPS RESET'],
+    ['Período:', mes],
+    ['Generado:', new Date().toLocaleString('es-MX')],
+    ['Exportación vía:', 'Microsoft 365 OneDrive'],
+    [],
+    ['Indicador','Valor'],
+    ['Total facturado', totalFac],
+    ['Ganancia estimada', totalGan],
+    ['Por cobrar', porCobrar],
+    [],
+    ['Total órdenes', ordenes.length],
+    ['Pendientes', ordenes.filter(o=>(o.estado||'')==='PENDIENTE').length],
+    ['En proceso', ordenes.filter(o=>(o.estado||'')==='EN_PROCESO').length],
+    ['Pagadas', ordenes.filter(o=>(o.estado||'')==='PAGADO').length],
+    ['Termo', ordenes.filter(o=>(o.estado||'')==='TERMO').length],
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(h3);
+  ws3['!cols'] = [{wch:30},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen');
+
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+
+async function _logExportM365(filename, url) {
+  const log = {
+    tipo: 'microsoft_365',
+    filename, url,
+    fecha: new Date().toISOString(),
+    cuenta: M365._account?.username || '',
+    ordenes_count: ordenes.length,
+    total_facturado: ordenes.reduce((s,o)=>s+(o.total||0),0)
+  };
+  const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
+  logs.unshift(log);
+  localStorage.setItem('alarmas_export_logs', JSON.stringify(logs.slice(0,30)));
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { collection, addDoc } = window._firebaseModules;
+      await addDoc(collection(window._firebaseDb, 'export_logs'), log);
+    } catch(e) { /* no crítico */ }
+  }
+}
+
+function cargarLogsExport() {
+  const cont = document.getElementById('m365-log-lista');
+  if (!cont) return;
+  const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
+  if (!logs.length) { cont.innerHTML = '<span style="color:var(--muted)">Sin exportaciones registradas.</span>'; return; }
+  cont.innerHTML = logs.slice(0,8).map(l => {
+    const fecha = new Date(l.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
+    const icono = l.tipo === 'microsoft_365' ? '🔷' : '📊';
+    const link = l.url ? `<a href="${esc(l.url)}" target="_blank" style="color:var(--accent);text-decoration:none">Ver →</a>` : '';
+    return `<div class="export-log-row">
+      <span>${icono} ${esc(l.filename||l.tipo)}</span>
+      <span style="color:var(--muted)">${fecha} ${link}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Banner día 30 ─────────────────────────────────────
+function checkBannerExport() {
+  const hoy = new Date();
+  const mes = hoy.toISOString().slice(0,7);
+  const ultimoExport = localStorage.getItem('m365_ultimo_export');
+  const diasRestantes = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate() - hoy.getDate();
+  const banner = document.getElementById('export-banner');
+  if (!banner) return;
+  // Mostrar el banner el día 30, o el último día del mes si tiene menos de 30
+  const esDia30 = hoy.getDate() === 30 || (hoy.getDate() > 28 && diasRestantes === 0);
+  if (esDia30 && ultimoExport !== mes && localStorage.getItem('m365_client_id')) {
+    banner.classList.add('show');
+  }
+}
+
+function cerrarBannerExport() {
+  document.getElementById('export-banner')?.classList.remove('show');
+}
 
 // ═══════════════════════════════════════
 // CONFIRM MODAL
@@ -1815,6 +2237,12 @@ window.respaldoJSON = respaldoJSON;
 window.restaurarJSON = restaurarJSON;
 window.procesarRestaurarJSON = procesarRestaurarJSON;
 window.mostrarInfoFirebase = mostrarInfoFirebase;
+window.abrirModalM365 = abrirModalM365;
+window.cerrarModalM365 = cerrarModalM365;
+window.iniciarSesionM365 = iniciarSesionM365;
+window.cerrarSesionM365 = cerrarSesionM365;
+window.exportarM365 = exportarM365;
+window.cerrarBannerExport = cerrarBannerExport;
 window.cambiarEstado = cambiarEstado;
 window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;

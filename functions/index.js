@@ -1,0 +1,416 @@
+/**
+ * Firebase Cloud Functions — Alarmas Reset Pro
+ * Exportación automática mensual a Microsoft 365 (OneDrive/Excel)
+ *
+ * REQUISITOS PREVIOS:
+ * 1. Cuenta Firebase en plan Blaze (necesario para llamadas de red externas)
+ *    → firebase.google.com → Upgrade to Blaze (~$0 para este volumen)
+ *
+ * 2. Registro de App en Azure Active Directory:
+ *    → portal.azure.com → Azure AD → App registrations → New registration
+ *    → Name: "Alarmas Reset Export"
+ *    → Supported accounts: "Accounts in any organizational directory and personal Microsoft accounts"
+ *    → Redirect URI: (dejar vacío para client_credentials flow)
+ *    → Permisos: Microsoft Graph → Application permissions → Files.ReadWrite.All, User.ReadWrite.All
+ *    → Crear Client Secret en: Certificates & secrets → New client secret
+ *
+ * 3. Guardar en Firebase Secrets:
+ *    firebase functions:secrets:set AZURE_TENANT_ID
+ *    firebase functions:secrets:set AZURE_CLIENT_ID
+ *    firebase functions:secrets:set AZURE_CLIENT_SECRET
+ *    firebase functions:secrets:set ONEDRIVE_USER_EMAIL
+ *
+ * 4. Desplegar:
+ *    cd functions && npm install
+ *    firebase deploy --only functions
+ */
+
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { defineSecret } = require('firebase-functions/params');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+const { ClientSecretCredential } = require('@azure/identity');
+const { Client } = require('@microsoft/microsoft-graph-client');
+const { TokenCredentialAuthenticationProvider } = require('@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials');
+const ExcelJS = require('exceljs');
+
+initializeApp();
+
+// Secrets (configurados en Firebase Console o via CLI)
+const AZURE_TENANT_ID    = defineSecret('AZURE_TENANT_ID');
+const AZURE_CLIENT_ID    = defineSecret('AZURE_CLIENT_ID');
+const AZURE_CLIENT_SECRET = defineSecret('AZURE_CLIENT_SECRET');
+const ONEDRIVE_USER_EMAIL = defineSecret('ONEDRIVE_USER_EMAIL');
+
+const ESTADO_LABELS = {
+  PENDIENTE: 'Pendiente',
+  PAGADO: 'Pagado',
+  TERMO: 'Termo',
+  EN_PROCESO: 'En proceso'
+};
+
+// ════════════════════════════════════════════════════════
+// FUNCIÓN PRINCIPAL — Exportación automática día 30
+// ════════════════════════════════════════════════════════
+exports.exportMensualM365 = onSchedule({
+  schedule: '0 8 30 * *',           // Día 30 de cada mes a las 8:00 AM
+  timeZone: 'America/Monterrey',
+  retryCount: 3,                     // Reintentos automáticos ante fallo
+  secrets: [AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, ONEDRIVE_USER_EMAIL]
+}, async (event) => {
+  const db = getFirestore();
+  const inicio = Date.now();
+  const mes = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const logRef = db.collection('export_logs').doc();
+
+  // Verificar si ya se exportó este mes (evita duplicados en reintento)
+  const exportExistente = await db.collection('export_logs')
+    .where('mes', '==', mes)
+    .where('estado', '==', 'exito')
+    .limit(1)
+    .get();
+
+  if (!exportExistente.empty) {
+    console.log(`Ya existe exportación exitosa para ${mes}. Omitiendo.`);
+    return;
+  }
+
+  // Log de inicio
+  await logRef.set({
+    mes,
+    tipo: 'automatico_mensual',
+    estado: 'iniciado',
+    fecha_inicio: Timestamp.now(),
+    intento: event.retryCount || 1
+  });
+
+  try {
+    // 1. Obtener todas las órdenes de Firestore
+    console.log('Leyendo órdenes de Firestore...');
+    const snapshot = await db.collection('ordenes')
+      .orderBy('fecha_creacion', 'desc')
+      .get();
+    const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    console.log(`${ordenes.length} órdenes encontradas.`);
+
+    // 2. Construir archivo Excel
+    console.log('Construyendo Excel...');
+    const buffer = await buildExcel(ordenes, mes);
+
+    // 3. Subir a OneDrive
+    const filename = `AlarmasReset-${mes}.xlsx`;
+    console.log(`Subiendo ${filename} a OneDrive...`);
+    const fileUrl = await uploadToOneDrive(buffer, filename);
+    console.log(`Subido exitosamente: ${fileUrl}`);
+
+    // 4. Log de éxito
+    await logRef.update({
+      estado: 'exito',
+      filename,
+      url: fileUrl,
+      fecha_fin: Timestamp.now(),
+      duracion_ms: Date.now() - inicio,
+      ordenes_exportadas: ordenes.length,
+      total_facturado: ordenes.reduce((s, o) => s + (o.total || 0), 0),
+      ganancia: ordenes.reduce((s, o) =>
+        s + (o.productos || []).reduce((g, p) =>
+          g + (parseFloat(p.costo) || 0) - (parseFloat(p.inversion) || 0), 0), 0)
+    });
+
+    console.log(`✅ Exportación mensual completada: ${filename}`);
+
+  } catch (error) {
+    console.error('Error en exportación mensual:', error);
+
+    await logRef.update({
+      estado: 'error',
+      error_mensaje: error.message,
+      error_stack: error.stack?.slice(0, 500),
+      fecha_fin: Timestamp.now(),
+      duracion_ms: Date.now() - inicio
+    });
+
+    // Re-lanzar para que Firebase reintente (retryCount: 3)
+    throw error;
+  }
+});
+
+// ════════════════════════════════════════════════════════
+// FUNCIÓN MANUAL — Trigger HTTP para pruebas
+// Llamar con: POST /exportManual (solo desde Firebase Console o curl)
+// ════════════════════════════════════════════════════════
+exports.exportManual = require('firebase-functions/v2/https').onRequest({
+  secrets: [AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, ONEDRIVE_USER_EMAIL],
+  cors: false
+}, async (req, res) => {
+  // Verificar que la petición viene de localhost o del mismo proyecto
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  try {
+    const db = getFirestore();
+    const snapshot = await db.collection('ordenes').orderBy('fecha_creacion', 'desc').get();
+    const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const mes = new Date().toISOString().slice(0, 7);
+    const buffer = await buildExcel(ordenes, mes);
+    const filename = `AlarmasReset-${mes}-manual.xlsx`;
+    const fileUrl = await uploadToOneDrive(buffer, filename);
+
+    await db.collection('export_logs').add({
+      mes, tipo: 'manual', estado: 'exito',
+      filename, url: fileUrl,
+      fecha_inicio: Timestamp.now(),
+      ordenes_exportadas: ordenes.length
+    });
+
+    res.json({ success: true, url: fileUrl, filename, ordenes: ordenes.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════
+// CONSTRUCTOR DE EXCEL (3 hojas con formato profesional)
+// ════════════════════════════════════════════════════════
+async function buildExcel(ordenes, mes) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Alarmas y GPS Reset';
+  wb.lastModifiedBy = 'Sistema Automático';
+  wb.created = new Date();
+  wb.modified = new Date();
+
+  const COLOR_HEADER  = { argb: 'FF0A0C0F' };
+  const COLOR_TEXT    = { argb: 'FFFFFFFF' };
+  const COLOR_ACCENT  = { argb: 'FFFF6B35' };
+  const COLOR_GREEN   = { argb: 'FF06D6A0' };
+  const COLOR_RED     = { argb: 'FFEF233C' };
+  const ESTADO_COLORS = {
+    PAGADO:     { argb: 'FFD4EDDA' },
+    PENDIENTE:  { argb: 'FFFFF3CD' },
+    EN_PROCESO: { argb: 'FFD1ECF1' },
+    TERMO:      { argb: 'FFFFE5CC' }
+  };
+
+  function applyHeaderStyle(row) {
+    row.font = { bold: true, color: COLOR_TEXT, size: 10, name: 'Calibri' };
+    row.fill = { type: 'pattern', pattern: 'solid', fgColor: COLOR_HEADER };
+    row.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false };
+    row.height = 18;
+  }
+
+  // ── Hoja 1: Órdenes ──────────────────────────────────
+  const ws1 = wb.addWorksheet('Órdenes', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+  });
+  ws1.columns = [
+    { header: 'ID',              key: 'id',        width: 22 },
+    { header: 'Cliente',         key: 'cliente',   width: 24 },
+    { header: 'Vehículo',        key: 'vehiculo',  width: 24 },
+    { header: 'F. Instalación',  key: 'fInst',     width: 16 },
+    { header: 'F. Pago',         key: 'fPago',     width: 16 },
+    { header: 'Estado',          key: 'estado',    width: 14 },
+    { header: 'Total',           key: 'total',     width: 14 },
+    { header: 'A Cuenta',        key: 'aCuenta',   width: 14 },
+    { header: 'Saldo',           key: 'saldo',     width: 14 },
+    { header: 'Notas',           key: 'notas',     width: 36 },
+  ];
+  applyHeaderStyle(ws1.getRow(1));
+
+  const FMT_MXN = '"$"#,##0.00';
+
+  ordenes.forEach((o, idx) => {
+    const t = o.total || 0, a = o.a_cuenta_total || 0, saldo = t - a;
+    const est = (o.estado || 'PENDIENTE').toUpperCase();
+    const row = ws1.addRow({
+      id: o.id || '',
+      cliente: o.cliente || '',
+      vehiculo: o.vehiculo || '',
+      fInst: o.fecha_instalacion || '',
+      fPago: o.fecha_pago || '',
+      estado: ESTADO_LABELS[est] || est,
+      total: t, aCuenta: a, saldo,
+      notas: o.recordatorios || ''
+    });
+
+    // Fondo alterno
+    const bg = idx % 2 === 0
+      ? { argb: 'FFFAFAFA' }
+      : { argb: 'FFFFFFFF' };
+    row.fill = { type: 'pattern', pattern: 'solid', fgColor: bg };
+
+    // Color estado
+    const estadoCell = row.getCell('estado');
+    if (ESTADO_COLORS[est]) {
+      estadoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: ESTADO_COLORS[est] };
+    }
+    estadoCell.alignment = { horizontal: 'center' };
+
+    // Formato moneda
+    ['total', 'aCuenta'].forEach(k => {
+      row.getCell(k).numFmt = FMT_MXN;
+    });
+
+    // Saldo — rojo si positivo, verde si 0
+    const saldoCell = row.getCell('saldo');
+    saldoCell.numFmt = FMT_MXN;
+    saldoCell.font = { color: saldo > 0 ? COLOR_RED : COLOR_GREEN, bold: saldo > 0 };
+  });
+
+  // Fila totales
+  const lastRow1 = ws1.lastRow.number + 1;
+  const totRow = ws1.addRow({
+    cliente: 'TOTALES', estado: '',
+    total: ordenes.reduce((s, o) => s + (o.total || 0), 0),
+    aCuenta: ordenes.reduce((s, o) => s + (o.a_cuenta_total || 0), 0),
+    saldo: ordenes.reduce((s, o) => s + (o.total || 0) - (o.a_cuenta_total || 0), 0)
+  });
+  totRow.font = { bold: true };
+  totRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+  ['total', 'aCuenta', 'saldo'].forEach(k => {
+    totRow.getCell(k).numFmt = FMT_MXN;
+    totRow.getCell(k).font = { bold: true };
+  });
+
+  // ── Hoja 2: Servicios ─────────────────────────────────
+  const ws2 = wb.addWorksheet('Servicios', {
+    views: [{ state: 'frozen', ySplit: 1 }]
+  });
+  ws2.columns = [
+    { header: 'ID Orden',   key: 'id',        width: 22 },
+    { header: 'Cliente',    key: 'cliente',   width: 24 },
+    { header: 'Vehículo',   key: 'vehiculo',  width: 24 },
+    { header: 'Estado',     key: 'estado',    width: 14 },
+    { header: 'Servicio',   key: 'servicio',  width: 34 },
+    { header: 'Costo',      key: 'costo',     width: 14 },
+    { header: 'Inversión',  key: 'inversion', width: 14 },
+    { header: 'Ganancia',   key: 'ganancia',  width: 14 },
+    { header: 'Garantía',   key: 'garantia',  width: 18 },
+  ];
+  applyHeaderStyle(ws2.getRow(1));
+
+  let idx2 = 0;
+  ordenes.forEach(o => {
+    const est = (o.estado || 'PENDIENTE').toUpperCase();
+    (o.productos || []).forEach(p => {
+      const c = parseFloat(p.costo) || 0;
+      const inv = parseFloat(p.inversion) || 0;
+      const row = ws2.addRow({
+        id: o.id || '', cliente: o.cliente || '', vehiculo: o.vehiculo || '',
+        estado: ESTADO_LABELS[est] || est,
+        servicio: p.nombre || '',
+        costo: c, inversion: inv, ganancia: c - inv,
+        garantia: p.garantia || 'Sin garantía'
+      });
+      const bg = idx2 % 2 === 0 ? { argb: 'FFFAFAFA' } : { argb: 'FFFFFFFF' };
+      row.fill = { type: 'pattern', pattern: 'solid', fgColor: bg };
+      ['costo', 'inversion'].forEach(k => { row.getCell(k).numFmt = FMT_MXN; });
+      const ganCell = row.getCell('ganancia');
+      ganCell.numFmt = FMT_MXN;
+      ganCell.font = { color: c - inv >= 0 ? COLOR_GREEN : COLOR_RED };
+      row.getCell('estado').alignment = { horizontal: 'center' };
+      idx2++;
+    });
+  });
+
+  // ── Hoja 3: Resumen financiero ────────────────────────
+  const ws3 = wb.addWorksheet('Resumen');
+  ws3.getColumn(1).width = 32;
+  ws3.getColumn(2).width = 24;
+
+  const totalFac = ordenes.reduce((s, o) => s + (o.total || 0), 0);
+  const totalGan = ordenes.reduce((s, o) =>
+    s + (o.productos || []).reduce((g, p) =>
+      g + (parseFloat(p.costo) || 0) - (parseFloat(p.inversion) || 0), 0), 0);
+  const porCobrar = ordenes
+    .filter(o => ['PENDIENTE', 'EN_PROCESO'].includes((o.estado || '').toUpperCase()))
+    .reduce((s, o) => s + (o.total || 0) - (o.a_cuenta_total || 0), 0);
+
+  // Encabezado
+  const titleRow = ws3.addRow(['RESUMEN FINANCIERO MENSUAL']);
+  titleRow.font = { bold: true, size: 16, color: COLOR_ACCENT };
+  ws3.addRow(['Alarmas y GPS Reset — Solo Led Auto']);
+  ws3.addRow([`Período: ${new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}`]);
+  ws3.addRow([`Generado: ${new Date().toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' })}`]);
+  ws3.addRow([]);
+
+  // Métricas financieras
+  const addMetric = (label, value, isCurrency = true, color = null) => {
+    const row = ws3.addRow([label, value]);
+    row.getCell(1).font = { bold: false, size: 11 };
+    row.getCell(2).font = { bold: true, size: 12, color: color || { argb: 'FF111111' } };
+    if (isCurrency) row.getCell(2).numFmt = FMT_MXN;
+    row.getCell(2).alignment = { horizontal: 'right' };
+    return row;
+  };
+
+  const hdr1 = ws3.addRow(['FINANZAS', '']);
+  hdr1.font = { bold: true, size: 11, color: COLOR_TEXT };
+  hdr1.fill = { type: 'pattern', pattern: 'solid', fgColor: COLOR_HEADER };
+
+  addMetric('Total facturado en el período', totalFac, true, { argb: 'FFFFD166' });
+  addMetric('Ganancia estimada', totalGan, true, { argb: 'FF06D6A0' });
+  addMetric('Por cobrar (pendiente + en proceso)', porCobrar, true, { argb: 'FFEF233C' });
+
+  ws3.addRow([]);
+  const hdr2 = ws3.addRow(['ÓRDENES', '']);
+  hdr2.font = { bold: true, size: 11, color: COLOR_TEXT };
+  hdr2.fill = { type: 'pattern', pattern: 'solid', fgColor: COLOR_HEADER };
+
+  addMetric('Total de órdenes', ordenes.length, false);
+  addMetric('Pendientes', ordenes.filter(o => o.estado === 'PENDIENTE').length, false, { argb: 'FFFF6B35' });
+  addMetric('En proceso', ordenes.filter(o => o.estado === 'EN_PROCESO').length, false, { argb: 'FF4361EE' });
+  addMetric('Pagadas', ordenes.filter(o => o.estado === 'PAGADO').length, false, { argb: 'FF06D6A0' });
+  addMetric('Termo', ordenes.filter(o => o.estado === 'TERMO').length, false, { argb: 'FFFFD166' });
+
+  ws3.addRow([]);
+  ws3.addRow(['Exportado automáticamente por Alarmas Reset Pro — Sistema v2.0']);
+
+  // Buffer final
+  return await wb.xlsx.writeBuffer();
+}
+
+// ════════════════════════════════════════════════════════
+// SUBIDA A ONEDRIVE VÍA MICROSOFT GRAPH API
+// ════════════════════════════════════════════════════════
+async function uploadToOneDrive(buffer, filename) {
+  const credential = new ClientSecretCredential(
+    process.env.AZURE_TENANT_ID,
+    process.env.AZURE_CLIENT_ID,
+    process.env.AZURE_CLIENT_SECRET
+  );
+
+  const authProvider = new TokenCredentialAuthenticationProvider(credential, {
+    scopes: ['https://graph.microsoft.com/.default']
+  });
+
+  const client = Client.initWithMiddleware({ authProvider });
+  const userEmail = process.env.ONEDRIVE_USER_EMAIL;
+
+  // Crear carpeta /AlarmasReset si no existe
+  try {
+    await client
+      .api(`/users/${userEmail}/drive/root/children`)
+      .post({
+        name: 'AlarmasReset',
+        folder: {},
+        '@microsoft.graph.conflictBehavior': 'replace'
+      });
+  } catch (e) {
+    // La carpeta ya existe — es el error esperado
+    if (!e.message?.includes('nameAlreadyExists') && !e.statusCode === 409) {
+      console.warn('Advertencia al crear carpeta:', e.message);
+    }
+  }
+
+  // Subir archivo (reemplaza si ya existe)
+  const uploadPath = `/users/${userEmail}/drive/root:/AlarmasReset/${filename}:/content`;
+  const response = await client
+    .api(uploadPath)
+    .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    .put(Buffer.from(buffer));
+
+  return response.webUrl || '';
+}
