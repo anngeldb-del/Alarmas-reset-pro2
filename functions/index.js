@@ -400,7 +400,7 @@ async function uploadToOneDrive(buffer, filename) {
       });
   } catch (e) {
     // La carpeta ya existe — es el error esperado
-    if (!e.message?.includes('nameAlreadyExists') && !e.statusCode === 409) {
+    if (!e.message?.includes('nameAlreadyExists') && e.statusCode !== 409) {
       console.warn('Advertencia al crear carpeta:', e.message);
     }
   }
