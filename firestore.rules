@@ -5,5 +5,20 @@ service cloud.firestore {
     match /ordenes/{document=**} {
       allow read, write: if true;
     }
+    // Servicios e ítems del checklist — acceso abierto (uso interno)
+    match /checklist_services/{document=**} {
+      allow read, write: if true;
+    }
+    match /checklist_custom_items/{document=**} {
+      allow read, write: if true;
+    }
+    // Historial de exportaciones M365 — acceso abierto (uso interno)
+    match /export_logs/{document=**} {
+      allow read, write: if true;
+    }
+    // Datos de usuario (migración) — solo el propietario autenticado
+    match /usuarios/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
