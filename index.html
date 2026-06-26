@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -238,6 +237,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .export-banner.show{display:flex}
 .export-banner-text{flex:1;font-size:13px;font-family:var(--font-display);font-weight:700}
 .export-banner-sub{font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+.import-banner{display:none;background:linear-gradient(135deg,rgba(144,96,255,.12),rgba(0,229,200,.06));border:1px solid rgba(144,96,255,.35);border-radius:var(--radius);padding:14px 16px;margin:8px 20px 0;gap:12px;align-items:center}
+.import-banner.show{display:flex}
 
 /* M365 MODAL */
 .m365-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:12px;font-size:13px}
@@ -380,6 +381,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </div>
   <button class="btn btn-primary btn-sm" onclick="abrirModalM365()">Exportar</button>
   <button class="btn btn-ghost btn-sm" onclick="cerrarBannerExport()" style="padding:6px 8px">✕</button>
+</div>
+
+<!-- IMPORTAR ARTÍCULOS DESDE COTIZACIONES -->
+<div class="import-banner" id="import-banner">
+  <span style="font-size:22px">📋</span>
+  <div style="flex:1">
+    <div class="export-banner-text" id="import-banner-title">Artículos listos para importar</div>
+    <div class="export-banner-sub" id="import-banner-sub">Desde Cotizaciones — toca para cargar en nueva orden</div>
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="importarArticulos()">Importar</button>
+  <button class="btn btn-ghost btn-sm" onclick="descartarImport()" style="padding:6px 8px">✕</button>
 </div>
 
 <!-- DASHBOARD -->
@@ -1592,6 +1604,7 @@ function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   setTimeout(initOnboarding, 800);
+  checkPendingImport();
 }
 window.addEventListener('firebaseReady', () => {
   if (document.readyState === 'loading') {
@@ -1601,7 +1614,7 @@ window.addEventListener('firebaseReady', () => {
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window._useFirebase) cargarOrdenesLocal();
+  if (!window._useFirebase) { cargarOrdenesLocal(); checkPendingImport(); }
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
@@ -2311,6 +2324,83 @@ window.cambiarEstado = cambiarEstado;
 window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;
 window.skipOnboarding = skipOnboarding;
+
+/* ── IMPORTAR ARTÍCULOS DESDE COT-ALARMS-RST ── */
+function checkPendingImport() {
+  try {
+    const raw = localStorage.getItem('pending_cotizacion');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || data.status !== 'pending' || !data.items || !data.items.length) return;
+    const n = data.items.length;
+    const title = document.getElementById('import-banner-title');
+    const sub   = document.getElementById('import-banner-sub');
+    if (title) title.textContent = n + ' artículo' + (n > 1 ? 's' : '') + ' listo' + (n > 1 ? 's' : '') + ' para importar';
+    if (sub)   sub.textContent   = (data.client && data.client.nombre ? data.client.nombre + ' · ' : '') + 'Desde Cotizaciones — toca para cargar';
+    const banner = document.getElementById('import-banner');
+    if (banner) banner.classList.add('show');
+  } catch(e) {}
+}
+
+function importarArticulos() {
+  try {
+    const raw = localStorage.getItem('pending_cotizacion');
+    if (!raw) { toast('⚠️ No hay artículos pendientes de importar'); return; }
+    const data = JSON.parse(raw);
+    if (!data || !data.items || !data.items.length) { toast('⚠️ Sin artículos para importar'); return; }
+
+    navTo('nueva');
+
+    const fill = () => {
+      const root = getFormRoot();
+      if (!root) { setTimeout(fill, 150); return; }
+
+      const veh = root.querySelector('#f-vehiculo');
+      const cli = root.querySelector('#f-cliente');
+      const rec = root.querySelector('#f-recordatorios');
+      if (veh && data.client && data.client.vehiculo) veh.value = data.client.vehiculo;
+      if (cli && data.client && data.client.nombre)   cli.value = data.client.nombre;
+      if (rec && data.client && data.client.notas && data.client.notas.trim()) rec.value = data.client.notas;
+
+      const cont = root.querySelector('#productos-form');
+      if (cont) {
+        cont.innerHTML = '';
+        data.items.forEach((item, i) => {
+          const div = document.createElement('div');
+          div.innerHTML = productoRowHTML({ nombre: item.label, costo: '', inversion: '', garantia: '' }, Date.now() + i);
+          const row = div.firstElementChild;
+          if (row) cont.appendChild(row);
+        });
+      }
+    };
+    setTimeout(fill, 120);
+
+    data.status = 'imported';
+    localStorage.setItem('pending_cotizacion', JSON.stringify(data));
+    const banner = document.getElementById('import-banner');
+    if (banner) banner.classList.remove('show');
+    const n = data.items.length;
+    toast('📋 ' + n + ' artículo' + (n > 1 ? 's' : '') + ' importado' + (n > 1 ? 's' : '') + ' — completa los precios');
+  } catch(e) {
+    toast('⚠️ Error al importar: ' + (e.message || e));
+  }
+}
+
+function descartarImport() {
+  try {
+    const raw = localStorage.getItem('pending_cotizacion');
+    if (raw) {
+      const data = JSON.parse(raw);
+      data.status = 'discarded';
+      localStorage.setItem('pending_cotizacion', JSON.stringify(data));
+    }
+  } catch(e) {}
+  const banner = document.getElementById('import-banner');
+  if (banner) banner.classList.remove('show');
+}
+
+window.importarArticulos = importarArticulos;
+window.descartarImport = descartarImport;
 </script>
 </body>
 </html>
