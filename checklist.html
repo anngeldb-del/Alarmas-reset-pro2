@@ -6,10 +6,41 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <title>Alarmas Reset — Cotizaciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 
-<!-- FIREBASE SDK -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
   }
+</script>
+<!-- FIREBASE SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, doc,
+    onSnapshot, setDoc, deleteDoc,
+    query, orderBy, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+    authDomain: "alarmas-reset-e3484.firebaseapp.com",
+    projectId: "alarmas-reset-e3484",
+    storageBucket: "alarmas-reset-e3484.firebasestorage.app",
+    messagingSenderId: "1096561116547",
+    appId: "1:1096561116547:web:b13df05c092785723aa2b6"
+  };
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window._db = db;
+    window._fs = { collection, doc, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp };
+    window._fbReady = true;
+  } catch(e) {
+    console.warn('Firebase no disponible:', e);
+    window._fbReady = false;
+  }
+  window.dispatchEvent(new Event('fbReady'));
 </script>
