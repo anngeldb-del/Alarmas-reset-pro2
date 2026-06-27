@@ -13,7 +13,6 @@
     "firebase-functions": "^4.9.0",
     "@azure/identity": "^4.4.1",
     "@microsoft/microsoft-graph-client": "^3.0.7",
-    "@microsoft/microsoft-graph-client-azure-identity": "^1.0.0",
     "exceljs": "^4.4.0"
   }
 }
