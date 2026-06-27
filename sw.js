@@ -1,4 +1,4 @@
-const CACHE = 'app-v3';
+const CACHE = 'app-v4'; // Incrementar al desplegar nuevos archivos estáticos
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
@@ -14,6 +14,18 @@ self.addEventListener('activate', e => {
   );
 });
 self.addEventListener('fetch', e => {
+  // No interceptar peticiones a Firestore, MSAL ni Graph API — solo assets estáticos
+  const url = e.request.url;
+  if (
+    url.includes('firestore.googleapis.com') ||
+    url.includes('identitytoolkit.googleapis.com') ||
+    url.includes('googleapis.com') ||
+    url.includes('login.microsoftonline.com') ||
+    url.includes('graph.microsoft.com') ||
+    url.includes('alcdn.msauth.net')
+  ) {
+    return; // Dejar que el navegador maneje estas peticiones directamente
+  }
   e.respondWith(
     fetch(e.request)
       .then(res => {
