@@ -1,10 +1,7 @@
-const CACHE = 'app-v3';
+const CACHE = 'app-v4';
+const STATIC = ['./', './index.html', './checklist.html', './manifest.json'];
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(['./', './index.html', './checklist.html', './manifest.json']))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(
@@ -14,6 +11,8 @@ self.addEventListener('activate', e => {
   );
 });
 self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
