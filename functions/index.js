@@ -49,6 +49,14 @@ const ESTADO_LABELS = {
   EN_PROCESO: 'En proceso'
 };
 
+// Previene fórmula injection en Excel: valores como =SYSTEM() se ejecutarían
+// en Excel si ExcelJS los escribe sin prefijo. El apóstrofe inicial le indica
+// a Excel que trate el valor como texto, no como fórmula.
+function sanitizeCell(v) {
+  if (typeof v !== 'string') return v;
+  return /^[=+\-@\t\r\n]/.test(v) ? "'" + v : v;
+}
+
 // ════════════════════════════════════════════════════════
 // FUNCIÓN PRINCIPAL — Exportación automática día 30
 // ════════════════════════════════════════════════════════
@@ -225,14 +233,14 @@ async function buildExcel(ordenes, mes) {
     const t = o.total || 0, a = o.a_cuenta_total || 0, saldo = t - a;
     const est = (o.estado || 'PENDIENTE').toUpperCase();
     const row = ws1.addRow({
-      id: o.id || '',
-      cliente: o.cliente || '',
-      vehiculo: o.vehiculo || '',
-      fInst: o.fecha_instalacion || '',
-      fPago: o.fecha_pago || '',
-      estado: ESTADO_LABELS[est] || est,
+      id:       sanitizeCell(o.id || ''),
+      cliente:  sanitizeCell(o.cliente || ''),
+      vehiculo: sanitizeCell(o.vehiculo || ''),
+      fInst:    sanitizeCell(o.fecha_instalacion || ''),
+      fPago:    sanitizeCell(o.fecha_pago || ''),
+      estado:   ESTADO_LABELS[est] || est,
       total: t, aCuenta: a, saldo,
-      notas: o.recordatorios || ''
+      notas:    sanitizeCell(o.recordatorios || '')
     });
 
     // Fondo alterno
@@ -260,7 +268,7 @@ async function buildExcel(ordenes, mes) {
   });
 
   // Fila totales
-  const lastRow1 = ws1.lastRow.number + 1;
+  ws1.addRow([]);
   const totRow = ws1.addRow({
     cliente: 'TOTALES', estado: '',
     total: ordenes.reduce((s, o) => s + (o.total || 0), 0),
@@ -298,11 +306,13 @@ async function buildExcel(ordenes, mes) {
       const c = parseFloat(p.costo) || 0;
       const inv = parseFloat(p.inversion) || 0;
       const row = ws2.addRow({
-        id: o.id || '', cliente: o.cliente || '', vehiculo: o.vehiculo || '',
-        estado: ESTADO_LABELS[est] || est,
-        servicio: p.nombre || '',
+        id:       sanitizeCell(o.id || ''),
+        cliente:  sanitizeCell(o.cliente || ''),
+        vehiculo: sanitizeCell(o.vehiculo || ''),
+        estado:   ESTADO_LABELS[est] || est,
+        servicio: sanitizeCell(p.nombre || ''),
         costo: c, inversion: inv, ganancia: c - inv,
-        garantia: p.garantia || 'Sin garantía'
+        garantia: sanitizeCell(p.garantia || 'Sin garantía')
       });
       const bg = idx2 % 2 === 0 ? { argb: 'FFFAFAFA' } : { argb: 'FFFFFFFF' };
       row.fill = { type: 'pattern', pattern: 'solid', fgColor: bg };
@@ -399,8 +409,7 @@ async function uploadToOneDrive(buffer, filename) {
         '@microsoft.graph.conflictBehavior': 'replace'
       });
   } catch (e) {
-    // La carpeta ya existe — es el error esperado
-    if (!e.message?.includes('nameAlreadyExists') && e.statusCode !== 409) {
+    if (e.statusCode !== 409 && !e.message?.includes('nameAlreadyExists')) {
       console.warn('Advertencia al crear carpeta:', e.message);
     }
   }
