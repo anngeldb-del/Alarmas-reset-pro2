@@ -2,11 +2,2316 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://alcdn.msauth.net https://login.microsoftonline.com https://graph.microsoft.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://alcdn.msauth.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com wss://firestore.googleapis.com;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Alarmas Reset — Control de Órdenes</title>
 
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  // ══════════════════════════════════════════════════
+  // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
+  // ══════════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+    authDomain: "alarmas-reset-e3484.firebaseapp.com",
+    projectId: "alarmas-reset-e3484",
+    storageBucket: "alarmas-reset-e3484.firebasestorage.app",
+    messagingSenderId: "1096561116547",
+    appId: "1:1096561116547:web:b13df05c092785723aa2b6",
+    measurementId: "G-TJD208HVFB"
+  };
+  const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
+    && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
+  window._useFirebase = false;
+  if (fbConfigured) {
+    try {
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      window._firebaseDb = db;
+      window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query };
+      window._useFirebase = true;
+    } catch(e) {
+      console.warn('Firebase no inicializado:', e);
+      window._useFirebase = false;
+    }
   }
+  window.dispatchEvent(new Event('firebaseReady'));
 </script>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b35">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alarmas Reset">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg:#0a0a0f; --surface:#13131a; --surface2:#1c1c26; --border:#2a2a38;
+  --accent:#ff6b35; --accent2:#ffd166; --green:#06d6a0; --red:#ef233c;
+  --text:#f0f0f5; --muted:#7a7a95; --radius:12px;
+  --font-display:'Syne',sans-serif; --font-body:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;min-height:100vh;overflow-x:hidden}
+
+/* HEADER */
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+.brand{font-family:var(--font-display);font-weight:800;font-size:18px;letter-spacing:-0.5px}
+.brand span{color:var(--accent)}
+.firebase-badge{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.firebase-badge.on{background:rgba(6,214,160,.15);color:var(--green);border:1px solid rgba(6,214,160,.3)}
+.firebase-badge.off{background:rgba(255,107,53,.1);color:var(--accent);border:1px solid rgba(255,107,53,.3)}
+
+/* TABS */
+.nav-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:60px;z-index:99}
+.nav-tabs::-webkit-scrollbar{display:none}
+.tab-btn{flex:1;min-width:70px;padding:14px 10px;background:none;border:none;color:var(--muted);font-family:var(--font-display);font-weight:600;font-size:11px;letter-spacing:.5px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;text-transform:uppercase}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* VIEWS */
+.view{display:none;padding:20px}
+.view.active{display:block}
+
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.green::before{background:var(--green)}
+.stat-card.orange::before{background:var(--accent)}
+.stat-card.yellow::before{background:var(--accent2)}
+.stat-card.red::before{background:var(--red)}
+.stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.stat-value{font-family:var(--font-display);font-size:22px;font-weight:800;line-height:1}
+.stat-card.green .stat-value{color:var(--green)}
+.stat-card.orange .stat-value{color:var(--accent)}
+.stat-card.yellow .stat-value{color:var(--accent2)}
+.stat-card.red .stat-value{color:var(--red)}
+
+/* LISTA */
+.filter-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font-display)}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.search-box{width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;margin-bottom:16px;outline:none}
+.search-box:focus{border-color:var(--accent)}
+.search-box::placeholder{color:var(--muted)}
+
+.orden-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;transition:border-color .2s}
+.orden-card:hover{border-color:var(--accent)}
+.orden-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;gap:12px}
+.orden-title{font-family:var(--font-display);font-weight:700;font-size:15px}
+.orden-sub{color:var(--muted);font-size:12px;margin-top:3px}
+.estado-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.estado-badge.pagado{background:rgba(6,214,160,.15);color:var(--green)}
+.estado-badge.pendiente{background:rgba(255,107,53,.15);color:var(--accent)}
+.estado-badge.termo{background:rgba(255,209,102,.15);color:var(--accent2)}
+.orden-body{display:none;border-top:1px solid var(--border);padding:14px 16px}
+.orden-body.open{display:block}
+.producto-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:8px}
+.producto-row:last-child{border-bottom:none}
+.producto-nombre{font-size:13px;flex:1}
+.producto-costo{font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--accent2);white-space:nowrap}
+.orden-totales{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.total-item{font-size:12px}
+.total-label{color:var(--muted);font-size:11px}
+.total-val{font-family:var(--font-display);font-weight:700;margin-top:2px}
+.orden-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* GRUPOS POR CLIENTE */
+.cliente-group{margin-bottom:16px}
+.cliente-group-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .2s,background .2s;gap:10px;user-select:none}
+.cliente-group-header:hover{border-color:var(--accent);background:#1f1f2d}
+.cliente-group-name{font-family:var(--font-display);font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.cliente-group-name span.icon{font-size:15px;flex-shrink:0}
+.cliente-group-name .nombre{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cliente-group-stats{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.cg-badge{padding:3px 9px;border-radius:20px;font-weight:700;font-size:10px;white-space:nowrap}
+.cg-badge.count{background:rgba(122,122,149,.15);color:var(--muted)}
+.cg-badge.pending{background:rgba(239,35,60,.1);color:var(--red)}
+.cg-badge.ok{background:rgba(6,214,160,.1);color:var(--green)}
+.cg-arrow{color:var(--muted);font-size:12px;flex-shrink:0;transition:transform .2s}
+.cg-arrow.open{transform:rotate(0deg)}
+.cg-arrow.closed{transform:rotate(-90deg)}
+.cliente-group-body{padding-left:0;padding-top:4px}
+.cliente-group-body.collapsed{display:none}
+
+/* VISTA TOGGLE */
+.view-mode-row{display:flex;gap:6px;margin-bottom:10px}
+.view-mode-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;font-family:var(--font-display);letter-spacing:.3px}
+.view-mode-btn.active{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
+
+/* BOTONES */
+.btn{padding:9px 16px;border-radius:8px;border:none;font-family:var(--font-display);font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#ff8355}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-green{background:rgba(6,214,160,.15);color:var(--green);border:1px solid rgba(6,214,160,.3)}
+.btn-green:hover{background:rgba(6,214,160,.25)}
+.btn-danger{background:rgba(239,35,60,.1);color:var(--red);border:1px solid rgba(239,35,60,.2)}
+.btn-danger:hover{background:rgba(239,35,60,.2)}
+.btn-sm{padding:6px 12px;font-size:11px}
+
+.fab{position:fixed;bottom:24px;right:20px;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 20px rgba(255,107,53,.4);z-index:200;display:flex;align-items:center;justify-content:center;line-height:1;transition:transform .2s}
+.fab:hover{transform:scale(1.08)}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:600px;margin:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-title{font-family:var(--font-display);font-weight:800;font-size:18px}
+.modal-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.modal-body{padding:20px}
+
+/* FORM */
+.form-section{font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 12px;display:flex;align-items:center;gap:8px}
+.form-section::after{content:'';flex:1;height:1px;background:var(--border)}
+.form-row{display:grid;gap:12px;margin-bottom:12px}
+.form-row.cols-2{grid-template-columns:1fr 1fr}
+.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.form-input,.form-select,.form-textarea{padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;transition:border-color .2s;width:100%;-webkit-appearance:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237a7a95' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.producto-form-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;position:relative;margin-bottom:8px}
+.producto-form-row .remove-btn{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;line-height:1}
+.ganancia-preview{font-size:11px;color:var(--green);margin-top:4px}
+.partida-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;position:relative}
+.partida-row .remove-btn{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--red);font-size:16px;cursor:pointer}
+
+/* EMPTY / TOAST */
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:500;opacity:0;transition:opacity .3s;white-space:nowrap}
+.toast.show{opacity:1}
+
+/* OVERLAY DOCUMENTOS */
+.doc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:400;overflow-y:auto;padding:0}
+.doc-overlay.open{display:block}
+.doc-topbar{background:#1a1a24;padding:12px 16px;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10;border-bottom:1px solid #2a2a38}
+.doc-topbar-title{color:#aaa;font-size:13px;flex:1;font-family:'Syne',sans-serif;font-weight:600}
+.doc-frame{background:#fff;min-height:100vh}
+
+/* COTIZACION FORM */
+.subtotal-preview{font-size:11px;color:var(--accent2);margin-top:4px}
+.iva-toggle-row{display:flex;gap:8px;margin-bottom:8px}
+.iva-opt{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--font-display);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+.iva-opt.on{background:rgba(255,107,53,.15);border-color:var(--accent);color:var(--accent)}
+.iva-opt:disabled{opacity:.5;cursor:not-allowed}
+.iva-pct-wrap{margin-top:4px}
+.iva-pct-wrap.off{opacity:.45;pointer-events:none}
+#cr-iva-row.off{opacity:.35}
+#cr-iva-row.off span:last-child{text-decoration:line-through}
+
+/* HAMBURGER */
+.hamburger-btn{background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;padding:6px 8px;border-radius:6px;display:flex;align-items:center;line-height:1;transition:background .2s}
+.hamburger-btn:hover{background:var(--surface2)}
+
+/* SIDEBAR */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500}
+.sidebar-overlay.open{display:block}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:280px;background:#111118;border-right:1px solid var(--border);z-index:501;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column}
+.sidebar.open{transform:translateX(0)}
+.sidebar-top{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-top-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;border-radius:6px;line-height:1;margin-right:4px}
+.sidebar-brand{font-family:var(--font-display);font-weight:800;font-size:16px}
+.sidebar-brand span{color:var(--accent)}
+.sidebar-version{font-size:10px;color:var(--muted);margin-top:3px}
+.sidebar-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);padding:14px 20px 5px}
+.sidebar-item{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;background:none;border:none;width:100%;text-align:left;color:var(--text);font-size:14px;font-family:var(--font-body);transition:background .15s}
+.sidebar-item:hover{background:rgba(255,255,255,.05)}
+.sidebar-item.active{color:var(--accent);background:rgba(255,107,53,.1)}
+.si-icon{width:22px;text-align:center;flex-shrink:0;font-size:15px}
+.si-label{flex:1}
+.si-badge{background:var(--red);color:#fff;border-radius:20px;font-size:10px;font-weight:700;padding:2px 7px}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.sb-avatar{width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
+.sb-user-name{font-family:var(--font-display);font-weight:700;font-size:13px}
+.sb-user-status{font-size:11px;color:var(--muted);margin-top:2px}
+.sb-user-status.connected{color:var(--green)}
+
+/* BANNER DÍA 30 */
+.export-banner{display:none;background:linear-gradient(135deg,rgba(255,107,53,.15),rgba(255,209,102,.1));border:1px solid rgba(255,107,53,.35);border-radius:var(--radius);padding:14px 16px;margin:16px 20px 0;gap:12px;align-items:center}
+.export-banner.show{display:flex}
+.export-banner-text{flex:1;font-size:13px;font-family:var(--font-display);font-weight:700}
+.export-banner-sub{font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+
+/* M365 MODAL */
+.m365-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:12px;font-size:13px}
+.m365-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.m365-dot.on{background:var(--green)}
+.m365-dot.err{background:var(--red)}
+.export-log-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+.export-log-row:last-child{border-bottom:none}
+
+/* ESTADO EN PROCESO */
+.estado-badge.en_proceso{background:rgba(67,97,238,.15);color:#4361ee}
+
+/* INLINE STATUS PICKER */
+.estado-picker{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.estado-opt{padding:5px 13px;border-radius:20px;border:none;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;opacity:.45;font-family:var(--font-display);letter-spacing:.3px}
+.estado-opt:hover{opacity:.75}
+.estado-opt.sel{opacity:1;box-shadow:0 0 0 2px currentColor}
+.estado-opt.pagado{background:rgba(6,214,160,.15);color:var(--green)}
+.estado-opt.pendiente{background:rgba(255,107,53,.15);color:var(--accent)}
+.estado-opt.en_proceso{background:rgba(67,97,238,.15);color:#4361ee}
+.estado-opt.termo{background:rgba(255,209,102,.15);color:var(--accent2)}
+
+/* CONFIRM MODAL */
+.confirm-body{text-align:center;padding:24px 20px}
+.confirm-icon{font-size:40px;margin-bottom:12px}
+.confirm-msg{color:var(--muted);font-size:14px;line-height:1.55;margin-bottom:24px}
+.confirm-btns{display:flex;gap:10px}
+
+/* ONBOARDING */
+.onboard-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:700;align-items:center;justify-content:center;padding:20px}
+.onboard-overlay.open{display:flex}
+.onboard-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:100%;max-width:340px;padding:28px 24px;text-align:center;animation:slideUp .3s ease}
+.onboard-ico{font-size:52px;margin-bottom:16px}
+.onboard-title{font-family:var(--font-display);font-weight:800;font-size:20px;margin-bottom:8px}
+.onboard-desc{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px}
+.onboard-dots{display:flex;gap:6px;justify-content:center;margin-bottom:20px}
+.onboard-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .3s}
+.onboard-dot.on{background:var(--accent)}
+
+/* PRINT */
+@media print{
+  body > *{display:none !important}
+  #doc-print-frame{display:block !important;position:static !important;background:#fff !important}
+  #doc-print-frame *{display:revert !important}
+}
+
+@media(max-width:380px){
+  .dash-grid{grid-template-columns:1fr 1fr}
+  .form-row.cols-3{grid-template-columns:1fr 1fr}
+  .stat-value{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-top">
+    <button class="sidebar-top-close" onclick="closeSidebar()">☰</button>
+    <div>
+      <div class="sidebar-brand">🔐 Alarmas <span>Reset</span></div>
+      <div class="sidebar-version">Control de Órdenes v2.0</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section-label">PRINCIPAL</div>
+  <button class="sidebar-item active" id="si-dashboard" onclick="navTo('dashboard')">
+    <span class="si-icon">📊</span><span class="si-label">Inicio</span>
+  </button>
+
+  <div class="sidebar-section-label">GESTIÓN</div>
+  <button class="sidebar-item" id="si-ordenes" onclick="navTo('ordenes')">
+    <span class="si-icon">📋</span><span class="si-label">Órdenes</span>
+    <span class="si-badge" id="si-pend-badge" style="display:none">0</span>
+  </button>
+  <button class="sidebar-item" id="si-nueva" onclick="navTo('nueva')">
+    <span class="si-icon">➕</span><span class="si-label">Nueva Orden</span>
+  </button>
+  <button class="sidebar-item" id="si-cotizaciones" onclick="navTo('cotizaciones')">
+    <span class="si-icon">📄</span><span class="si-label">Cotizar</span>
+  </button>
+
+  <div class="sidebar-section-label">HERRAMIENTAS</div>
+  <button class="sidebar-item" onclick="exportarExcel()">
+    <span class="si-icon">📊</span><span class="si-label">Exportar Excel local</span>
+  </button>
+  <button class="sidebar-item" onclick="abrirModalM365()">
+    <span class="si-icon" style="font-size:13px">🔷</span><span class="si-label">Microsoft 365</span>
+    <span id="si-m365-dot" style="font-size:10px;color:var(--muted)">●</span>
+  </button>
+  <button class="sidebar-item" onclick="respaldoJSON()">
+    <span class="si-icon">📥</span><span class="si-label">Respaldo JSON</span>
+  </button>
+  <button class="sidebar-item" onclick="restaurarJSON()">
+    <span class="si-icon">📤</span><span class="si-label">Restaurar JSON</span>
+  </button>
+
+  <div class="sidebar-section-label">CONFIG</div>
+  <button class="sidebar-item" onclick="mostrarInfoFirebase()">
+    <span class="si-icon">🔥</span><span class="si-label">Firebase</span>
+    <span id="si-fb-dot" style="font-size:10px;color:var(--muted)">●</span>
+  </button>
+
+  <div class="sidebar-footer">
+    <div class="sb-avatar">AR</div>
+    <div>
+      <div class="sb-user-name">Alarmas y GPS Reset</div>
+      <div class="sb-user-status" id="sb-user-status">● Local</div>
+    </div>
+  </div>
+</nav>
+
+<!-- FILE INPUT para Restaurar JSON -->
+<input type="file" id="json-restore-input" accept=".json" style="display:none" onchange="procesarRestaurarJSON(event)">
+
+<!-- HEADER -->
+<header class="app-header">
+  <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menú">☰</button>
+  <div class="brand">🔐 Alarmas <span>Reset</span></div>
+  <span class="firebase-badge off" id="fb-badge">● Local</span>
+</header>
+
+<!-- TABS -->
+<nav class="nav-tabs">
+  <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 Inicio</button>
+  <button class="tab-btn" onclick="showTab('ordenes',this)">📋 Órdenes</button>
+  <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
+  <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
+</nav>
+
+<!-- BANNER DÍA 30 -->
+<div class="export-banner" id="export-banner">
+  <span style="font-size:24px">🔷</span>
+  <div>
+    <div class="export-banner-text">Exportación mensual Microsoft 365</div>
+    <div class="export-banner-sub">Hoy es día 30 — ¿Exportar respaldo a OneDrive?</div>
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="abrirModalM365()">Exportar</button>
+  <button class="btn btn-ghost btn-sm" onclick="cerrarBannerExport()" style="padding:6px 8px">✕</button>
+</div>
+
+<!-- DASHBOARD -->
+<div class="view active" id="tab-dashboard">
+  <div class="dash-grid">
+    <div class="stat-card green"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
+    <div class="stat-card orange"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
+    <div class="stat-card yellow"><div class="stat-label">Facturado</div><div class="stat-value" id="stat-total">$0</div></div>
+    <div class="stat-card red"><div class="stat-label">Órdenes Pend.</div><div class="stat-value" id="stat-ordpend">0</div></div>
+  </div>
+  <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Últimas órdenes</div>
+  <div id="recientes-lista"></div>
+</div>
+
+<!-- LISTA ÓRDENES -->
+<div class="view" id="tab-ordenes">
+  <input class="search-box" type="text" id="search-input" placeholder="🔍 Buscar cliente, vehículo, servicio..." oninput="renderOrdenes()">
+  <div class="view-mode-row">
+    <button class="view-mode-btn active" id="btn-vista-cliente" onclick="setVista(true)">👤 Por cliente</button>
+    <button class="view-mode-btn" id="btn-vista-lista" onclick="setVista(false)">📋 Cronológico</button>
+  </div>
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
+    <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
+    <button class="filter-btn" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
+    <button class="filter-btn" onclick="setFilter('TERMO',this)">Termo</button>
+    <button class="filter-btn" onclick="setFilter('EN_PROCESO',this)">En proceso</button>
+  </div>
+  <div id="ordenes-lista"></div>
+</div>
+
+<!-- NUEVA ORDEN -->
+<div class="view" id="tab-nueva">
+  <div id="form-nueva-wrapper"></div>
+</div>
+
+<!-- COTIZACIONES -->
+<div class="view" id="tab-cotizaciones">
+  <div id="cot-form-wrapper"></div>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="abrirModalNueva()">+</button>
+
+<!-- MODAL ORDEN -->
+<div class="modal-overlay" id="modal-orden">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Nueva Orden</div>
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- OVERLAY DOCUMENTO (boleta + cotización usan el mismo) -->
+<div class="doc-overlay" id="doc-overlay">
+  <div class="doc-topbar">
+    <span class="doc-topbar-title" id="doc-topbar-title">Documento</span>
+    <!-- BOTÓN IMPRIMIR: abre nueva ventana con el doc y llama print() -->
+    <button class="btn btn-green btn-sm" onclick="docImprimir()">🖨️ Imprimir / PDF</button>
+    <!-- BOTÓN COMPARTIR: descarga el archivo HTML o usa Web Share -->
+    <button class="btn btn-ghost btn-sm" onclick="docCompartir()">📤 Compartir</button>
+    <button class="btn btn-ghost btn-sm" onclick="cerrarDoc()">✕</button>
+  </div>
+  <div class="doc-frame" id="doc-frame"></div>
+</div>
+
+<!-- MODAL MICROSOFT 365 -->
+<div class="modal-overlay" id="modal-m365">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">🔷 Microsoft 365 — OneDrive</div>
+      <button class="modal-close" onclick="cerrarModalM365()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Estado de conexión -->
+      <div class="m365-status" id="m365-conn-status">
+        <div class="m365-dot" id="m365-dot"></div>
+        <span id="m365-conn-text">Sin sesión iniciada</span>
+      </div>
+
+      <!-- Configuración -->
+      <div class="form-section">Configuración Azure AD</div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Client ID (Azure App Registration)</label>
+        <input class="form-input" id="m365-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          value="" style="font-family:monospace;font-size:12px">
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        ℹ️ Registra tu app en <strong>portal.azure.com</strong> → Azure AD → App registrations.<br>
+        Permisos necesarios: <code>Files.ReadWrite</code> · <code>User.Read</code><br>
+        Redirect URI: <code id="m365-redirect-hint" style="color:var(--accent)">cargando...</code>
+      </div>
+
+      <!-- Acciones -->
+      <div class="form-section">Acciones</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="iniciarSesionM365()" id="btn-m365-login">
+          🔷 Iniciar sesión con Microsoft
+        </button>
+        <button class="btn btn-ghost" id="btn-m365-export" onclick="exportarM365()" disabled style="opacity:.5">
+          📊 Exportar ahora a OneDrive
+        </button>
+        <button class="btn btn-ghost" onclick="cerrarSesionM365()" id="btn-m365-logout" style="display:none">
+          Cerrar sesión Microsoft
+        </button>
+      </div>
+
+      <!-- Historial de exportaciones -->
+      <div class="form-section">Historial de exportaciones</div>
+      <div id="m365-log-lista" style="font-size:12px;color:var(--muted)">Sin exportaciones registradas.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:360px">
+    <div class="confirm-body">
+      <div class="confirm-icon" id="confirm-icon">⚠️</div>
+      <div class="modal-title" id="confirm-title" style="margin-bottom:8px">¿Confirmar?</div>
+      <div class="confirm-msg" id="confirm-msg"></div>
+      <div class="confirm-btns">
+        <button class="btn btn-danger" style="flex:1" id="confirm-ok-btn">Confirmar</button>
+        <button class="btn btn-ghost" style="flex:1" id="confirm-cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div class="onboard-overlay" id="onboard-overlay">
+  <div class="onboard-card">
+    <div class="onboard-ico" id="onboard-ico">🔐</div>
+    <div class="onboard-title" id="onboard-title">Bienvenido</div>
+    <div class="onboard-desc" id="onboard-desc"></div>
+    <div class="onboard-dots" id="onboard-dots"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-sm" onclick="skipOnboarding()">Omitir</button>
+      <button class="btn btn-primary" style="flex:1" id="onboard-next-btn" onclick="nextOnboardStep()">Siguiente →</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════
+let ordenes = [];
+let filtroEstado = 'todos';
+let vistaAgrupada = true;
+let editandoId = null;
+let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
+let cotFolioRegistrado = false;
+/** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
+let activeFormMount = null;
+let fsListenerStarted = false;
+let _autoExportChecked = false;
+const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
+
+// Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
+const EMPRESA = {
+  nombre:    'Alarmas y GPS Reset',
+  subtitulo: 'Solo Led Auto',
+  contacto:  'Ing. Luis Ángel Díaz Bernal',
+  email:     'anngeldb@gmail.com',
+  tel:       '871-231-8050',
+  dir:       'Torreón Gde, 914 Hacienda Santa María'
+};
+
+// CSS para los documentos impresos
+const DOC_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;color:#111;padding:28px;background:#fff}
+  .doc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #111;flex-wrap:wrap;gap:12px}
+  .doc-brand{font-family:'Syne',sans-serif;font-size:22px;font-weight:800}
+  .doc-brand span{color:#ff6b35}
+  .doc-brand-sub{font-size:11px;color:#555;margin-top:3px}
+  .doc-contact{font-size:11px;color:#666;margin-top:2px;line-height:1.7}
+  .doc-badge{text-align:right}
+  .doc-badge-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:1px}
+  .doc-badge-num{font-size:12px;color:#ff6b35;font-weight:700;margin-top:4px}
+  .doc-badge-date{font-size:11px;color:#999;margin-top:2px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#f8f8f8;padding:14px;border-radius:6px;margin-bottom:16px;font-size:12px}
+  .info-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px}
+  .info-val{font-weight:600;margin-top:2px;min-height:16px}
+  .desc-box{background:#f8f8f8;border-left:3px solid #ff6b35;padding:10px 14px;font-size:12px;margin-bottom:16px;min-height:36px}
+  .desc-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px}
+  th{background:#111;color:#fff;padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  td{padding:8px;border-bottom:1px solid #eee;vertical-align:top}
+  tr:nth-child(even) td{background:#fafafa}
+  .num{text-align:right;font-weight:600;white-space:nowrap}
+  .totales{margin-left:auto;width:240px;margin-bottom:16px}
+  .total-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #eee}
+  .total-row.main{font-weight:800;font-size:15px;border-top:2px solid #111;border-bottom:none;padding-top:8px;margin-top:4px}
+  .total-row.verde{color:#06d6a0}
+  .total-row.rojo{color:#e63946}
+  .nota-box{padding:10px 14px;background:#f8f8f8;border-left:3px solid #ff6b35;margin-top:12px;font-size:12px}
+  .condiciones td{padding:5px 8px;border-bottom:1px solid #eee}
+  .condiciones td:first-child{color:#999;font-weight:700;font-size:10px;width:140px;text-transform:uppercase;white-space:nowrap}
+  .firmas{display:flex;gap:24px;margin-top:36px}
+  .firma{flex:1;text-align:center}
+  .firma-line{border-top:1px solid #999;margin-top:40px;margin-bottom:6px}
+  .firma-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px}
+  .footer{margin-top:20px;padding-top:12px;border-top:1px dashed #ccc;text-align:center;font-size:10px;color:#aaa}
+  @media print{body{padding:10px}}
+`;
+
+// ═══════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════
+const IDB = {
+  db: null,
+  _p: null,
+  init() {
+    if (this._p) return this._p;
+    this._p = new Promise(resolve => {
+      if (!window.indexedDB) { resolve(false); return; }
+      const req = indexedDB.open('alarmas_reset_db', 1);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('ordenes'))
+          d.createObjectStore('ordenes', { keyPath: 'id' });
+      };
+      req.onsuccess = e => { this.db = e.target.result; resolve(true); };
+      req.onerror = () => resolve(false);
+    });
+    return this._p;
+  },
+  getAll() {
+    if (!this.db) return Promise.resolve([]);
+    return new Promise((res, rej) => {
+      const req = this.db.transaction('ordenes','readonly').objectStore('ordenes').getAll();
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  },
+  putAll(items) {
+    if (!this.db) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction('ordenes','readwrite');
+      const store = tx.objectStore('ordenes');
+      store.clear();
+      items.forEach(item => { if (item.id) store.put(item); });
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+};
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function fmt(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function renderAll(){
+  renderDashboard(); renderOrdenes(); updateSidebarStatus();
+  if (!_autoExportChecked && ordenes.length > 0) {
+    _autoExportChecked = true;
+    setTimeout(intentarAutoExportM365, 800);
+  }
+}
+
+// ═══════════════════════════════════════
+// DOCUMENTO OVERLAY — imprimir / compartir
+// ═══════════════════════════════════════
+let _docHTML = ''; // guarda el HTML del doc actual
+
+function abrirDoc(titulo, bodyHTML) {
+  // Construir HTML completo con estilos
+  _docHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>' + titulo + ' — Alarmas y GPS Reset</title>'
+    + '<style>' + DOC_CSS + '</style>'
+    + '</head><body>' + bodyHTML + '</body></html>';
+
+  // Mostrar en el overlay dentro de la app
+  document.getElementById('doc-frame').innerHTML = bodyHTML;
+  // Aplicar estilos dentro del frame para preview
+  let styleEl = document.getElementById('doc-preview-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'doc-preview-style';
+    document.getElementById('doc-frame').appendChild(styleEl);
+  }
+  document.getElementById('doc-topbar-title').textContent = titulo;
+  document.getElementById('doc-overlay').classList.add('open');
+}
+
+function cerrarDoc() {
+  document.getElementById('doc-overlay').classList.remove('open');
+}
+
+// 🖨️ IMPRIMIR — inyecta iframe oculto, escribe el doc y llama print()
+function docImprimir() {
+  if (!_docHTML) return;
+  // Remover iframe previo si existe
+  const old = document.getElementById('_pf');
+  if (old) old.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = '_pf';
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:0';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open(); doc.write(_docHTML); doc.close();
+  let _printed = false;
+  function _doPrint() {
+    if (_printed) return;
+    _printed = true;
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
+  }
+  iframe.onload = _doPrint;
+  // Fallback si onload no dispara en algunos móviles
+  setTimeout(_doPrint, 800);
+}
+
+// 📤 COMPARTIR
+async function docCompartir() {
+  if (!_docHTML) return;
+  const titulo = document.getElementById('doc-topbar-title').textContent;
+  const filename = titulo.replace(/\s+/g, '-') + '-AlarmasReset.html';
+  const blob = new Blob([_docHTML], { type: 'text/html;charset=utf-8' });
+
+  // Web Share API con archivo (Android Chrome / Safari iOS — requiere HTTPS)
+  if (navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type: 'text/html' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: titulo, files: [file] });
+        return;
+      }
+    } catch(e) { if (e.name === 'AbortError') return; }
+  }
+
+  // Fallback: descarga directa del archivo
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('📥 Descargado — ábrelo y usa Compartir del navegador');
+}
+
+// ═══════════════════════════════════════
+// ENCABEZADO DE EMPRESA (reutilizable)
+// ═══════════════════════════════════════
+function headerEmpresa(tipoDoc, folio, fecha) {
+  return '<div class="doc-header">'
+    + '<div>'
+    +   '<div class="doc-brand">' + EMPRESA.nombre.replace('Reset','<span>Reset</span>') + '</div>'
+    +   '<div class="doc-brand-sub">' + EMPRESA.subtitulo + '</div>'
+    +   '<div class="doc-contact">'
+    +     '<strong>' + EMPRESA.contacto + '</strong><br>'
+    +     EMPRESA.email + ' &nbsp;·&nbsp; ' + EMPRESA.tel + '<br>'
+    +     '📍 ' + EMPRESA.dir
+    +   '</div>'
+    + '</div>'
+    + '<div class="doc-badge">'
+    +   '<div class="doc-badge-title">' + tipoDoc + '</div>'
+    +   '<div class="doc-badge-num">' + folio + '</div>'
+    +   '<div class="doc-badge-date">Emitida: ' + fecha + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
+// ═══════════════════════════════════════
+// FIREBASE / LOCALSTORAGE
+// ═══════════════════════════════════════
+async function cargarOrdenesLocal() {
+  await IDB.init();
+  try {
+    if (IDB.db) {
+      const data = await IDB.getAll();
+      if (data && data.length > 0) {
+        ordenes = data.sort((a,b)=>(b.fecha_creacion||0)-(a.fecha_creacion||0));
+        renderAll(); return;
+      }
+      const ls = localStorage.getItem('alarmas_ordenes');
+      if (ls) {
+        try { ordenes = JSON.parse(ls); await IDB.putAll(ordenes); } catch(e) { ordenes = []; }
+        renderAll(); return;
+      }
+    }
+    const data = localStorage.getItem('alarmas_ordenes');
+    ordenes = data ? JSON.parse(data) : [];
+  } catch(e) {
+    ordenes = [];
+    console.error(e);
+  }
+  renderAll();
+}
+
+async function cargarOrdenes() {
+  if (window._useFirebase && window._firebaseDb && window._firebaseModules) {
+    try {
+      const { collection, onSnapshot, orderBy, query } = window._firebaseModules;
+      const q = query(collection(window._firebaseDb,'ordenes'), orderBy('fecha_creacion','desc'));
+      if (!fsListenerStarted) {
+        fsListenerStarted = true;
+        onSnapshot(q, snap => {
+          ordenes = snap.docs.map(d=>({id:d.id,...d.data()}));
+          renderAll();
+        }, err => {
+          console.error(err);
+          toast('⚠️ Firestore no disponible — modo local');
+          window._useFirebase = false;
+          fsListenerStarted = false;
+          updateFirebaseBadge();
+          cargarOrdenesLocal();
+        });
+      }
+      return;
+    } catch(e) { console.error(e); }
+  }
+  cargarOrdenesLocal();
+}
+
+function updateFirebaseBadge() {
+  const badge = document.getElementById('fb-badge');
+  if (!badge) return;
+  if (window._useFirebase) {
+    badge.textContent = '● Firebase';
+    badge.classList.remove('off');
+    badge.classList.add('on');
+  } else {
+    badge.textContent = '● Local';
+    badge.classList.remove('on');
+    badge.classList.add('off');
+  }
+  updateSidebarStatus();
+}
+
+async function guardarLocal() {
+  try {
+    if (IDB.db) await IDB.putAll(ordenes);
+    localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes));
+  } catch(e) {
+    try { localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); } catch(e2) {}
+  }
+}
+
+async function guardarOrden(orden) {
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { collection, addDoc, updateDoc, doc } = window._firebaseModules;
+      if (orden.id) {
+        const id = orden.id;
+        const data = {...orden};
+        delete data.id;
+        await updateDoc(doc(window._firebaseDb,'ordenes',id), data);
+      } else {
+        orden.fecha_creacion = Date.now();
+        await addDoc(collection(window._firebaseDb,'ordenes'), orden);
+      }
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Firebase no disponible — guardando local');
+      window._useFirebase = false;
+      updateFirebaseBadge();
+    }
+  }
+  if (orden.id) {
+    const idx = ordenes.findIndex(o=>o.id===orden.id);
+    if (idx >= 0) ordenes[idx] = orden;
+    else ordenes.unshift(orden);
+  } else {
+    orden.id = 'local_'+Date.now();
+    orden.fecha_creacion = Date.now();
+    ordenes.unshift(orden);
+  }
+  guardarLocal();
+  renderAll();
+}
+
+async function eliminarOrden(id) {
+  const ok = await confirmarAccion('Eliminar orden', '¿Eliminar esta orden? Esta acción no se puede deshacer.', '🗑️', 'Eliminar');
+  if (!ok) return;
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { deleteDoc, doc } = window._firebaseModules;
+      await deleteDoc(doc(window._firebaseDb,'ordenes',id));
+      toast('Orden eliminada');
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Error al eliminar: ' + (e.message || e));
+      return;
+    }
+  }
+  ordenes = ordenes.filter(o => o.id !== id);
+  guardarLocal();
+  renderAll();
+  toast('Orden eliminada');
+}
+
+// ═══════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════
+function showTab(id, btn) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id !== 'nueva') {
+    document.getElementById('form-nueva-wrapper').innerHTML = '';
+    if (activeFormMount === 'nueva') activeFormMount = null;
+  }
+  if (id === 'nueva') {
+    editandoId = null;
+    mountOrdenForm(null, 'nueva');
+  }
+  if (id==='cotizaciones') {
+    document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
+    setTimeout(recalcCot, 0);
+  }
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+function renderDashboard() {
+  let gan=0,cob=0,fac=0,pend=0;
+  ordenes.forEach(o=>{
+    const t=o.total||0, a=o.a_cuenta_total||0;
+    gan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
+    fac+=t;
+    const _est=(o.estado||'').toUpperCase();
+    if(_est==='PENDIENTE'||_est==='EN_PROCESO'){cob+=t-a;pend++;}
+  });
+  document.getElementById('stat-ganancia').textContent=fmt(gan);
+  document.getElementById('stat-pendiente').textContent=fmt(cob);
+  document.getElementById('stat-total').textContent=fmt(fac);
+  document.getElementById('stat-ordpend').textContent=pend;
+  const cont=document.getElementById('recientes-lista');
+  const rec=ordenes.slice(0,5);
+  if(!rec.length){cont.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin órdenes aún</div></div>';return;}
+  cont.innerHTML=rec.map(o=>{
+    const est=(o.estado||'PENDIENTE').toUpperCase();
+    return `<div class="orden-card" onclick="irAOrden('${o.id}')">
+      <div class="orden-header">
+        <div><div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
+        <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div></div>
+        <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
+      </div></div>`;
+  }).join('');
+}
+
+function irAOrden(id) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-ordenes').classList.add('active');
+  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  filtroEstado='todos'; renderOrdenes();
+  setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
+}
+
+// ═══════════════════════════════════════
+// LISTA ÓRDENES
+// ═══════════════════════════════════════
+function setFilter(f,btn){ filtroEstado=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
+
+function setVista(agrupada) {
+  vistaAgrupada = agrupada;
+  document.getElementById('btn-vista-cliente').classList.toggle('active', agrupada);
+  document.getElementById('btn-vista-lista').classList.toggle('active', !agrupada);
+  renderOrdenes();
+}
+
+function filtrarLista() {
+  const q=(document.getElementById('search-input')?.value||'').toLowerCase();
+  let lista=ordenes;
+  if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
+  if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q)));
+  return lista;
+}
+
+function renderOrdenes() {
+  const lista = filtrarLista();
+  const cont=document.getElementById('ordenes-lista');
+  if(!lista.length){cont.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';return;}
+  if (vistaAgrupada) {
+    cont.innerHTML = renderPorCliente(lista);
+  } else {
+    cont.innerHTML = lista.map(o=>ordenCard(o)).join('');
+  }
+}
+
+function renderPorCliente(lista) {
+  const grupos = {};
+  lista.forEach(o => {
+    const key = (o.cliente||'Sin nombre').trim() || 'Sin nombre';
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(o);
+  });
+
+  const keys = Object.keys(grupos).sort((a, b) => {
+    const aPend = grupos[a].some(o=>(o.estado||'').toUpperCase()==='PENDIENTE');
+    const bPend = grupos[b].some(o=>(o.estado||'').toUpperCase()==='PENDIENTE');
+    if (aPend && !bPend) return -1;
+    if (!aPend && bPend) return 1;
+    return a.localeCompare(b, 'es');
+  });
+
+  return keys.map(nombre => {
+    const ords = grupos[nombre];
+    const saldoPend = ords.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
+      .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0), 0);
+    const groupId = 'cg_' + btoa(nombre).replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
+    const badgePend = saldoPend > 0
+      ? `<span class="cg-badge pending">Por cobrar ${fmt(saldoPend)}</span>`
+      : `<span class="cg-badge ok">✓ Al corriente</span>`;
+    return `<div class="cliente-group">
+      <div class="cliente-group-header" onclick="toggleClienteGroup('${groupId}')">
+        <div class="cliente-group-name"><span class="icon">👤</span><span class="nombre">${esc(nombre)}</span></div>
+        <div class="cliente-group-stats">
+          <span class="cg-badge count">${ords.length} orden${ords.length!==1?'es':''}</span>
+          ${badgePend}
+          <span class="cg-arrow open" id="${groupId}-arrow">▼</span>
+        </div>
+      </div>
+      <div class="cliente-group-body" id="${groupId}-body">
+        ${ords.map(o=>ordenCard(o)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleClienteGroup(id) {
+  const body = document.getElementById(id+'-body');
+  const arrow = document.getElementById(id+'-arrow');
+  if (!body) return;
+  const isCollapsed = body.classList.toggle('collapsed');
+  if (arrow) {
+    arrow.textContent = isCollapsed ? '▶' : '▼';
+    arrow.classList.toggle('open', !isCollapsed);
+    arrow.classList.toggle('closed', isCollapsed);
+  }
+}
+
+function ordenCard(o) {
+  const est=(o.estado||'PENDIENTE').toUpperCase();
+  const prods=o.productos||[];
+  const total=o.total||0, aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
+  const rec=o.recordatorios?`<div style="margin-top:8px;padding:8px 10px;background:rgba(255,209,102,.08);border-left:2px solid var(--accent2);border-radius:4px;font-size:12px;color:var(--accent2)">📌 ${esc(o.recordatorios)}</div>`:'';
+  return `<div class="orden-card" id="ord-${o.id}">
+    <div class="orden-header" onclick="toggleOrden('${o.id}')">
+      <div><div class="orden-title">${esc(o.vehiculo||'—')} · <span style="color:var(--muted)">${esc(o.cliente||'—')}</span></div>
+      <div class="orden-sub">${prods.length} servicio(s) · 📅 ${esc(o.fecha_instalacion||'sin fecha')}</div></div>
+      <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
+    </div>
+    <div class="orden-body" id="body-${o.id}">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Servicios</div>
+      ${prods.map(p=>`<div class="producto-row"><span class="producto-nombre">${esc(p.nombre)}</span><span class="producto-costo">${fmt(p.costo)}</span></div>`).join('')}
+      <div class="orden-totales">
+        <div class="total-item"><div class="total-label">Total orden</div><div class="total-val">${fmt(total)}</div></div>
+        <div class="total-item"><div class="total-label">A cuenta</div><div class="total-val" style="color:var(--green)">${fmt(aCuenta)}</div></div>
+        <div class="total-item"><div class="total-label">Saldo</div><div class="total-val" style="color:${saldo>0?'var(--red)':'var(--green)'}">${fmt(saldo)}</div></div>
+        <div class="total-item"><div class="total-label">F. Pago</div><div class="total-val" style="font-size:13px">${esc(o.fecha_pago||'—')}</div></div>
+      </div>
+      ${rec}
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;margin-top:12px">Cambiar estado</div>
+      <div class="estado-picker">
+        <button class="estado-opt pendiente ${est==='PENDIENTE'?'sel':''}" onclick="cambiarEstado('${o.id}','PENDIENTE')">Pendiente</button>
+        <button class="estado-opt en_proceso ${est==='EN_PROCESO'?'sel':''}" onclick="cambiarEstado('${o.id}','EN_PROCESO')">En proceso</button>
+        <button class="estado-opt pagado ${est==='PAGADO'?'sel':''}" onclick="cambiarEstado('${o.id}','PAGADO')">Pagado</button>
+        <button class="estado-opt termo ${est==='TERMO'?'sel':''}" onclick="cambiarEstado('${o.id}','TERMO')">Termo</button>
+      </div>
+      <div class="orden-actions">
+        <button class="btn btn-green btn-sm" onclick="verBoleta('${o.id}')">🧾 Boleta</button>
+        <button class="btn btn-ghost btn-sm" onclick="editarOrden('${o.id}')">✏️ Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarOrden('${o.id}')">🗑️ Borrar</button>
+      </div>
+    </div></div>`;
+}
+
+function toggleOrden(id){ document.getElementById('body-'+id).classList.toggle('open'); }
+
+// ═══════════════════════════════════════
+// BOLETA
+// ═══════════════════════════════════════
+function verBoleta(id) {
+  const o=ordenes.find(x=>x.id===id); if(!o) return;
+  const prods=o.productos||[];
+  const total=o.total||prods.reduce((s,p)=>s+(parseFloat(p.costo)||0),0);
+  const aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
+  const folio='AR-'+(o.id||'').slice(-6).toUpperCase();
+  const hoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const garantias=prods.filter(p=>p.garantia).map(p=>'• '+p.nombre+': <strong>'+p.garantia+'</strong>').join('<br>');
+
+  const estadoRow = saldo<=0
+    ? '<div class="total-row verde"><span>Estado</span><span>✅ PAGADO</span></div>'
+    : '<div class="total-row rojo"><span>Saldo pendiente</span><span>'+fmt(saldo)+'</span></div>';
+
+  const bodyHTML =
+    headerEmpresa('ORDEN DE SERVICIO', folio, hoy)
+    + '<div class="info-grid">'
+    +   '<div><div class="info-label">Cliente</div><div class="info-val">'+esc(o.cliente||'—')+'</div></div>'
+    +   '<div><div class="info-label">Vehículo</div><div class="info-val">'+esc(o.vehiculo||'—')+'</div></div>'
+    +   '<div><div class="info-label">Fecha instalación</div><div class="info-val">'+esc(o.fecha_instalacion||'—')+'</div></div>'
+    +   '<div><div class="info-label">Fecha pago</div><div class="info-val">'+esc(o.fecha_pago||'—')+'</div></div>'
+    + '</div>'
+    + '<table><thead><tr><th>#</th><th>Descripción del servicio</th><th style="text-align:right">Precio</th></tr></thead><tbody>'
+    + prods.map((p,i)=>'<tr><td style="color:#999;width:28px">'+(i+1)+'</td><td>'+esc(p.nombre)+'</td><td class="num">'+fmt(p.costo)+'</td></tr>').join('')
+    + '</tbody></table>'
+    + '<div style="display:flex;justify-content:flex-end"><div class="totales">'
+    +   '<div class="total-row"><span>Subtotal</span><span>'+fmt(prods.reduce((s,p)=>s+(parseFloat(p.costo)||0),0))+'</span></div>'
+    +   (aCuenta>0?'<div class="total-row"><span>A cuenta recibido</span><span>- '+fmt(aCuenta)+'</span></div>':'')
+    +   estadoRow
+    +   '<div class="total-row main"><span>TOTAL</span><span>'+fmt(total)+'</span></div>'
+    + '</div></div>'
+    + (garantias?'<div class="nota-box"><strong>Garantías incluidas:</strong><br>'+garantias+'</div>':'')
+    + (o.recordatorios&&o.recordatorios!=='GARANTIA 1 AÑO'&&o.recordatorios!=='GARANTIA 6 MESES'?'<div class="nota-box" style="margin-top:8px"><strong>Nota:</strong> '+esc(o.recordatorios)+'</div>':'')
+    + '<div class="footer">Gracias por su preferencia · '+EMPRESA.nombre+' · '+EMPRESA.subtitulo+'<br>Este documento es comprobante de los servicios realizados</div>';
+
+  abrirDoc('Orden de Servicio', bodyHTML);
+}
+
+// ═══════════════════════════════════════
+// FORMULARIO ORDEN
+// ═══════════════════════════════════════
+function clearFormMounts(except) {
+  if (except !== 'modal') {
+    document.getElementById('modal-body').innerHTML = '';
+    document.getElementById('modal-orden').classList.remove('open');
+  }
+  if (except !== 'nueva') {
+    document.getElementById('form-nueva-wrapper').innerHTML = '';
+  }
+}
+
+function getFormRoot() {
+  if (activeFormMount === 'nueva') {
+    const w = document.getElementById('form-nueva-wrapper');
+    return w && w.querySelector('#productos-form') ? w : null;
+  }
+  if (activeFormMount === 'modal') {
+    const m = document.getElementById('modal-body');
+    return m && m.querySelector('#productos-form') ? m : null;
+  }
+  const modal = document.getElementById('modal-body');
+  if (modal && modal.querySelector('#productos-form')) return modal;
+  const tab = document.getElementById('form-nueva-wrapper');
+  if (tab && tab.querySelector('#productos-form')) return tab;
+  return null;
+}
+
+function mountOrdenForm(orden, mount) {
+  activeFormMount = mount;
+  clearFormMounts(mount);
+  const html = buildFormHTML(orden);
+  if (mount === 'nueva') {
+    document.getElementById('form-nueva-wrapper').innerHTML = html;
+  } else {
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('modal-orden').classList.add('open');
+  }
+  bindFormRowEvents();
+  recalcTotal();
+}
+
+function bindFormRowEvents() {
+  const root = getFormRoot();
+  if (!root) return;
+  const cont = root.querySelector('#productos-form');
+  if (!cont || cont._boundRows) return;
+  cont._boundRows = true;
+  cont.addEventListener('input', e => {
+    if (e.target.matches('.prod-costo, .prod-inversion')) calcGanancia(e.target);
+  });
+}
+
+function buildFormHTML(orden) {
+  const o=orden||{};
+  const prods=o.productos&&o.productos.length?o.productos:[{nombre:'',costo:'',inversion:'',garantia:''}];
+  return `
+  <div class="form-section">Datos del vehículo y cliente</div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Vehículo *</label>
+      <input class="form-input" id="f-vehiculo" placeholder="Ej: Chevrolet Beat" value="${esc(o.vehiculo||'')}"></div>
+    <div class="form-group"><label class="form-label">Cliente *</label>
+      <input class="form-input" id="f-cliente" placeholder="Nombre del cliente" value="${esc(o.cliente||'')}"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">F. Instalación</label>
+      <input class="form-input" type="date" id="f-fecha-inst" value="${esc(o.fecha_instalacion||'')}"></div>
+    <div class="form-group"><label class="form-label">F. Pago</label>
+      <input class="form-input" type="date" id="f-fecha-pago" value="${esc(o.fecha_pago||'')}"></div>
+  </div>
+  <div class="form-section">Servicios / Productos</div>
+  <div id="productos-form">${prods.map((p,i)=>productoRowHTML(p,i)).join('')}</div>
+  <button type="button" class="btn btn-ghost" style="width:100%;margin-bottom:4px" data-action="add-servicio">+ Agregar servicio</button>
+  <div class="form-section">Pagos y estado</div>
+  <div class="form-row cols-3">
+    <div class="form-group"><label class="form-label">Total <span style="color:var(--green);font-size:10px">● AUTO</span></label>
+      <input class="form-input" type="number" id="f-total" placeholder="Auto" value="${o.total||''}" style="color:var(--accent2);font-weight:700"></div>
+    <div class="form-group"><label class="form-label">A cuenta</label>
+      <input class="form-input" type="number" id="f-a-cuenta" placeholder="0" value="${o.a_cuenta_total||''}"></div>
+    <div class="form-group"><label class="form-label">Estado</label>
+      <select class="form-select" id="f-estado">
+        <option value="PENDIENTE" ${(o.estado||'PENDIENTE')==='PENDIENTE'?'selected':''}>Pendiente</option>
+        <option value="EN_PROCESO" ${(o.estado||'')==='EN_PROCESO'?'selected':''}>En proceso</option>
+        <option value="PAGADO" ${(o.estado||'')==='PAGADO'?'selected':''}>Pagado</option>
+        <option value="TERMO" ${(o.estado||'')==='TERMO'?'selected':''}>Termo</option>
+      </select></div>
+  </div>
+  <div class="form-group" style="margin-bottom:20px"><label class="form-label">Recordatorios / Notas</label>
+    <input class="form-input" id="f-recordatorios" placeholder="Garantía, cobrar quincena..." value="${esc(o.recordatorios||'')}"></div>
+  <div style="display:flex;gap:10px;padding-top:4px">
+    <button class="btn btn-primary" style="flex:1" onclick="submitOrden()">💾 Guardar orden</button>
+    <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+  </div>`;
+}
+
+function productoRowHTML(p,i) {
+  const g=(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0);
+  return `<div class="producto-form-row" id="prod-row-${i}">
+    <button class="remove-btn" onclick="quitarProducto(${i})">✕</button>
+    <div class="form-row" style="margin-bottom:6px">
+      <div class="form-group"><label class="form-label">Descripción del servicio</label>
+        <input class="form-input prod-nombre" placeholder="Ej: Instalación de alarma" value="${esc(p.nombre||'')}"></div>
+    </div>
+    <div class="form-row cols-3">
+      <div class="form-group"><label class="form-label">Costo ($)</label>
+        <input class="form-input prod-costo" type="number" placeholder="0" value="${p.costo||''}" oninput="calcGanancia(this)"></div>
+      <div class="form-group"><label class="form-label">Inversión ($)</label>
+        <input class="form-input prod-inversion" type="number" placeholder="0" value="${p.inversion||''}" oninput="calcGanancia(this)"></div>
+      <div class="form-group"><label class="form-label">Garantía</label>
+        <select class="form-select prod-garantia">
+          <option value="" ${!p.garantia?'selected':''}>Sin garantía</option>
+          <option value="GARANTIA 6 MESES" ${p.garantia==='GARANTIA 6 MESES'?'selected':''}>6 meses</option>
+          <option value="GARANTIA 1 AÑO" ${p.garantia==='GARANTIA 1 AÑO'?'selected':''}>1 año</option>
+        </select></div>
+    </div>
+    <div class="ganancia-preview" id="gan-${i}">Ganancia: ${fmt(g)}</div>
+  </div>`;
+}
+
+function calcGanancia(input) {
+  const row = input.closest('.producto-form-row');
+  if (!row) return;
+  const costo = parseFloat(row.querySelector('.prod-costo')?.value) || 0;
+  const inv = parseFloat(row.querySelector('.prod-inversion')?.value) || 0;
+  const el = row.querySelector('.ganancia-preview');
+  if (el) el.textContent = 'Ganancia: ' + fmt(costo - inv);
+  recalcTotal();
+}
+
+function recalcTotal() {
+  const root = getFormRoot();
+  if (!root) return;
+  const rows = root.querySelectorAll('#productos-form .producto-form-row');
+  let suma = 0;
+  rows.forEach(r => { suma += parseFloat(r.querySelector('.prod-costo')?.value) || 0; });
+  const el = root.querySelector('#f-total');
+  if (el) {
+    el.value = suma || '';
+    el.style.borderColor = 'var(--green)';
+    setTimeout(() => { el.style.borderColor = ''; }, 800);
+  }
+}
+
+function agregarProductoRow() {
+  const root = getFormRoot();
+  if (!root) {
+    toast('⚠️ Abre el formulario de orden (pestaña Nueva o botón +)');
+    return;
+  }
+  const cont = root.querySelector('#productos-form');
+  if (!cont) return;
+  const i = Date.now();
+  const div = document.createElement('div');
+  div.innerHTML = productoRowHTML({}, i);
+  const row = div.firstElementChild;
+  if (!row) return;
+  cont.appendChild(row);
+  recalcTotal();
+  row.querySelector('.prod-nombre')?.focus();
+}
+
+function quitarProducto(i) {
+  const root = getFormRoot();
+  if (!root) return;
+  const rows = root.querySelectorAll('#productos-form .producto-form-row');
+  if (rows.length <= 1) {
+    toast('⚠️ Debe haber al menos un servicio');
+    return;
+  }
+  const r = root.querySelector('#prod-row-'+i);
+  if (r) { r.remove(); recalcTotal(); }
+}
+
+function leerProductos() {
+  const root = getFormRoot();
+  if (!root) return [];
+  return Array.from(root.querySelectorAll('#productos-form .producto-form-row')).map(r => ({
+    nombre: r.querySelector('.prod-nombre')?.value?.trim() || '',
+    costo: parseFloat(r.querySelector('.prod-costo')?.value) || 0,
+    inversion: parseFloat(r.querySelector('.prod-inversion')?.value) || 0,
+    garantia: r.querySelector('.prod-garantia')?.value || ''
+  })).map(p => {
+    if (!p.nombre && p.costo > 0) p.nombre = 'Servicio';
+    return p;
+  }).filter(p => p.nombre);
+}
+
+async function submitOrden() {
+  const root = getFormRoot();
+  if (!root) { toast('⚠️ Formulario no encontrado'); return; }
+  const vehiculo = root.querySelector('#f-vehiculo')?.value?.trim();
+  const cliente = root.querySelector('#f-cliente')?.value?.trim();
+  if (!vehiculo || !cliente) { toast('⚠️ Vehículo y cliente son obligatorios'); return; }
+  const prods = leerProductos();
+  if (!prods.length) { toast('⚠️ Agrega al menos un servicio'); return; }
+  const orden = {
+    vehiculo, cliente,
+    fecha_instalacion: root.querySelector('#f-fecha-inst')?.value || '',
+    fecha_pago: root.querySelector('#f-fecha-pago')?.value || '',
+    total: parseFloat(root.querySelector('#f-total')?.value) || 0,
+    a_cuenta_total: parseFloat(root.querySelector('#f-a-cuenta')?.value) || 0,
+    estado: root.querySelector('#f-estado')?.value || 'PENDIENTE',
+    recordatorios: root.querySelector('#f-recordatorios')?.value?.trim() || '',
+    productos: prods
+  };
+  if (editandoId) orden.id = editandoId;
+  try {
+    await guardarOrden(orden);
+    if (activeFormMount === 'modal') cerrarModal();
+    else {
+      document.getElementById('form-nueva-wrapper').innerHTML = '';
+      activeFormMount = null;
+      showTab('ordenes', document.querySelectorAll('.tab-btn')[1]);
+    }
+    toast('✅ Orden guardada');
+    editandoId = null;
+  } catch(e) { /* toast ya mostrado en guardarOrden */ }
+}
+
+// MODAL
+function abrirModalNueva() {
+  editandoId = null;
+  document.getElementById('modal-title').textContent = 'Nueva Orden';
+  mountOrdenForm(null, 'modal');
+}
+function editarOrden(id) {
+  const o = ordenes.find(x => x.id === id);
+  if (!o) return;
+  editandoId = id;
+  document.getElementById('modal-title').textContent = 'Editar Orden';
+  mountOrdenForm(o, 'modal');
+}
+function cerrarModal() {
+  document.getElementById('modal-orden').classList.remove('open');
+  document.getElementById('modal-body').innerHTML = '';
+  if (activeFormMount === 'modal') activeFormMount = null;
+  editandoId = null;
+}
+
+// ═══════════════════════════════════════
+// COTIZACIONES
+// ═══════════════════════════════════════
+function buildCotFormHTML() {
+  cotFolioRegistrado = false;
+  const folio='COT-'+new Date().getFullYear()+'-'+String(cotFolioNum).padStart(3,'0');
+  const hoy=new Date().toISOString().split('T')[0];
+  const vigencia=new Date(Date.now()+15*24*60*60*1000).toISOString().split('T')[0];
+  return `
+  <div class="form-section">Datos del cliente</div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Cliente / Empresa *</label>
+      <input class="form-input" id="c-cliente" placeholder="Nombre del cliente"></div>
+    <div class="form-group"><label class="form-label">Atención a</label>
+      <input class="form-input" id="c-atencion" placeholder="Contacto"></div>
+  </div>
+  <div class="form-group" style="margin-bottom:12px"><label class="form-label">Dirección</label>
+    <input class="form-input" id="c-direccion" placeholder="Dirección del cliente"></div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">No. Cotización</label>
+      <input class="form-input" id="c-folio" value="${folio}"></div>
+    <div class="form-group"><label class="form-label">Fecha</label>
+      <input class="form-input" type="date" id="c-fecha" value="${hoy}"></div>
+  </div>
+  <div class="form-group" style="margin-bottom:12px"><label class="form-label">Válida hasta</label>
+    <input class="form-input" type="date" id="c-vigencia" value="${vigencia}"></div>
+  <div class="form-section">Descripción del proyecto</div>
+  <div class="form-group" style="margin-bottom:12px">
+    <textarea class="form-textarea" id="c-descripcion" rows="3" placeholder="Describe brevemente el alcance del servicio..." style="resize:vertical"></textarea></div>
+  <div class="form-section">Partidas / Productos</div>
+  <div id="cot-partidas">${cotPartidaHTML({nombre:'',marca:'',cant:1,precio:'',descto:0},0)}</div>
+  <button class="btn btn-ghost" style="width:100%;margin-bottom:4px" onclick="agregarPartida()">+ Agregar partida</button>
+  <div class="form-section">Totales</div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Descuento adicional %</label>
+      <input class="form-input" type="number" id="c-descto-global" value="0" oninput="recalcCot()" min="0" max="100"></div>
+    <div class="form-group"><label class="form-label">Envío / Instalación ($)</label>
+      <input class="form-input" type="number" id="c-envio" placeholder="0" oninput="recalcCot()"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Otros cargos ($)</label>
+      <input class="form-input" type="number" id="c-otros" placeholder="0" oninput="recalcCot()"></div>
+    <div class="form-group"><label class="form-label">IVA en cotización</label>
+      <div class="iva-toggle-row">
+        <button type="button" class="iva-opt ${(localStorage.getItem('cot_iva')!=='0')?'on':''}" id="btn-iva-on" onclick="setIvaCot(true)">✓ Con IVA</button>
+        <button type="button" class="iva-opt ${(localStorage.getItem('cot_iva')==='0')?'on':''}" id="btn-iva-off" onclick="setIvaCot(false)">✕ Sin IVA</button>
+      </div>
+      <div class="iva-pct-wrap ${(localStorage.getItem('cot_iva')==='0')?'off':''}" id="c-iva-pct-wrap">
+        <select class="form-select" id="c-iva-pct" onchange="recalcCot()">
+          <option value="16">16%</option>
+          <option value="8">8%</option>
+          <option value="0">0% (exento)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div id="cot-resumen" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Subtotal</span><span id="cr-sub">$0</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Descuento</span><span id="cr-dsc" style="color:var(--red)">-$0</span></div>
+    <div id="cr-iva-row" style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)" id="cr-iva-lbl">IVA</span><span id="cr-iva">$0</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Envío/Otros</span><span id="cr-env">$0</span></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+      <span style="font-family:var(--font-display);font-weight:800">TOTAL</span>
+      <span style="font-family:var(--font-display);font-weight:800;color:var(--accent2);font-size:18px" id="cr-total">$0</span>
+    </div></div>
+  <div class="form-section">Condiciones</div>
+  <div class="form-group" style="margin-bottom:10px"><label class="form-label">Forma de pago</label>
+    <input class="form-input" id="c-pago" value="50% anticipo al confirmar / 50% contra entrega e instalación"></div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Tiempo de entrega</label>
+      <input class="form-input" id="c-entrega" placeholder="Ej: 3-7 días hábiles"></div>
+    <div class="form-group"><label class="form-label">Garantía</label>
+      <input class="form-input" id="c-garantia" placeholder="Ej: 12 meses equipo"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Incluye instalación</label>
+      <select class="form-select" id="c-instalacion">
+        <option>Sí — incluida en precio</option>
+        <option>No — cotización aparte</option>
+        <option>Parcialmente</option>
+      </select></div>
+    <div class="form-group"><label class="form-label">Transporte</label>
+      <input class="form-input" id="c-transporte" placeholder="Por definir según ubicación"></div>
+  </div>
+  <div class="form-group" style="margin-bottom:20px"><label class="form-label">Notas adicionales</label>
+    <input class="form-input" id="c-notas" placeholder="Observaciones o acuerdos especiales"></div>
+  <div style="display:flex;gap:10px;padding-top:4px;padding-bottom:40px">
+    <button class="btn btn-primary" style="flex:1" onclick="verCotizacion()">🧾 Ver cotización</button>
+  </div>`;
+}
+
+function cotPartidaHTML(p,i) {
+  const sub=(parseFloat(p.precio)||0)*(parseFloat(p.cant)||1)*(1-(parseFloat(p.descto)||0)/100);
+  return `<div class="partida-row" id="cot-p-${i}">
+    <button class="remove-btn" onclick="quitarPartida(${i})">✕</button>
+    <div class="form-row" style="margin-bottom:6px">
+      <div class="form-group"><label class="form-label">Descripción del producto / servicio</label>
+        <input class="form-input cot-pnombre" placeholder="Ej: Sistema DVR 4 canales" value="${esc(p.nombre||'')}"></div>
+    </div>
+    <div class="form-row cols-3">
+      <div class="form-group"><label class="form-label">Marca / Modelo</label>
+        <input class="form-input cot-pmarca" placeholder="Marca" value="${esc(p.marca||'')}"></div>
+      <div class="form-group"><label class="form-label">Cant.</label>
+        <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" step="1" oninput="calcPartida(this);recalcCot()"></div>
+      <div class="form-group"><label class="form-label">P. Unitario ($)</label>
+        <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||''}" oninput="calcPartida(this);recalcCot()"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Dscto. %</label>
+        <input class="form-input cot-pdescto" type="number" value="${p.descto||0}" min="0" max="100" oninput="calcPartida(this);recalcCot()"></div>
+      <div class="form-group"><label class="form-label">Subtotal</label>
+        <input class="form-input cot-psubtotal" type="number" readonly value="${sub||''}" style="color:var(--accent2);font-weight:700;background:var(--surface)"></div>
+    </div>
+  </div>`;
+}
+
+function calcPartida(input) {
+  const row=input.closest('.partida-row');
+  const cant=parseFloat(row.querySelector('.cot-pcant').value)||1;
+  const precio=parseFloat(row.querySelector('.cot-pprecio').value)||0;
+  const descto=parseFloat(row.querySelector('.cot-pdescto').value)||0;
+  row.querySelector('.cot-psubtotal').value=(precio*cant*(1-descto/100)).toFixed(2)||'';
+}
+
+function cotIvaActivo() {
+  return localStorage.getItem('cot_iva') !== '0';
+}
+
+function getIvaRateCot() {
+  if (!cotIvaActivo()) return 0;
+  return (parseFloat(document.getElementById('c-iva-pct')?.value) || 16) / 100;
+}
+
+function setIvaCot(activo) {
+  localStorage.setItem('cot_iva', activo ? '1' : '0');
+  const btnOn = document.getElementById('btn-iva-on');
+  const btnOff = document.getElementById('btn-iva-off');
+  const wrap = document.getElementById('c-iva-pct-wrap');
+  const row = document.getElementById('cr-iva-row');
+  if (btnOn) btnOn.classList.toggle('on', activo);
+  if (btnOff) btnOff.classList.toggle('on', !activo);
+  if (wrap) wrap.classList.toggle('off', !activo);
+  if (row) row.classList.toggle('off', !activo);
+  recalcCot();
+}
+
+function recalcCot() {
+  const rows=document.querySelectorAll('#cot-partidas .partida-row');
+  let subtotal=0; rows.forEach(r=>{subtotal+=parseFloat(r.querySelector('.cot-psubtotal')?.value)||0;});
+  const descGlobal=(parseFloat(document.getElementById('c-descto-global')?.value)||0)/100;
+  const ivaRate=getIvaRateCot();
+  const ivaActivo=cotIvaActivo() && ivaRate>0;
+  const envio=(parseFloat(document.getElementById('c-envio')?.value)||0)+(parseFloat(document.getElementById('c-otros')?.value)||0);
+  const descMonto=subtotal*descGlobal, base=subtotal-descMonto, iva=ivaActivo?base*ivaRate:0, total=base+iva+envio;
+  if(document.getElementById('cr-sub')){
+    document.getElementById('cr-sub').textContent=fmt(subtotal);
+    document.getElementById('cr-dsc').textContent='-'+fmt(descMonto);
+    const lblIva=document.getElementById('cr-iva-lbl');
+    if(lblIva) lblIva.textContent=ivaActivo?'IVA ('+Math.round(ivaRate*100)+'%)':'IVA (no aplica)';
+    document.getElementById('cr-iva').textContent=ivaActivo?fmt(iva):'—';
+    const rowIva=document.getElementById('cr-iva-row');
+    if(rowIva) rowIva.classList.toggle('off',!ivaActivo);
+    document.getElementById('cr-env').textContent=fmt(envio);
+    document.getElementById('cr-total').textContent=fmt(total);
+  }
+  return {subtotal,descMonto,iva,envio,total,ivaRate:ivaActivo?ivaRate:0,descGlobal,ivaActivo};
+}
+
+function agregarPartida(){ const cont=document.getElementById('cot-partidas'); if(!cont)return; const i=Date.now(); const div=document.createElement('div'); div.innerHTML=cotPartidaHTML({},i); cont.appendChild(div.firstElementChild); }
+function quitarPartida(i){ const r=document.getElementById('cot-p-'+i); if(r){r.remove();recalcCot();} }
+
+function leerPartidas() {
+  return Array.from(document.querySelectorAll('#cot-partidas .partida-row')).map(r=>({
+    nombre:r.querySelector('.cot-pnombre')?.value?.trim()||'',
+    marca:r.querySelector('.cot-pmarca')?.value?.trim()||'',
+    cant:parseFloat(r.querySelector('.cot-pcant')?.value)||1,
+    precio:parseFloat(r.querySelector('.cot-pprecio')?.value)||0,
+    descto:parseFloat(r.querySelector('.cot-pdescto')?.value)||0,
+    subtotal:parseFloat(r.querySelector('.cot-psubtotal')?.value)||0
+  })).filter(p=>p.nombre && (p.precio > 0));
+}
+
+function verCotizacion() {
+  const cliente=document.getElementById('c-cliente')?.value?.trim();
+  if(!cliente){toast('⚠️ El nombre del cliente es obligatorio');return;}
+  const nums=recalcCot();
+  const partidas=leerPartidas();
+  const folio=document.getElementById('c-folio')?.value||'';
+  const fecha=document.getElementById('c-fecha')?.value||'';
+  const vigencia=document.getElementById('c-vigencia')?.value||'';
+  if (!cotFolioRegistrado) {
+    cotFolioRegistrado = true;
+    cotFolioNum++; localStorage.setItem('cot_folio', cotFolioNum);
+  }
+
+  const bodyHTML =
+    headerEmpresa('COTIZACIÓN', folio, fecha)
+    + '<div class="info-grid">'
+    +   '<div><div class="info-label">Cliente / Empresa</div><div class="info-val">'+esc(document.getElementById('c-cliente')?.value||'')+'</div></div>'
+    +   '<div><div class="info-label">No. Cotización</div><div class="info-val">'+esc(folio)+'</div></div>'
+    +   '<div><div class="info-label">Atención a</div><div class="info-val">'+esc(document.getElementById('c-atencion')?.value||'')+'</div></div>'
+    +   '<div><div class="info-label">Fecha</div><div class="info-val">'+esc(fecha)+'</div></div>'
+    +   '<div><div class="info-label">Dirección</div><div class="info-val">'+esc(document.getElementById('c-direccion')?.value||'')+'</div></div>'
+    +   '<div><div class="info-label">Válida hasta</div><div class="info-val">'+esc(vigencia)+'</div></div>'
+    + '</div>'
+    + (document.getElementById('c-descripcion')?.value?.trim()?'<div class="desc-box"><div class="desc-label">Descripción del proyecto</div>'+esc(document.getElementById('c-descripcion').value)+'</div>':'')
+    + '<table><thead><tr><th style="width:24px">#</th><th>Descripción</th><th>Marca/Modelo</th><th style="width:40px;text-align:center">Cant.</th><th style="width:80px;text-align:right">P. Unit.</th><th style="width:50px;text-align:center">Dscto.</th><th style="width:90px;text-align:right">Subtotal</th></tr></thead><tbody>'
+    + partidas.map((p,i)=>'<tr><td style="color:#999">'+(i+1)+'</td><td>'+esc(p.nombre)+'</td><td style="color:#666">'+esc(p.marca)+'</td><td style="text-align:center">'+p.cant+'</td><td class="num">'+fmt(p.precio)+'</td><td style="text-align:center">'+(p.descto>0?p.descto+'%':'—')+'</td><td class="num">'+fmt(p.subtotal)+'</td></tr>').join('')
+    + '</tbody></table>'
+    + '<div style="display:flex;justify-content:flex-end"><div class="totales">'
+    +   '<div class="total-row"><span>Subtotal</span><span>'+fmt(nums.subtotal)+'</span></div>'
+    +   (nums.descMonto>0?'<div class="total-row"><span>Descuento adicional</span><span>- '+fmt(nums.descMonto)+'</span></div>':'')
+    +   (nums.ivaActivo&&nums.ivaRate>0?'<div class="total-row"><span>IVA ('+Math.round(nums.ivaRate*100)+'%)</span><span>'+fmt(nums.iva)+'</span></div>':'')
+    +   (!nums.ivaActivo?'<div class="total-row" style="color:#888"><span>IVA</span><span>No aplica / Sin IVA</span></div>':'')
+    +   (nums.envio>0?'<div class="total-row"><span>Envío / Otros</span><span>'+fmt(nums.envio)+'</span></div>':'')
+    +   '<div class="total-row main"><span>TOTAL A PAGAR</span><span>'+fmt(nums.total)+'</span></div>'
+    +   '<div style="font-size:10px;color:#999;margin-top:4px;text-align:right">Moneda: MXN</div>'
+    + '</div></div>'
+    + '<div class="condiciones"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-bottom:6px">Condiciones comerciales</div>'
+    + '<table>'
+    +   '<tr><td>Forma de pago</td><td>'+esc(document.getElementById('c-pago')?.value||'')+'</td></tr>'
+    +   '<tr><td>Tiempo de entrega</td><td>'+esc(document.getElementById('c-entrega')?.value||'')+'</td></tr>'
+    +   '<tr><td>Garantía</td><td>'+esc(document.getElementById('c-garantia')?.value||'')+'</td></tr>'
+    +   '<tr><td>Instalación</td><td>'+esc(document.getElementById('c-instalacion')?.value||'')+'</td></tr>'
+    +   '<tr><td>Transporte</td><td>'+esc(document.getElementById('c-transporte')?.value||'')+'</td></tr>'
+    +   (document.getElementById('c-notas')?.value?.trim()?'<tr><td>Notas</td><td>'+esc(document.getElementById('c-notas').value)+'</td></tr>':'')
+    + '</table></div>'
+    + '<div class="firmas">'
+    +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">'+EMPRESA.contacto+'<br>'+EMPRESA.nombre+' — '+EMPRESA.subtitulo+'</div></div>'
+    +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">Nombre y firma del cliente<br>'+esc(cliente)+'</div></div>'
+    + '</div>'
+    + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+'</div>';
+
+  abrirDoc('Cotización '+folio, bodyHTML);
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();_confirmCancel();} });
+document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
+
+function initAppData() {
+  updateFirebaseBadge();
+  cargarOrdenes();
+  setTimeout(initOnboarding, 800);
+}
+window.addEventListener('firebaseReady', () => {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAppData, { once: true });
+  } else {
+    initAppData();
+  }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window._useFirebase) cargarOrdenesLocal();
+  document.addEventListener('click', e => {
+    if (e.target.closest('[data-action="add-servicio"]')) {
+      e.preventDefault();
+      agregarProductoRow();
+    }
+  });
+  document.getElementById('confirm-ok-btn').addEventListener('click', _confirmOk);
+  document.getElementById('confirm-cancel-btn').addEventListener('click', _confirmCancel);
+  document.getElementById('modal-confirm').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-confirm')) _confirmCancel();
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// MICROSOFT 365 — INTEGRACIÓN GRAPH API (FASE 1)
+// ═══════════════════════════════════════════════════════
+
+const M365 = {
+  _instance: null,
+  _account: null,
+  SCOPES: ['Files.ReadWrite', 'User.Read'],
+
+  get clientId() {
+    return localStorage.getItem('m365_client_id') || '';
+  },
+
+  async loadMSAL() {
+    if (window.msal) return true;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+      s.onload = () => resolve(true);
+      s.onerror = () => reject(new Error('No se pudo cargar MSAL.js'));
+      document.head.appendChild(s);
+    });
+  },
+
+  async getInstance() {
+    if (this._instance) return this._instance;
+    if (!this.clientId) throw new Error('Configura tu Client ID de Azure primero.');
+    await this.loadMSAL();
+    this._instance = new msal.PublicClientApplication({
+      auth: {
+        clientId: this.clientId,
+        authority: 'https://login.microsoftonline.com/common',
+        redirectUri: window.location.origin + window.location.pathname
+      },
+      cache: {
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: false
+      }
+    });
+    await this._instance.initialize();
+    // Restaurar cuenta activa si hay
+    const accounts = this._instance.getAllAccounts();
+    if (accounts.length > 0) this._account = accounts[0];
+    return this._instance;
+  },
+
+  async login() {
+    const inst = await this.getInstance();
+    const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES });
+    this._account = resp.account;
+    return resp.accessToken;
+  },
+
+  async getToken() {
+    const inst = await this.getInstance();
+    if (!this._account) throw new Error('Inicia sesión con Microsoft primero.');
+    try {
+      const resp = await inst.acquireTokenSilent({ scopes: this.SCOPES, account: this._account });
+      return resp.accessToken;
+    } catch(e) {
+      // Token expirado — pedir interactivo
+      const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES, account: this._account });
+      this._account = resp.account;
+      return resp.accessToken;
+    }
+  },
+
+  logout() {
+    this._account = null;
+    this._instance = null;
+    localStorage.removeItem('m365_client_id');
+  },
+
+  isLoggedIn() {
+    return !!this._account;
+  },
+
+  async graphFetch(token, path, method = 'GET', body = null, contentType = 'application/json') {
+    const opts = {
+      method,
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': contentType }
+    };
+    if (body) opts.body = body;
+    const resp = await fetch(`https://graph.microsoft.com/v1.0${path}`, opts);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: { message: resp.statusText } }));
+      throw new Error(err.error?.message || `Graph API ${resp.status}`);
+    }
+    return method === 'PUT' ? resp.json() : resp.json().catch(() => ({}));
+  },
+
+  async uploadExcel(token, buffer, filename) {
+    // Crear carpeta /AlarmasReset en OneDrive raíz
+    try {
+      await this.graphFetch(token, '/me/drive/root/children', 'POST', JSON.stringify({
+        name: 'AlarmasReset', folder: {},
+        '@microsoft.graph.conflictBehavior': 'replace'
+      }));
+    } catch(e) { /* carpeta ya existe */ }
+
+    // Subir archivo (replace si existe)
+    const uint8 = new Uint8Array(buffer);
+    const blob = new Blob([uint8], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const resp = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/AlarmasReset/${filename}:/content`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        },
+        body: blob
+      }
+    );
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Upload error ${resp.status}`);
+    }
+    return resp.json();
+  }
+};
+
+// ── UI: Modal M365 ────────────────────────────────────
+function abrirModalM365() {
+  closeSidebar();
+  const clientIdEl = document.getElementById('m365-client-id');
+  if (clientIdEl) clientIdEl.value = localStorage.getItem('m365_client_id') || '';
+  const hint = document.getElementById('m365-redirect-hint');
+  if (hint) hint.textContent = window.location.origin + window.location.pathname;
+  actualizarUIm365();
+  cargarLogsExport();
+  document.getElementById('modal-m365').classList.add('open');
+}
+
+function cerrarModalM365() {
+  document.getElementById('modal-m365').classList.remove('open');
+}
+
+function actualizarUIm365() {
+  const isOn = M365.isLoggedIn();
+  const dot = document.getElementById('m365-dot');
+  const txt = document.getElementById('m365-conn-text');
+  const btnExport = document.getElementById('btn-m365-export');
+  const btnLogout = document.getElementById('btn-m365-logout');
+  const sidebarDot = document.getElementById('si-m365-dot');
+
+  if (dot) { dot.className = 'm365-dot' + (isOn ? ' on' : ''); }
+  if (txt) txt.textContent = isOn
+    ? `Conectado: ${M365._account?.username || M365._account?.name || 'cuenta Microsoft'}`
+    : 'Sin sesión iniciada';
+  if (btnExport) { btnExport.disabled = !isOn; btnExport.style.opacity = isOn ? '1' : '.5'; }
+  if (btnLogout) btnLogout.style.display = isOn ? '' : 'none';
+  if (sidebarDot) sidebarDot.style.color = isOn ? 'var(--green)' : 'var(--muted)';
+}
+
+async function iniciarSesionM365() {
+  const clientId = document.getElementById('m365-client-id')?.value?.trim();
+  if (!clientId) { toast('⚠️ Ingresa tu Client ID de Azure'); return; }
+  localStorage.setItem('m365_client_id', clientId);
+  M365._instance = null; // Forzar reinicio con nuevo client ID
+  toast('⏳ Abriendo ventana de Microsoft...');
+  try {
+    await M365.login();
+    actualizarUIm365();
+    toast('✅ Sesión iniciada con Microsoft');
+  } catch(e) {
+    if (e.name === 'BrowserAuthError' && e.errorCode === 'user_cancelled') {
+      toast('Inicio de sesión cancelado');
+    } else {
+      toast('⚠️ Error: ' + e.message);
+    }
+  }
+}
+
+function cerrarSesionM365() {
+  M365.logout();
+  actualizarUIm365();
+  toast('Sesión de Microsoft cerrada');
+}
+
+async function exportarM365() {
+  if (!M365.isLoggedIn()) { toast('⚠️ Inicia sesión con Microsoft primero'); return; }
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
+
+  const btnExport = document.getElementById('btn-m365-export');
+  if (btnExport) { btnExport.disabled = true; btnExport.textContent = '⏳ Exportando...'; }
+
+  try {
+    toast('⏳ Generando Excel...');
+    if (typeof XLSX === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const buffer = _buildExcelBuffer();
+    const mes = new Date().toISOString().slice(0, 7);
+    const filename = `AlarmasReset-${mes}.xlsx`;
+
+    toast('⏳ Subiendo a OneDrive...');
+    const token = await M365.getToken();
+    const fileData = await M365.uploadExcel(token, buffer, filename);
+
+    // Registrar exportación
+    await _logExportM365(filename, fileData.webUrl || '');
+    cargarLogsExport();
+    actualizarUIm365();
+
+    const mesLabel = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    toast(`✅ Exportado a OneDrive: ${filename}`);
+
+    // Marcar para no volver a mostrar banner este mes
+    localStorage.setItem('m365_ultimo_export', mes);
+    cerrarBannerExport();
+
+  } catch(e) {
+    console.error('Error exportar M365:', e);
+    toast('⚠️ Error: ' + e.message);
+  } finally {
+    if (btnExport) { btnExport.disabled = false; btnExport.textContent = '📊 Exportar ahora a OneDrive'; }
+  }
+}
+
+function _buildExcelBuffer() {
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Órdenes
+  const h1 = [['ID','Cliente','Vehículo','F. Instalación','F. Pago','Estado','Total','A Cuenta','Saldo','Notas']];
+  ordenes.forEach(o => {
+    const t = o.total||0, a = o.a_cuenta_total||0;
+    const est = (o.estado||'PENDIENTE').toUpperCase();
+    h1.push([o.id||'', o.cliente||'', o.vehiculo||'', o.fecha_instalacion||'', o.fecha_pago||'',
+      ESTADO_LABELS[est]||est, t, a, t-a, o.recordatorios||'']);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(h1);
+  ws1['!cols'] = [{wch:20},{wch:24},{wch:24},{wch:15},{wch:15},{wch:14},{wch:13},{wch:13},{wch:13},{wch:34}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Órdenes');
+
+  // Hoja 2: Servicios detallados
+  const h2 = [['ID Orden','Cliente','Vehículo','Estado','Servicio','Costo','Inversión','Ganancia','Garantía']];
+  ordenes.forEach(o => {
+    const est = (o.estado||'PENDIENTE').toUpperCase();
+    (o.productos||[]).forEach(p => {
+      const c = parseFloat(p.costo)||0, inv = parseFloat(p.inversion)||0;
+      h2.push([o.id||'', o.cliente||'', o.vehiculo||'', ESTADO_LABELS[est]||est,
+        p.nombre||'', c, inv, c-inv, p.garantia||'Sin garantía']);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(h2);
+  ws2['!cols'] = [{wch:20},{wch:24},{wch:24},{wch:14},{wch:32},{wch:13},{wch:13},{wch:13},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
+
+  // Hoja 3: Resumen financiero
+  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
+  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[])
+    .reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
+  const porCobrar = ordenes.filter(o=>['PENDIENTE','EN_PROCESO']
+    .includes((o.estado||'').toUpperCase()))
+    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const mes = new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  const h3 = [
+    ['RESUMEN FINANCIERO MENSUAL — ALARMAS Y GPS RESET'],
+    ['Período:', mes],
+    ['Generado:', new Date().toLocaleString('es-MX')],
+    ['Exportación vía:', 'Microsoft 365 OneDrive'],
+    [],
+    ['Indicador','Valor'],
+    ['Total facturado', totalFac],
+    ['Ganancia estimada', totalGan],
+    ['Por cobrar', porCobrar],
+    [],
+    ['Total órdenes', ordenes.length],
+    ['Pendientes', ordenes.filter(o=>(o.estado||'')==='PENDIENTE').length],
+    ['En proceso', ordenes.filter(o=>(o.estado||'')==='EN_PROCESO').length],
+    ['Pagadas', ordenes.filter(o=>(o.estado||'')==='PAGADO').length],
+    ['Termo', ordenes.filter(o=>(o.estado||'')==='TERMO').length],
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(h3);
+  ws3['!cols'] = [{wch:30},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen');
+
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+
+async function _logExportM365(filename, url) {
+  const log = {
+    tipo: 'microsoft_365',
+    filename, url,
+    fecha: new Date().toISOString(),
+    cuenta: M365._account?.username || '',
+    ordenes_count: ordenes.length,
+    total_facturado: ordenes.reduce((s,o)=>s+(o.total||0),0)
+  };
+  const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
+  logs.unshift(log);
+  localStorage.setItem('alarmas_export_logs', JSON.stringify(logs.slice(0,30)));
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { collection, addDoc } = window._firebaseModules;
+      await addDoc(collection(window._firebaseDb, 'export_logs'), log);
+    } catch(e) { /* no crítico */ }
+  }
+}
+
+function cargarLogsExport() {
+  const cont = document.getElementById('m365-log-lista');
+  if (!cont) return;
+  const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
+  if (!logs.length) { cont.innerHTML = '<span style="color:var(--muted)">Sin exportaciones registradas.</span>'; return; }
+  cont.innerHTML = logs.slice(0,8).map(l => {
+    const fecha = new Date(l.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
+    const icono = l.tipo === 'microsoft_365' ? '🔷' : '📊';
+    const link = l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">Ver →</a>` : '';
+    return `<div class="export-log-row">
+      <span>${icono} ${esc(l.filename||l.tipo)}</span>
+      <span style="color:var(--muted)">${fecha} ${link}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Auto-exportación día 30 (sin intervención si ya hay sesión) ──
+async function intentarAutoExportM365() {
+  const hoy = new Date();
+  const mes = hoy.toISOString().slice(0,7);
+  const ultimoExport = localStorage.getItem('m365_ultimo_export');
+  const clientId = localStorage.getItem('m365_client_id');
+  const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate();
+  const diaExport = Math.min(30, ultimoDia);
+
+  // Si no es el día de exportación, ya se exportó, o no hay configuración → solo revisar banner
+  if (hoy.getDate() !== diaExport || ultimoExport === mes || !clientId) {
+    checkBannerExport(); return;
+  }
+
+  try {
+    const inst = await M365.getInstance();
+    const accounts = inst.getAllAccounts();
+
+    if (!accounts.length) {
+      // Sin sesión guardada → mostrar banner para que el usuario haga clic
+      checkBannerExport(); return;
+    }
+
+    M365._account = accounts[0];
+    actualizarUIm365();
+
+    // Intentar token silencioso — si la sesión sigue viva, funciona sin popup
+    const resp = await inst.acquireTokenSilent({ scopes: M365.SCOPES, account: accounts[0] });
+
+    // ¡Sesión activa! Exportar sin que el usuario haga nada
+    toast('📅 Día ' + diaExport + ' — Exportando respaldo mensual a OneDrive...');
+
+    if (typeof XLSX === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const buffer = _buildExcelBuffer();
+    const filename = `AlarmasReset-${mes}.xlsx`;
+    const fileData = await M365.uploadExcel(resp.accessToken, buffer, filename);
+
+    await _logExportM365(filename, fileData?.webUrl || '');
+    localStorage.setItem('m365_ultimo_export', mes);
+    cerrarBannerExport();
+    toast('✅ Respaldo mensual guardado en OneDrive: ' + filename);
+
+  } catch(e) {
+    // Sesión expirada o token inválido → mostrar banner para login manual (un clic)
+    console.log('Auto-export silencioso:', e.message);
+    checkBannerExport();
+  }
+}
+
+// ── Banner día 30 ─────────────────────────────────────
+function checkBannerExport() {
+  const hoy = new Date();
+  const mes = hoy.toISOString().slice(0,7);
+  const ultimoExport = localStorage.getItem('m365_ultimo_export');
+  const diasRestantes = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate() - hoy.getDate();
+  const banner = document.getElementById('export-banner');
+  if (!banner) return;
+  // Mostrar el banner el día 30, o el último día del mes si tiene menos de 30
+  const esDia30 = hoy.getDate() === 30 || (hoy.getDate() > 28 && diasRestantes === 0);
+  if (esDia30 && ultimoExport !== mes && localStorage.getItem('m365_client_id')) {
+    banner.classList.add('show');
+  }
+}
+
+function cerrarBannerExport() {
+  document.getElementById('export-banner')?.classList.remove('show');
+}
+
+// ═══════════════════════════════════════
+// CONFIRM MODAL
+// ═══════════════════════════════════════
+let _confirmResolve = null;
+function confirmarAccion(titulo, msg, icono = '⚠️', textoOk = 'Confirmar') {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = titulo;
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('confirm-icon').textContent = icono;
+    document.getElementById('confirm-ok-btn').textContent = textoOk;
+    document.getElementById('modal-confirm').classList.add('open');
+  });
+}
+function _confirmOk() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+}
+function _confirmCancel() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+}
+
+// ═══════════════════════════════════════
+// CAMBIAR ESTADO INLINE
+// ═══════════════════════════════════════
+async function cambiarEstado(id, nuevoEstado) {
+  const orden = ordenes.find(o => o.id === id);
+  if (!orden || (orden.estado||'PENDIENTE').toUpperCase() === nuevoEstado) return;
+  orden.estado = nuevoEstado;
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { updateDoc, doc } = window._firebaseModules;
+      await updateDoc(doc(window._firebaseDb, 'ordenes', id), { estado: nuevoEstado });
+      toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
+      return;
+    } catch(e) { console.error(e); }
+  }
+  await guardarLocal();
+  renderAll();
+  toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
+  setTimeout(() => {
+    const body = document.getElementById('body-' + id);
+    if (body) body.classList.add('open');
+  }, 40);
+}
+
+// ═══════════════════════════════════════
+// ONBOARDING
+// ═══════════════════════════════════════
+const ONBOARD_STEPS = [
+  { ico:'🔐', title:'¡Bienvenido a Alarmas Reset!', desc:'Tu app de gestión de órdenes de servicio. Organiza clientes, vehículos y cobros en un solo lugar — con o sin internet.' },
+  { ico:'📊', title:'Dashboard de inicio', desc:'Aquí ves tu resumen financiero: ganancias, por cobrar y facturado. Las últimas 5 órdenes aparecen abajo para acceso rápido.' },
+  { ico:'📋', title:'Gestión de órdenes', desc:'Crea, edita y rastrea cada orden. Cambia el estado con un toque directo: Pendiente → En proceso → Pagado.' },
+  { ico:'☰', title:'Menú lateral', desc:'Accede a herramientas: exportar Excel con 3 hojas, respaldo JSON, restaurar datos y configuración de Firebase.' },
+];
+let _onboardStep = 0;
+
+function initOnboarding() {
+  if (localStorage.getItem('alarmas_onboarded')) return;
+  _onboardStep = 0;
+  _renderOnboardStep();
+  document.getElementById('onboard-overlay').classList.add('open');
+}
+
+function _renderOnboardStep() {
+  const s = ONBOARD_STEPS[_onboardStep];
+  document.getElementById('onboard-ico').textContent = s.ico;
+  document.getElementById('onboard-title').textContent = s.title;
+  document.getElementById('onboard-desc').textContent = s.desc;
+  document.getElementById('onboard-dots').innerHTML =
+    ONBOARD_STEPS.map((_,i) => `<div class="onboard-dot ${i===_onboardStep?'on':''}"></div>`).join('');
+  document.getElementById('onboard-next-btn').textContent =
+    _onboardStep < ONBOARD_STEPS.length - 1 ? 'Siguiente →' : '¡Empezar!';
+}
+
+function nextOnboardStep() {
+  _onboardStep++;
+  if (_onboardStep >= ONBOARD_STEPS.length) skipOnboarding();
+  else _renderOnboardStep();
+}
+
+function skipOnboarding() {
+  localStorage.setItem('alarmas_onboarded', '1');
+  document.getElementById('onboard-overlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen = sidebar.classList.toggle('open');
+  overlay.classList.toggle('open', isOpen);
+  if (isOpen) updateSidebarStatus();
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('open');
+}
+
+function navTo(tab) {
+  closeSidebar();
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3 };
+  showTab(tab, tabBtns[tabMap[tab]]);
+  document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
+  const si = document.getElementById('si-' + tab);
+  if (si) si.classList.add('active');
+}
+
+function updateSidebarStatus() {
+  const status = document.getElementById('sb-user-status');
+  const dot = document.getElementById('si-fb-dot');
+  if (status) {
+    if (window._useFirebase) {
+      status.textContent = '● Firebase';
+      status.className = 'sb-user-status connected';
+    } else {
+      status.textContent = '● Local';
+      status.className = 'sb-user-status';
+    }
+  }
+  if (dot) dot.style.color = window._useFirebase ? 'var(--green)' : 'var(--muted)';
+  const pend = ordenes.filter(o => (o.estado || '').toUpperCase() === 'PENDIENTE').length;
+  const badge = document.getElementById('si-pend-badge');
+  if (badge) {
+    badge.textContent = pend;
+    badge.style.display = pend > 0 ? '' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════
+// EXPORTAR EXCEL
+// ═══════════════════════════════════════
+function exportarExcel() {
+  closeSidebar();
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
+  if (typeof XLSX === 'undefined') {
+    toast('⏳ Cargando librería...');
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = _doExportExcel;
+    document.head.appendChild(s);
+  } else {
+    _doExportExcel();
+  }
+}
+
+function _doExportExcel() {
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Resumen de órdenes
+  const h1 = [['ID','Cliente','Vehículo','F. Instalación','F. Pago','Estado','Total','A Cuenta','Saldo','Notas']];
+  ordenes.forEach(o => {
+    const t = o.total||0, a = o.a_cuenta_total||0;
+    h1.push([o.id||'', o.cliente||'', o.vehiculo||'', o.fecha_instalacion||'', o.fecha_pago||'',
+      o.estado||'PENDIENTE', t, a, t-a, o.recordatorios||'']);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(h1);
+  ws1['!cols'] = [{wch:20},{wch:22},{wch:22},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:32}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Órdenes');
+
+  // Hoja 2: Detalle de servicios
+  const h2 = [['ID Orden','Cliente','Vehículo','Estado','Servicio','Costo','Inversión','Ganancia','Garantía']];
+  ordenes.forEach(o => {
+    (o.productos||[]).forEach(p => {
+      const c = parseFloat(p.costo)||0, inv = parseFloat(p.inversion)||0;
+      h2.push([o.id||'', o.cliente||'', o.vehiculo||'', o.estado||'PENDIENTE',
+        p.nombre||'', c, inv, c-inv, p.garantia||'Sin garantía']);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(h2);
+  ws2['!cols'] = [{wch:20},{wch:22},{wch:22},{wch:12},{wch:30},{wch:12},{wch:12},{wch:12},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
+
+  // Hoja 3: Resumen financiero
+  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
+  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[]).reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
+  const porCobrar = ordenes.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
+    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const h3 = [
+    ['Resumen Financiero — Alarmas y GPS Reset'],
+    ['Generado:', new Date().toLocaleDateString('es-MX',{dateStyle:'long'})],
+    [],
+    ['Indicador','Valor'],
+    ['Total facturado', totalFac],
+    ['Ganancia estimada', totalGan],
+    ['Por cobrar', porCobrar],
+    ['Total órdenes', ordenes.length],
+    ['Órdenes pendientes', ordenes.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE').length],
+    ['Órdenes pagadas', ordenes.filter(o=>(o.estado||'').toUpperCase()==='PAGADO').length],
+    ['Órdenes termo', ordenes.filter(o=>(o.estado||'').toUpperCase()==='TERMO').length],
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(h3);
+  ws3['!cols'] = [{wch:26},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen');
+
+  XLSX.writeFile(wb, 'AlarmasReset-' + new Date().toISOString().split('T')[0] + '.xlsx');
+  toast('✅ Excel generado y descargado');
+}
+
+// ═══════════════════════════════════════
+// RESPALDO / RESTAURAR JSON
+// ═══════════════════════════════════════
+function respaldoJSON() {
+  closeSidebar();
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para respaldar'); return; }
+  const data = JSON.stringify({ fecha: new Date().toISOString(), version: '2.0', ordenes }, null, 2);
+  const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'AlarmasReset-Respaldo-' + new Date().toISOString().split('T')[0] + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('✅ Respaldo JSON descargado');
+}
+
+function restaurarJSON() {
+  closeSidebar();
+  document.getElementById('json-restore-input').click();
+}
+
+function procesarRestaurarJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const nuevas = data.ordenes || (Array.isArray(data) ? data : null);
+      if (!nuevas || !Array.isArray(nuevas)) { toast('⚠️ Formato de archivo inválido'); return; }
+      if (!confirm('¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales actuales.')) return;
+      ordenes = nuevas;
+      guardarLocal();
+      renderAll();
+      toast('✅ ' + nuevas.length + ' órdenes restauradas');
+    } catch(err) {
+      toast('⚠️ Error al leer el archivo: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function mostrarInfoFirebase() {
+  closeSidebar();
+  toast(window._useFirebase ? '🔥 Firebase activo — alarmas-reset-e3484' : '💾 Modo local activo');
+}
+
+// Globales para onclick en HTML dinámico (GitHub Pages / móvil)
+window.setVista = setVista;
+window.toggleClienteGroup = toggleClienteGroup;
+window.agregarProductoRow = agregarProductoRow;
+window.quitarProducto = quitarProducto;
+window.calcGanancia = calcGanancia;
+window.submitOrden = submitOrden;
+window.abrirModalNueva = abrirModalNueva;
+window.editarOrden = editarOrden;
+window.cerrarModal = cerrarModal;
+window.eliminarOrden = eliminarOrden;
+window.showTab = showTab;
+window.setFilter = setFilter;
+window.toggleOrden = toggleOrden;
+window.verBoleta = verBoleta;
+window.irAOrden = irAOrden;
+window.setIvaCot = setIvaCot;
+window.agregarPartida = agregarPartida;
+window.quitarPartida = quitarPartida;
+window.verCotizacion = verCotizacion;
+window.docImprimir = docImprimir;
+window.docCompartir = docCompartir;
+window.cerrarDoc = cerrarDoc;
+window.toggleSidebar = toggleSidebar;
+window.closeSidebar = closeSidebar;
+window.navTo = navTo;
+window.exportarExcel = exportarExcel;
+window.respaldoJSON = respaldoJSON;
+window.restaurarJSON = restaurarJSON;
+window.procesarRestaurarJSON = procesarRestaurarJSON;
+window.mostrarInfoFirebase = mostrarInfoFirebase;
+window.abrirModalM365 = abrirModalM365;
+window.cerrarModalM365 = cerrarModalM365;
+window.iniciarSesionM365 = iniciarSesionM365;
+window.cerrarSesionM365 = cerrarSesionM365;
+window.exportarM365 = exportarM365;
+window.cerrarBannerExport = cerrarBannerExport;
+window.intentarAutoExportM365 = intentarAutoExportM365;
+window.cambiarEstado = cambiarEstado;
+window.confirmarAccion = confirmarAccion;
+window.nextOnboardStep = nextOnboardStep;
+window.skipOnboarding = skipOnboarding;
+</script>
+</body>
+</html>
