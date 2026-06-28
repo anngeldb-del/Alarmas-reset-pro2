@@ -6,10 +6,1931 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <title>Alarmas Reset — Cotizaciones</title>
-
-<!-- FIREBASE SDK -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
   }
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+<!-- FIREBASE SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, doc,
+    onSnapshot, setDoc, deleteDoc,
+    query, orderBy, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+    authDomain: "alarmas-reset-e3484.firebaseapp.com",
+    projectId: "alarmas-reset-e3484",
+    storageBucket: "alarmas-reset-e3484.firebasestorage.app",
+    messagingSenderId: "1096561116547",
+    appId: "1:1096561116547:web:b13df05c092785723aa2b6"
+  };
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window._db = db;
+    window._fs = { collection, doc, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp };
+    window._fbReady = true;
+  } catch(e) {
+    console.warn('Firebase no disponible:', e);
+    window._fbReady = false;
+  }
+  window.dispatchEvent(new Event('fbReady'));
+</script>
+<style>
+:root {
+  --bg: #070709;
+  --surface: #0f0f14;
+  --card: #141419;
+  --border: #1f1f2c;
+  --border2: #2a2a3c;
+  --cyan: #00e5c8;
+  --cyan2: rgba(0,229,200,0.12);
+  --orange: #ff6030;
+  --orange2: rgba(255,96,48,0.12);
+  --gold: #f0c040;
+  --purple: #9060ff;
+  --text: #e8e8f0;
+  --muted: #5a5a72;
+  --muted2: #3a3a4e;
+  --green-wa: #25D366;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  font-family:'Syne',sans-serif;
+  color:var(--text);
+  min-height:100vh;
+  padding-bottom:100px;
+  overflow-x:hidden;
+}
+
+/* NOISE OVERLAY */
+body::before{
+  content:'';
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:.4;
+}
+
+.page{max-width:480px;margin:0 auto;padding:0 14px;position:relative;z-index:1;}
+
+/* ── HEADER ── */
+.header{
+  padding:16px 0 0;
+  margin-bottom:4px;
+  position:relative;
+}
+.header-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--cyan2);border:1px solid rgba(0,229,200,.25);
+  border-radius:100px;padding:4px 12px;
+  font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;
+  color:var(--cyan);text-transform:uppercase;margin-bottom:12px;
+}
+.header-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+.header-logo{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:26px;letter-spacing:2px;line-height:1;
+  color:#fff;margin-bottom:2px;
+}
+.header-logo em{color:var(--cyan);font-style:normal;}
+.header-sub{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.5px;margin-bottom:16px;}
+.header-contact{
+  display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;
+}
+.contact-chip{
+  display:flex;align-items:center;gap:4px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:4px 8px;
+  font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);
+  text-decoration:none;transition:border-color .2s,color .2s;
+}
+.contact-chip:hover{border-color:var(--cyan);color:var(--cyan);}
+.contact-chip svg{width:11px;height:11px;flex-shrink:0;}
+
+/* ── TABS ── */
+.tabs-wrap{
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(to bottom, var(--bg) 85%, transparent);
+  padding:12px 0 8px;margin:0 -14px;padding-left:14px;padding-right:14px;
+}
+.tabs-scroll{
+  display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;
+  scrollbar-width:none;-ms-overflow-style:none;
+}
+.tabs-scroll::-webkit-scrollbar{display:none;}
+.tab{
+  flex-shrink:0;
+  display:flex;align-items:center;gap:5px;
+  padding:7px 14px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:600;
+  color:var(--muted);cursor:pointer;transition:all .2s;
+  white-space:nowrap;
+}
+.tab:hover{border-color:var(--border2);color:var(--text);}
+.tab.active{background:var(--cyan2);border-color:rgba(0,229,200,.35);color:var(--cyan);}
+.tab-icon{font-size:13px;}
+
+/* ── PANELS ── */
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* ── CLIENT CARD ── */
+.client-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;padding:14px;
+  margin-bottom:10px;
+}
+.section-label{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2.5px;color:var(--cyan);
+  text-transform:uppercase;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.fields-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.fields-row.full{grid-template-columns:1fr;}
+.field-g{display:flex;flex-direction:column;gap:4px;}
+.field-g label{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-weight:600;}
+.field-g input,.field-g textarea,.field-g select{
+  background:var(--bg);border:1px solid var(--border2);
+  border-radius:7px;padding:9px 11px;
+  color:var(--text);font-family:'Syne',sans-serif;font-size:12px;
+  outline:none;transition:border-color .2s;width:100%;resize:vertical;
+}
+.field-g input:focus,.field-g textarea:focus,.field-g select:focus{border-color:var(--cyan);}
+.field-g input::placeholder,.field-g textarea::placeholder{color:var(--muted);font-size:11px;}
+.field-g select{appearance:none;}
+
+/* ── SECTION BLOCK ── */
+.sect{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;margin-bottom:8px;overflow:hidden;
+}
+.sect-head{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 14px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,.015);
+}
+.sect-ico{
+  width:30px;height:30px;border-radius:7px;
+  background:var(--cyan2);border:1px solid rgba(0,229,200,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;flex-shrink:0;
+}
+.sect-ico.orange{background:var(--orange2);border-color:rgba(255,96,48,.2);}
+.sect-ico.gold{background:rgba(240,192,64,.1);border-color:rgba(240,192,64,.2);}
+.sect-ico.purple{background:rgba(144,96,255,.1);border-color:rgba(144,96,255,.2);}
+.sect-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1.5px;color:var(--text);flex:1;}
+.sect-badge{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);background:var(--border);padding:2px 8px;border-radius:20px;}
+
+/* ── ITEMS ── */
+.items-list{padding:2px 0;}
+.item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:11px 14px;cursor:pointer;
+  transition:background .15s;
+  border-bottom:1px solid rgba(255,255,255,.025);
+  user-select:none;
+}
+.item:last-child{border-bottom:none;}
+.item:active{background:rgba(0,229,200,.03);}
+.chk{
+  width:20px;height:20px;border-radius:5px;
+  border:1.5px solid var(--muted2);background:transparent;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .2s;margin-top:1px;
+}
+.item.sel .chk{background:var(--cyan);border-color:var(--cyan);}
+.item.sel .chk::after{content:'✓';font-size:11px;color:#000;font-weight:900;}
+.item-text{flex:1;}
+.item-name{font-size:13px;color:var(--text);font-weight:400;line-height:1.35;transition:color .2s;}
+.item.sel .item-name{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(0,229,200,.35);}
+.item-desc{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4;}
+.item-tag{
+  flex-shrink:0;font-family:'DM Mono',monospace;font-size:8px;
+  letter-spacing:.8px;padding:2px 6px;border-radius:4px;font-weight:400;
+  margin-top:2px;
+}
+.tag-c{background:rgba(0,229,200,.08);color:var(--cyan);border:1px solid rgba(0,229,200,.15);}
+.tag-o{background:rgba(255,96,48,.08);color:var(--orange);border:1px solid rgba(255,96,48,.15);}
+.tag-g{background:rgba(240,192,64,.08);color:var(--gold);border:1px solid rgba(240,192,64,.15);}
+.tag-p{background:rgba(144,96,255,.08);color:var(--purple);border:1px solid rgba(144,96,255,.15);}
+
+/* ── PROGRESS ── */
+.prog-wrap{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-bottom:8px;
+  display:flex;align-items:center;gap:12px;
+}
+.prog-info{flex:1;}
+.prog-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;}
+.prog-track{height:3px;background:var(--border2);border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),rgba(0,229,200,.4));border-radius:3px;transition:width .4s ease;}
+.prog-count{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--cyan);letter-spacing:1px;line-height:1;}
+.prog-sub{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:1px;}
+
+/* ── NOTES AREA ── */
+.notes-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;}
+
+/* ── ACTIONS ── */
+.action-row{display:flex;gap:8px;margin-bottom:8px;}
+.reset-btn{
+  flex:1;padding:10px;background:transparent;
+  border:1px solid var(--border2);border-radius:8px;
+  color:var(--muted);font-family:'Syne',sans-serif;font-size:11px;
+  font-weight:600;cursor:pointer;transition:all .2s;
+}
+.reset-btn:hover{border-color:var(--orange);color:var(--orange);}
+
+/* ── FOOTER ── */
+.footer-txt{
+  text-align:center;padding:12px 0 4px;
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:1.5px;color:var(--muted2);
+}
+.footer-txt span{color:var(--cyan);}
+
+/* ── FIXED SEND ── */
+.send-fixed{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:10px 14px 18px;
+  background:linear-gradient(to top,var(--bg) 65%,transparent);
+  z-index:100;
+}
+.send-fixed-inner{max-width:480px;margin:0 auto;}
+.send-btn{
+  width:100%;padding:15px 20px;
+  background:linear-gradient(135deg,#25D366,#128C7E);
+  border:none;border-radius:12px;color:#fff;
+  font-family:'Bebas Neue',sans-serif;font-size:17px;
+  letter-spacing:2px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 6px 28px rgba(37,211,102,.28);
+  transition:opacity .2s,transform .1s;
+}
+.send-btn:active{opacity:.85;transform:scale(.98);}
+
+/* ── ADD SERVICE TAB ── */
+.add-service-panel{padding:4px 0;}
+.add-form{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px;}
+.add-form h3{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.5px;color:var(--text);margin-bottom:14px;}
+.add-items-preview{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:10px;min-height:60px;}
+.add-items-preview p{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.preview-tag{display:inline-flex;align-items:center;gap:5px;background:var(--cyan2);border:1px solid rgba(0,229,200,.2);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--cyan);margin:3px 3px 0 0;}
+.preview-tag button{background:none;border:none;color:var(--cyan);cursor:pointer;font-size:13px;line-height:1;padding:0;}
+.add-btn{
+  width:100%;padding:12px;margin-top:10px;
+  background:var(--cyan2);border:1px solid rgba(0,229,200,.3);
+  border-radius:8px;color:var(--cyan);
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .2s;letter-spacing:.5px;
+}
+.add-btn:hover{background:rgba(0,229,200,.2);}
+.saved-services{margin-top:4px;}
+.saved-item{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-bottom:6px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.saved-item-name{font-size:13px;font-weight:600;color:var(--text);}
+.saved-item-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+.del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;transition:color .2s;}
+.del-btn:hover{color:var(--orange);}
+
+/* ── FIREBASE SPLASH ── */
+.firebase-note{
+  background:rgba(255,180,0,.06);border:1px solid rgba(255,180,0,.2);
+  border-radius:10px;padding:12px 14px;margin-bottom:10px;
+}
+.firebase-note p{font-size:11px;color:rgba(255,180,0,.8);line-height:1.6;}
+.firebase-note strong{color:#ffb400;}
+
+/* ── AGREGAR ÍTEM POR PANEL ── */
+.add-item-sect{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;margin-bottom:8px;overflow:hidden;
+}
+.add-item-head{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 14px;cursor:pointer;
+  background:rgba(0,229,200,.03);
+  border-bottom:1px solid transparent;
+  transition:background .2s;
+}
+.add-item-head:hover{background:rgba(0,229,200,.06);}
+.add-item-head.open{border-bottom-color:var(--border);}
+.add-item-toggle{
+  width:28px;height:28px;border-radius:6px;
+  background:var(--cyan2);border:1px solid rgba(0,229,200,.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;color:var(--cyan);flex-shrink:0;
+  transition:transform .2s;
+}
+.add-item-head.open .add-item-toggle{transform:rotate(45deg);}
+.add-item-label{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1.5px;color:var(--cyan);flex:1;}
+.add-item-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);background:var(--border);padding:2px 8px;border-radius:20px;}
+.add-item-form{padding:12px 14px;display:none;}
+.add-item-form.open{display:block;}
+.add-item-inputs{display:flex;gap:8px;margin-bottom:8px;}
+.add-item-inputs input{
+  flex:1;background:var(--bg);border:1px solid var(--border2);
+  border-radius:7px;padding:9px 11px;
+  color:var(--text);font-family:'Syne',sans-serif;font-size:12px;
+  outline:none;transition:border-color .2s;
+}
+.add-item-inputs input:focus{border-color:var(--cyan);}
+.add-item-inputs input::placeholder{color:var(--muted);font-size:11px;}
+.btn-add-item{
+  padding:9px 16px;background:var(--cyan2);
+  border:1px solid rgba(0,229,200,.3);border-radius:7px;
+  color:var(--cyan);font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;
+  white-space:nowrap;transition:background .2s;
+}
+.btn-add-item:hover{background:rgba(0,229,200,.2);}
+.custom-items-list{padding:2px 0;}
+.custom-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.025);
+  transition:background .15s;
+  user-select:none;
+}
+.custom-item:last-child{border-bottom:none;}
+.custom-item:active{background:rgba(0,229,200,.03);}
+.custom-item .chk{width:20px;height:20px;border-radius:5px;border:1.5px solid var(--muted2);background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;margin-top:1px;}
+.custom-item.sel .chk{background:var(--cyan);border-color:var(--cyan);}
+.custom-item.sel .chk::after{content:'✓';font-size:11px;color:#000;font-weight:900;}
+.custom-item .item-text{flex:1;}
+.custom-item .item-name{font-size:13px;color:var(--text);font-weight:400;line-height:1.35;transition:color .2s;}
+.custom-item.sel .item-name{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(0,229,200,.35);}
+.btn-del-item{
+  background:none;border:none;color:var(--muted2);
+  cursor:pointer;font-size:15px;padding:2px 4px;
+  transition:color .2s;flex-shrink:0;line-height:1;
+}
+.btn-del-item:hover{color:var(--orange);}
+.custom-badge{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.8px;padding:2px 6px;border-radius:4px;background:rgba(0,229,200,.08);color:var(--cyan);border:1px solid rgba(0,229,200,.15);}
+
+/* ── FOCUS VISIBLE ── */
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:4px;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:360px){
+  .header-logo{font-size:30px;}
+  .tab{padding:7px 10px;font-size:10px;}
+}
+
+/* ── AJUSTES / FINANZAS ── */
+.finance-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.finance-box{
+  background:var(--bg);border:1px solid var(--border2);
+  border-radius:10px;padding:12px;text-align:center;
+}
+.finance-box.full{grid-column:1/-1;}
+.finance-box-label{
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1.5px;
+  color:var(--muted);text-transform:uppercase;margin-bottom:6px;
+}
+.finance-box-amount{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;line-height:1;}
+.finance-box-amount.green{color:#25D366;}
+.finance-box-amount.red{color:var(--orange);}
+.finance-box-amount.gold{color:var(--gold);}
+.finance-mes-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.finance-mes-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--cyan);text-transform:uppercase;}
+.finance-dias-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);}
+.finance-input-group{margin-bottom:10px;}
+.finance-input-group input{
+  width:100%;background:var(--bg);border:1px solid var(--border2);
+  border-radius:7px;padding:9px 11px;
+  color:var(--text);font-family:'Syne',sans-serif;font-size:12px;
+  outline:none;transition:border-color .2s;margin-bottom:8px;
+}
+.finance-input-group input:focus{border-color:var(--cyan);}
+.finance-input-group input::placeholder{color:var(--muted);font-size:11px;}
+.finance-btn-row{display:flex;gap:8px;}
+.btn-fin{
+  flex:1;padding:10px;border-radius:8px;
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .2s;
+}
+.btn-fin.g{background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25D366;}
+.btn-fin.g:active{background:rgba(37,211,102,.2);}
+.btn-fin.i{background:var(--orange2);border:1px solid rgba(255,96,48,.3);color:var(--orange);}
+.btn-fin.i:active{background:rgba(255,96,48,.2);}
+.btn-historico{
+  width:100%;padding:13px;margin-bottom:8px;
+  background:rgba(144,96,255,.1);border:1px solid rgba(144,96,255,.25);
+  border-radius:10px;color:var(--purple);
+  font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1.5px;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.btn-historico:hover{background:rgba(144,96,255,.18);}
+.mov-list{margin-top:10px;}
+.mov-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.mov-item:last-child{border-bottom:none;}
+.mov-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.mov-dot.g{background:#25D366;}
+.mov-dot.i{background:var(--orange);}
+.mov-info{flex:1;min-width:0;}
+.mov-desc{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mov-fecha{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);}
+.mov-monto{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;flex-shrink:0;}
+.mov-monto.g{color:#25D366;}
+.mov-monto.i{color:var(--orange);}
+/* ── MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:200;display:flex;align-items:flex-end;justify-content:center;
+}
+.modal-overlay.hidden{display:none;}
+.modal-sheet{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px 20px 0 0;width:100%;max-width:480px;
+  max-height:88vh;overflow-y:auto;padding:20px 16px 48px;
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-bar{width:40px;height:4px;border-radius:2px;background:var(--border2);margin:0 auto 16px;}
+.modal-title{
+  font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;
+  color:var(--text);margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-close{
+  background:none;border:none;color:var(--muted);font-size:20px;
+  cursor:pointer;padding:2px 6px;transition:color .2s;line-height:1;
+}
+.modal-close:hover{color:var(--text);}
+.hist-month{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-bottom:8px;
+}
+.hist-month-title{
+  font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1.5px;
+  color:var(--cyan);margin-bottom:10px;text-transform:uppercase;
+}
+.hist-month-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.hist-col-label{
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1px;
+  color:var(--muted);text-transform:uppercase;margin-bottom:4px;
+}
+.hist-col-val{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px;}
+.hist-col-val.green{color:#25D366;}
+.hist-col-val.red{color:var(--orange);}
+.hist-col-val.gold{color:var(--gold);}
+.hist-empty{text-align:center;padding:32px;color:var(--muted);font-size:12px;line-height:1.8;}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+      <div class="header-badge">⚡ Alarmas Reset</div>
+      <div id="fb-status" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)">● Conectando...</div>
+    </div>
+    <div class="header-logo">ALARMAS RESET · <em>SOLO LED AUTO</em></div>
+    <div class="header-sub">Ing. Luis Angel Díaz Bernal &nbsp;·&nbsp; Multimedia · Alarmas · LED · GPS · Cámaras</div>
+    <div class="header-contact">
+      <a class="contact-chip" href="https://wa.me/528712318050">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        871 231 8050
+      </a>
+      <a class="contact-chip" href="mailto:anngeldb@gmail.com">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m2 7 10 7 10-7"/></svg>
+        anngeldb@gmail.com
+      </a>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-wrap">
+    <div class="tabs-scroll">
+      <div class="tab active" onclick="showTab('pantallas')" id="tab-pantallas">
+        <span class="tab-icon">🖥️</span> Pantallas
+      </div>
+      <div class="tab" onclick="showTab('camaras')" id="tab-camaras">
+        <span class="tab-icon">📷</span> Cámaras
+      </div>
+      <div class="tab" onclick="showTab('alarmas')" id="tab-alarmas">
+        <span class="tab-icon">🚨</span> Alarmas
+      </div>
+      <div class="tab" onclick="showTab('gps')" id="tab-gps">
+        <span class="tab-icon">📡</span> GPS
+      </div>
+      <div class="tab" onclick="showTab('luces')" id="tab-luces">
+        <span class="tab-icon">💡</span> Luces LED
+      </div>
+      <div class="tab" onclick="showTab('agregar')" id="tab-agregar">
+        <span class="tab-icon">＋</span> Agregar
+      </div>
+      <div class="tab" onclick="showTab('ajustes')" id="tab-ajustes">
+        <span class="tab-icon">⚙️</span> Ajustes
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: PANTALLAS                -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel active" id="panel-pantallas">
+
+    <div class="prog-wrap">
+      <div class="prog-info">
+        <div class="prog-label">Selección actual</div>
+        <div class="prog-track"><div class="prog-fill" id="fill-pantallas" style="width:0%"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="prog-count" id="cnt-pantallas">0</div>
+        <div class="prog-sub">ITEMS</div>
+      </div>
+    </div>
+
+    <!-- cliente -->
+    <div class="client-card">
+      <div class="section-label">Datos del cliente</div>
+      <div class="fields-row">
+        <div class="field-g"><label>Nombre</label><input id="p_nombre" placeholder="Tu nombre"></div>
+        <div class="field-g"><label>Teléfono</label><input id="p_tel" placeholder="Cel / WA"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-g"><label>Marca</label><input id="p_marca" placeholder="Ej. Nissan"></div>
+        <div class="field-g"><label>Modelo</label><input id="p_modelo" placeholder="Ej. Versa"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-g"><label>Año</label><input id="p_anio" placeholder="Ej. 2020" type="number"></div>
+        <div class="field-g"><label>Color vehículo</label><input id="p_color" placeholder="Ej. Gris"></div>
+      </div>
+    </div>
+
+    <!-- Tamaño -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">📐</div>
+        <div class="sect-title">Tamaño de Pantalla</div>
+        <div class="sect-badge">PULGADAS</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Pantalla 7 pulgadas"><div class="chk"></div><div class="item-text"><div class="item-name">7&quot;</div></div><span class="item-tag tag-c">TAMAÑO</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Pantalla 9 pulgadas"><div class="chk"></div><div class="item-text"><div class="item-name">9&quot;</div></div><span class="item-tag tag-c">TAMAÑO</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Pantalla 10 pulgadas"><div class="chk"></div><div class="item-text"><div class="item-name">10&quot;</div></div><span class="item-tag tag-c">TAMAÑO</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Pantalla 12 pulgadas"><div class="chk"></div><div class="item-text"><div class="item-name">12&quot;</div></div><span class="item-tag tag-c">TAMAÑO</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Pantalla 13 pulgadas"><div class="chk"></div><div class="item-text"><div class="item-name">13&quot;</div></div><span class="item-tag tag-c">TAMAÑO</span></div>
+      </div>
+    </div>
+
+    <!-- RAM -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">💾</div>
+        <div class="sect-title">Memoria RAM</div>
+        <div class="sect-badge">RAM</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="RAM 2 GB"><div class="chk"></div><div class="item-text"><div class="item-name">2 GB RAM</div></div><span class="item-tag tag-c">RAM</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="RAM 4 GB"><div class="chk"></div><div class="item-text"><div class="item-name">4 GB RAM</div></div><span class="item-tag tag-c">RAM</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="RAM 6 GB"><div class="chk"></div><div class="item-text"><div class="item-name">6 GB RAM</div></div><span class="item-tag tag-c">RAM</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="RAM 8 GB"><div class="chk"></div><div class="item-text"><div class="item-name">8 GB RAM</div></div><span class="item-tag tag-c">RAM</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="RAM 12 GB"><div class="chk"></div><div class="item-text"><div class="item-name">12 GB RAM</div></div><span class="item-tag tag-c">RAM</span></div>
+      </div>
+    </div>
+
+    <!-- Display -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">🖥️</div>
+        <div class="sect-title">Tipo de Display</div>
+        <div class="sect-badge">PANEL</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Display HD"><div class="chk"></div><div class="item-text"><div class="item-name">HD</div></div><span class="item-tag tag-c">DISPLAY</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Display QLED"><div class="chk"></div><div class="item-text"><div class="item-name">QLED</div><div class="item-desc">Colores más vivos, mayor contraste</div></div><span class="item-tag tag-c">DISPLAY</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Display IPS"><div class="chk"></div><div class="item-text"><div class="item-name">IPS</div><div class="item-desc">Ángulos de visión amplios</div></div><span class="item-tag tag-c">DISPLAY</span></div>
+      </div>
+    </div>
+
+    <!-- Android Auto -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">📱</div>
+        <div class="sect-title">Android Auto / CarPlay</div>
+        <div class="sect-badge">CONNECT</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Android Auto/CarPlay Inalámbrico"><div class="chk"></div><div class="item-text"><div class="item-name">Inalámbrico (Wireless)</div></div><span class="item-tag tag-c">WIRELESS</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Android Auto/CarPlay Cable USB-A"><div class="chk"></div><div class="item-text"><div class="item-name">Alámbrico — USB-A</div></div><span class="item-tag tag-o">CABLE</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Android Auto/CarPlay Cable USB-C"><div class="chk"></div><div class="item-text"><div class="item-name">Alámbrico — USB-C</div></div><span class="item-tag tag-o">CABLE</span></div>
+      </div>
+    </div>
+
+    <!-- Procesador -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico orange">🔧</div>
+        <div class="sect-title">Procesador</div>
+        <div class="sect-badge">CPU</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="CPU Snapdragon"><div class="chk"></div><div class="item-text"><div class="item-name">Snapdragon</div><div class="item-desc">Alta potencia, menor consumo</div></div><span class="item-tag tag-g">CPU</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="CPU RST167"><div class="chk"></div><div class="item-text"><div class="item-name">RST167</div></div><span class="item-tag tag-g">CPU</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="CPU ARC-112"><div class="chk"></div><div class="item-text"><div class="item-name">ARC-112</div></div><span class="item-tag tag-g">CPU</span></div>
+      </div>
+    </div>
+
+    <!-- Audio -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico purple">🔊</div>
+        <div class="sect-title">Procesador de Audio</div>
+        <div class="sect-badge">DSP</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Audio Sony DSP"><div class="chk"></div><div class="item-text"><div class="item-name">Sony DSP</div><div class="item-desc">Ecualizador de alta fidelidad</div></div><span class="item-tag tag-p">AUDIO</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Audio Active 326"><div class="chk"></div><div class="item-text"><div class="item-name">Active 326</div></div><span class="item-tag tag-p">AUDIO</span></div>
+      </div>
+    </div>
+
+    <!-- WiFi -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">📶</div>
+        <div class="sect-title">Conectividad WiFi</div>
+        <div class="sect-badge">WIFI</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Con WiFi integrado"><div class="chk"></div><div class="item-text"><div class="item-name">Con WiFi</div></div><span class="item-tag tag-c">WIFI</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Sin WiFi"><div class="chk"></div><div class="item-text"><div class="item-name">Sin WiFi</div></div><span class="item-tag tag-o">N/A</span></div>
+      </div>
+    </div>
+
+    <!-- Extras pantalla -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">⭐</div>
+        <div class="sect-title">Extras / Add-ons</div>
+        <div class="sect-badge">PLUS</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Cámara de reversa HD"><div class="chk"></div><div class="item-text"><div class="item-name">Cámara de reversa HD</div><div class="item-desc">Alta definición, imagen clara de noche y día</div></div><span class="item-tag tag-c">HD</span></div>
+        <div class="item" onclick="sel(this,'pantallas')" data-label="Cámara 360°"><div class="chk"></div><div class="item-text"><div class="item-name">Cámara 360°</div><div class="item-desc">Vista panorámica alrededor del vehículo</div></div><span class="item-tag tag-o">ADD-ON</span></div>
+      </div>
+    </div>
+
+    <!-- Ítems personalizados pantallas -->
+    <div class="add-item-sect" id="custom-sect-pantallas">
+      <div class="add-item-head" onclick="toggleAddForm('pantallas')">
+        <div class="add-item-toggle">+</div>
+        <div class="add-item-label">Agregar ítem personalizado</div>
+        <div class="add-item-count" id="custom-count-pantallas">0 personalizados</div>
+      </div>
+      <div class="add-item-form" id="add-form-pantallas">
+        <div class="add-item-inputs">
+          <input id="custom-input-pantallas" placeholder="Ej. Pantalla 15 pulgadas OLED" maxlength="80">
+          <button class="btn-add-item" onclick="addCustomItem('pantallas')">+ Agregar</button>
+        </div>
+        <div class="custom-items-list" id="custom-list-pantallas"></div>
+      </div>
+    </div>
+
+    <div class="notes-wrap">
+      <div class="section-label">Notas adicionales</div>
+      <div class="field-g"><textarea id="p_notas" rows="2" placeholder="Detalles extra, presupuesto, dudas..."></textarea></div>
+    </div>
+
+    <div class="action-row">
+      <button class="reset-btn" onclick="resetPanel('pantallas')">🔄 Limpiar</button>
+    </div>
+    <div class="footer-txt">ALARMAS RESET · <span>Solo Led Auto</span> · Ing. Luis Angel Díaz Bernal</div>
+    <div style="height:80px"></div>
+  </div>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: CÁMARAS                  -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-camaras">
+    <div class="prog-wrap">
+      <div class="prog-info">
+        <div class="prog-label">Selección actual</div>
+        <div class="prog-track"><div class="prog-fill" id="fill-camaras" style="width:0%"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="prog-count" id="cnt-camaras">0</div>
+        <div class="prog-sub">ITEMS</div>
+      </div>
+    </div>
+    <div class="client-card">
+      <div class="section-label">Datos del cliente</div>
+      <div class="fields-row">
+        <div class="field-g"><label>Nombre</label><input id="c_nombre" placeholder="Tu nombre"></div>
+        <div class="field-g"><label>Teléfono</label><input id="c_tel" placeholder="Cel / WA"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-g"><label>Marca</label><input id="c_marca" placeholder="Ej. Toyota"></div>
+        <div class="field-g"><label>Modelo / Año</label><input id="c_modelo" placeholder="Ej. Corolla 2021"></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">📷</div>
+        <div class="sect-title">Cámara de Reversa</div>
+        <div class="sect-badge">REVERSA</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'camaras')" data-label="Cámara de reversa HD"><div class="chk"></div><div class="item-text"><div class="item-name">Reversa HD</div><div class="item-desc">Alta definición, imagen clara de noche y día</div></div><span class="item-tag tag-c">HD</span></div>
+        <div class="item" onclick="sel(this,'camaras')" data-label="Cámara de reversa con líneas dinámicas"><div class="chk"></div><div class="item-text"><div class="item-name">Reversa con Líneas Dinámicas</div><div class="item-desc">Guías de trayectoria que se mueven con el volante</div></div><span class="item-tag tag-g">DINÁMICA</span></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico orange">🔭</div>
+        <div class="sect-title">Vista Panorámica</div>
+        <div class="sect-badge">360°</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'camaras')" data-label="Sistema de cámara 360° (4 cámaras)"><div class="chk"></div><div class="item-text"><div class="item-name">Sistema 360°</div><div class="item-desc">4 cámaras, vista panorámica completa alrededor del auto</div></div><span class="item-tag tag-o">360°</span></div>
+        <div class="item" onclick="sel(this,'camaras')" data-label="Cámara frontal HD"><div class="chk"></div><div class="item-text"><div class="item-name">Cámara Frontal HD</div><div class="item-desc">Para monitorear frente del vehículo</div></div><span class="item-tag tag-o">FRONTAL</span></div>
+      </div>
+    </div>
+
+    <!-- Ítems personalizados cámaras -->
+    <div class="add-item-sect" id="custom-sect-camaras">
+      <div class="add-item-head" onclick="toggleAddForm('camaras')">
+        <div class="add-item-toggle">+</div>
+        <div class="add-item-label">Agregar ítem personalizado</div>
+        <div class="add-item-count" id="custom-count-camaras">0 personalizados</div>
+      </div>
+      <div class="add-item-form" id="add-form-camaras">
+        <div class="add-item-inputs">
+          <input id="custom-input-camaras" placeholder="Ej. Cámara lateral derecha 4K" maxlength="80">
+          <button class="btn-add-item" onclick="addCustomItem('camaras')">+ Agregar</button>
+        </div>
+        <div class="custom-items-list" id="custom-list-camaras"></div>
+      </div>
+    </div>
+
+    <div class="notes-wrap">
+      <div class="section-label">Notas adicionales</div>
+      <div class="field-g"><textarea id="c_notas" rows="2" placeholder="Modelo exacto, tipo de pantalla que tienes..."></textarea></div>
+    </div>
+    <div class="action-row">
+      <button class="reset-btn" onclick="resetPanel('camaras')">🔄 Limpiar</button>
+    </div>
+    <div style="height:80px"></div>
+  </div>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: ALARMAS                  -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-alarmas">
+    <div class="prog-wrap">
+      <div class="prog-info">
+        <div class="prog-label">Selección actual</div>
+        <div class="prog-track"><div class="prog-fill" id="fill-alarmas" style="width:0%"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="prog-count" id="cnt-alarmas">0</div>
+        <div class="prog-sub">ITEMS</div>
+      </div>
+    </div>
+    <div class="client-card">
+      <div class="section-label">Datos del cliente</div>
+      <div class="fields-row">
+        <div class="field-g"><label>Nombre</label><input id="a_nombre" placeholder="Tu nombre"></div>
+        <div class="field-g"><label>Teléfono</label><input id="a_tel" placeholder="Cel / WA"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-g"><label>Marca</label><input id="a_marca" placeholder="Ej. Chevrolet"></div>
+        <div class="field-g"><label>Modelo / Año</label><input id="a_modelo" placeholder="Ej. Aveo 2019"></div>
+      </div>
+    </div>
+
+    <!-- Protección -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">🛡️</div>
+        <div class="sect-title">Protección de Puertas</div>
+        <div class="sect-badge">SENSORES</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Protección 2 puertas"><div class="chk"></div><div class="item-text"><div class="item-name">Protección 2 puertas</div></div><span class="item-tag tag-c">2P</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Protección 4 puertas"><div class="chk"></div><div class="item-text"><div class="item-name">Protección 4 puertas</div><div class="item-desc">Cobertura completa de todas las puertas</div></div><span class="item-tag tag-c">4P</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Protección cajuela"><div class="chk"></div><div class="item-text"><div class="item-name">Protección cajuela</div></div><span class="item-tag tag-o">CAJUELA</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Protección cofre"><div class="chk"></div><div class="item-text"><div class="item-name">Protección cofre (motor)</div></div><span class="item-tag tag-o">COFRE</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Sensor de rotura de cristales"><div class="chk"></div><div class="item-text"><div class="item-name">Sensor rotura de cristales</div><div class="item-desc">Detección de impacto en vidrios</div></div><span class="item-tag tag-g">CRISTAL</span></div>
+      </div>
+    </div>
+
+    <!-- Control motor -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico orange">⚙️</div>
+        <div class="sect-title">Control de Motor</div>
+        <div class="sect-badge">MOTOR</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Bloqueo de encendido (anti-arrancado)"><div class="chk"></div><div class="item-text"><div class="item-name">Bloqueo de encendido</div><div class="item-desc">Desactiva el encendido si no se desactiva la alarma</div></div><span class="item-tag tag-o">ANTI-ROBO</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Arrancador remoto a distancia"><div class="chk"></div><div class="item-text"><div class="item-name">Arrancador remoto a distancia</div><div class="item-desc">Enciende el auto desde el control o celular</div></div><span class="item-tag tag-o">REMOTO</span></div>
+      </div>
+    </div>
+
+    <!-- Seguros -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico purple">🔒</div>
+        <div class="sect-title">Seguros Eléctricos</div>
+        <div class="sect-badge">LOCKS</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Seguros eléctricos 2 puertas"><div class="chk"></div><div class="item-text"><div class="item-name">Seguros eléctricos 2 puertas</div></div><span class="item-tag tag-p">2P</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Seguros eléctricos 4 puertas"><div class="chk"></div><div class="item-text"><div class="item-name">Seguros eléctricos 4 puertas</div></div><span class="item-tag tag-p">4P</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Seguros eléctricos con interface (vehículos equipados de agencia)"><div class="chk"></div><div class="item-text"><div class="item-name">Interface para vehículos con seguros eléctricos</div><div class="item-desc">Para autos que ya traen seguros eléctricos de agencia</div></div><span class="item-tag tag-p">OEM</span></div>
+      </div>
+    </div>
+
+    <!-- Cajuela eléctrica -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico gold">🚗</div>
+        <div class="sect-title">Cajuela Eléctrica</div>
+        <div class="sect-badge">TRUNK</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Cajuela eléctrica estándar"><div class="chk"></div><div class="item-text"><div class="item-name">Cajuela eléctrica</div><div class="item-desc">Apertura eléctrica desde control o botón</div></div><span class="item-tag tag-g">ELEC</span></div>
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Cajuela eléctrica con interface (vehículos equipados de agencia)"><div class="chk"></div><div class="item-text"><div class="item-name">Cajuela eléctrica con interface</div><div class="item-desc">Para autos equipados de agencia con cajuela original eléctrica</div></div><span class="item-tag tag-g">OEM</span></div>
+      </div>
+    </div>
+
+    <!-- Power window -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">🪟</div>
+        <div class="sect-title">Power Window</div>
+        <div class="sect-badge">CRISTALES</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'alarmas')" data-label="Power Window — levanta cristales automático"><div class="chk"></div><div class="item-text"><div class="item-name">Power Window</div><div class="item-desc">Sube y baja los cristales automáticamente al armar/desarmar</div></div><span class="item-tag tag-c">AUTO</span></div>
+      </div>
+    </div>
+
+    <!-- Ítems personalizados alarmas -->
+    <div class="add-item-sect" id="custom-sect-alarmas">
+      <div class="add-item-head" onclick="toggleAddForm('alarmas')">
+        <div class="add-item-toggle">+</div>
+        <div class="add-item-label">Agregar ítem personalizado</div>
+        <div class="add-item-count" id="custom-count-alarmas">0 personalizados</div>
+      </div>
+      <div class="add-item-form" id="add-form-alarmas">
+        <div class="add-item-inputs">
+          <input id="custom-input-alarmas" placeholder="Ej. Sirena exterior 120dB" maxlength="80">
+          <button class="btn-add-item" onclick="addCustomItem('alarmas')">+ Agregar</button>
+        </div>
+        <div class="custom-items-list" id="custom-list-alarmas"></div>
+      </div>
+    </div>
+
+    <div class="notes-wrap">
+      <div class="section-label">Notas adicionales</div>
+      <div class="field-g"><textarea id="a_notas" rows="2" placeholder="¿Ya tiene alarma? ¿Seguros eléctricos de origen?..."></textarea></div>
+    </div>
+    <div class="action-row">
+      <button class="reset-btn" onclick="resetPanel('alarmas')">🔄 Limpiar</button>
+    </div>
+    <div style="height:80px"></div>
+  </div>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: GPS                      -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-gps">
+    <div class="prog-wrap">
+      <div class="prog-info">
+        <div class="prog-label">Selección actual</div>
+        <div class="prog-track"><div class="prog-fill" id="fill-gps" style="width:0%"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="prog-count" id="cnt-gps">0</div>
+        <div class="prog-sub">ITEMS</div>
+      </div>
+    </div>
+    <div class="client-card">
+      <div class="section-label">Datos del cliente</div>
+      <div class="fields-row">
+        <div class="field-g"><label>Nombre</label><input id="g_nombre" placeholder="Tu nombre"></div>
+        <div class="field-g"><label>Teléfono</label><input id="g_tel" placeholder="Cel / WA"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-g"><label>Marca</label><input id="g_marca" placeholder="Vehículo"></div>
+        <div class="field-g"><label>Modelo / Año</label><input id="g_modelo" placeholder="Ej. Ranger 2022"></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico">📡</div>
+        <div class="sect-title">GPS — Con Plataforma</div>
+        <div class="sect-badge">PREMIUM</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'gps')" data-label="GPS con plataforma — incluye 1 año de plataforma y datos"><div class="chk"></div><div class="item-text"><div class="item-name">GPS Con Plataforma</div><div class="item-desc">Incluye 1 año de plataforma de rastreo + datos incluidos</div></div><span class="item-tag tag-g">1 AÑO</span></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico orange">📍</div>
+        <div class="sect-title">GPS — Sin Plataforma</div>
+        <div class="sect-badge">PREPAGO</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'gps')" data-label="GPS sin plataforma (prepago)"><div class="chk"></div><div class="item-text"><div class="item-name">GPS Prepago</div><div class="item-desc">Sin renta mensual. Recargas de datos según tu consumo</div></div><span class="item-tag tag-o">PREPAGO</span></div>
+      </div>
+    </div>
+
+    <!-- Ítems personalizados GPS -->
+    <div class="add-item-sect" id="custom-sect-gps">
+      <div class="add-item-head" onclick="toggleAddForm('gps')">
+        <div class="add-item-toggle">+</div>
+        <div class="add-item-label">Agregar ítem personalizado</div>
+        <div class="add-item-count" id="custom-count-gps">0 personalizados</div>
+      </div>
+      <div class="add-item-form" id="add-form-gps">
+        <div class="add-item-inputs">
+          <input id="custom-input-gps" placeholder="Ej. Rastreador anti-jamming" maxlength="80">
+          <button class="btn-add-item" onclick="addCustomItem('gps')">+ Agregar</button>
+        </div>
+        <div class="custom-items-list" id="custom-list-gps"></div>
+      </div>
+    </div>
+
+    <div class="notes-wrap">
+      <div class="section-label">Notas adicionales</div>
+      <div class="field-g"><textarea id="g_notas" rows="2" placeholder="¿Para flota, personal, negocio?..."></textarea></div>
+    </div>
+    <div class="action-row">
+      <button class="reset-btn" onclick="resetPanel('gps')">🔄 Limpiar</button>
+    </div>
+    <div style="height:80px"></div>
+  </div>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: LUCES LED                -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-luces">
+    <div class="prog-wrap">
+      <div class="prog-info">
+        <div class="prog-label">Selección actual</div>
+        <div class="prog-track"><div class="prog-fill" id="fill-luces" style="width:0%"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="prog-count" id="cnt-luces">0</div>
+        <div class="prog-sub">ITEMS</div>
+      </div>
+    </div>
+    <div class="client-card">
+      <div class="section-label">Datos del cliente</div>
+      <div class="fields-row">
+        <div class="field-g"><label>Nombre</label><input id="l_nombre" placeholder="Tu nombre"></div>
+        <div class="field-g"><label>Teléfono</label><input id="l_tel" placeholder="Cel / WA"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-g"><label>Marca</label><input id="l_marca" placeholder="Vehículo"></div>
+        <div class="field-g"><label>Modelo / Año</label><input id="l_modelo" placeholder="Ej. Jetta 2023"></div>
+      </div>
+    </div>
+
+    <!-- Faros -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico gold">💡</div>
+        <div class="sect-title">Luz LED — Faros</div>
+        <div class="sect-badge">ALTA POTENCIA</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'luces')" data-label="LED alta potencia — solo Baja"><div class="chk"></div><div class="item-text"><div class="item-name">LED Alta Potencia — Solo Baja</div><div class="item-desc">Luz baja de alto rendimiento, mayor visibilidad</div></div><span class="item-tag tag-g">BAJA</span></div>
+        <div class="item" onclick="sel(this,'luces')" data-label="LED alta potencia — Alta y Baja (H4, H13)"><div class="chk"></div><div class="item-text"><div class="item-name">LED Alta Potencia — Alta y Baja</div><div class="item-desc">Doble función. Bulbos H4 / H13</div></div><span class="item-tag tag-g">H4 / H13</span></div>
+        <div class="item" onclick="sel(this,'luces')" data-label="LED control Bluetooth — bicolor (amarillo/blanco) con destellos"><div class="chk"></div><div class="item-text"><div class="item-name">LED Bluetooth — Bicolor</div><div class="item-desc">Dos colores: blanco y amarillo. Modo destellos. Control desde el celular</div></div><span class="item-tag tag-o">BT</span></div>
+      </div>
+    </div>
+
+    <!-- Interior -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico purple">🌈</div>
+        <div class="sect-title">Luz LED — Interior</div>
+        <div class="sect-badge">AMBIENTAL</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'luces')" data-label="Luz ambiental interior — Fibra óptica RGB dinámica (líneas)"><div class="chk"></div><div class="item-text"><div class="item-name">Fibra óptica RGB dinámica</div><div class="item-desc">Líneas de luz ambiental con colores dinámicos RGB</div></div><span class="item-tag tag-p">RGB</span></div>
+        <div class="item" onclick="sel(this,'luces')" data-label="LED interior blanco T10"><div class="chk"></div><div class="item-text"><div class="item-name">LED Interior Blanco — T10</div><div class="item-desc">Reemplazo de luces interiores a LED blanco puro</div></div><span class="item-tag tag-c">T10</span></div>
+      </div>
+    </div>
+
+    <!-- Fog / Niebla -->
+    <div class="sect">
+      <div class="sect-head">
+        <div class="sect-ico orange">🌫️</div>
+        <div class="sect-title">Niebla y Modificaciones</div>
+        <div class="sect-badge">CUSTOM</div>
+      </div>
+      <div class="items-list">
+        <div class="item" onclick="sel(this,'luces')" data-label="Modificación de faros (retrofit / retoque)"><div class="chk"></div><div class="item-text"><div class="item-name">Modificación de faros</div><div class="item-desc">Retrofit, retoque o mejora de óptica de faros existentes</div></div><span class="item-tag tag-o">CUSTOM</span></div>
+        <div class="item" onclick="sel(this,'luces')" data-label="Luces de niebla con bases para distintos vehículos"><div class="chk"></div><div class="item-text"><div class="item-name">Luces de niebla + bases</div><div class="item-desc">Con bases específicas para tu modelo de auto</div></div><span class="item-tag tag-o">FOG</span></div>
+      </div>
+    </div>
+
+    <!-- Ítems personalizados luces -->
+    <div class="add-item-sect" id="custom-sect-luces">
+      <div class="add-item-head" onclick="toggleAddForm('luces')">
+        <div class="add-item-toggle">+</div>
+        <div class="add-item-label">Agregar ítem personalizado</div>
+        <div class="add-item-count" id="custom-count-luces">0 personalizados</div>
+      </div>
+      <div class="add-item-form" id="add-form-luces">
+        <div class="add-item-inputs">
+          <input id="custom-input-luces" placeholder="Ej. LED secuencial de flechas" maxlength="80">
+          <button class="btn-add-item" onclick="addCustomItem('luces')">+ Agregar</button>
+        </div>
+        <div class="custom-items-list" id="custom-list-luces"></div>
+      </div>
+    </div>
+
+    <div class="notes-wrap">
+      <div class="section-label">Notas adicionales</div>
+      <div class="field-g"><textarea id="l_notas" rows="2" placeholder="Tipo de socket actual, colores que buscas..."></textarea></div>
+    </div>
+    <div class="action-row">
+      <button class="reset-btn" onclick="resetPanel('luces')">🔄 Limpiar</button>
+    </div>
+    <div style="height:80px"></div>
+  </div>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: AGREGAR SERVICIO         -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-agregar">
+    <div class="add-service-panel">
+
+      <div id="admin-status-note" class="firebase-note">
+        <p><strong>🔄 Conectando con Firebase...</strong><br>
+        Los datos se sincronizarán automáticamente en la nube.</p>
+      </div>
+
+      <div class="add-form">
+        <h3>Nueva Categoría de Servicio</h3>
+        <div class="field-g" style="margin-bottom:10px">
+          <label>Nombre del servicio</label>
+          <input id="new_service_name" placeholder="Ej. Sonido / Amplificadores">
+        </div>
+        <div class="field-g" style="margin-bottom:10px">
+          <label>Emoji / Ícono</label>
+          <input id="new_service_icon" placeholder="🔊" maxlength="4" style="width:80px">
+        </div>
+        <div class="field-g" style="margin-bottom:8px">
+          <label>Agrega opciones (una a la vez)</label>
+          <div style="display:flex;gap:8px">
+            <input id="new_option_input" placeholder="Ej. Amplificador Rockford 4 canales" style="flex:1">
+            <button class="add-btn" style="width:auto;padding:9px 14px;margin:0" onclick="addOption()">+</button>
+          </div>
+        </div>
+        <div class="add-items-preview" id="options_preview">
+          <p>Las opciones aparecerán aquí</p>
+        </div>
+        <button class="add-btn" onclick="saveService()">Guardar servicio</button>
+      </div>
+
+      <div id="saved_services_list" class="saved-services"></div>
+
+      <div class="firebase-note" id="sync-info-note" style="margin-top:8px;background:rgba(0,229,200,.05);border-color:rgba(0,229,200,.2)">
+        <p style="color:rgba(0,229,200,.85)"><strong style="color:var(--cyan)">✅ Sincronización en la nube activa</strong><br>
+        Las categorías y los ítems personalizados se guardan en Firebase Firestore y están disponibles en todos tus dispositivos en tiempo real.</p>
+      </div>
+
+      <div style="height:80px"></div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════ -->
+  <!-- PANEL: AJUSTES / FINANZAS       -->
+  <!-- ═══════════════════════════════ -->
+  <div class="panel" id="panel-ajustes">
+    <div style="padding:4px 0;">
+
+      <!-- Finanzas del mes actual -->
+      <div class="client-card">
+        <div class="section-label">Finanzas del mes</div>
+        <div class="finance-mes-row">
+          <div class="finance-mes-label" id="fin-mes-label">—</div>
+          <div class="finance-dias-label" id="fin-dias-label"></div>
+        </div>
+        <div class="finance-totals">
+          <div class="finance-box">
+            <div class="finance-box-label">Ganancias</div>
+            <div class="finance-box-amount green" id="fin-ganancia-total">$0.00</div>
+          </div>
+          <div class="finance-box">
+            <div class="finance-box-label">Inversiones</div>
+            <div class="finance-box-amount red" id="fin-inversion-total">$0.00</div>
+          </div>
+          <div class="finance-box full">
+            <div class="finance-box-label">Balance neto del mes</div>
+            <div class="finance-box-amount gold" id="fin-balance-total">$0.00</div>
+          </div>
+        </div>
+
+        <div class="finance-input-group">
+          <input id="fin-monto" type="number" step="0.01" min="0" placeholder="Monto (ej. 1500.00)">
+          <input id="fin-desc" type="text" placeholder="Descripción (ej. Instalación pantalla)" maxlength="60">
+          <div class="finance-btn-row">
+            <button class="btn-fin g" onclick="registrarMovimiento('ganancia')">+ Ganancia</button>
+            <button class="btn-fin i" onclick="registrarMovimiento('inversion')">– Inversión</button>
+          </div>
+        </div>
+
+        <div id="fin-mov-list" class="mov-list"></div>
+      </div>
+
+      <!-- Botón histórico -->
+      <button class="btn-historico" onclick="showHistorico()">
+        📊 Ver histórico de ganancias e inversiones
+      </button>
+
+      <!-- Info cierre automático -->
+      <div class="firebase-note" style="background:rgba(144,96,255,.06);border-color:rgba(144,96,255,.2);">
+        <p style="color:rgba(144,96,255,.85)">
+          <strong style="color:var(--purple)">📅 Cierre automático mensual</strong><br>
+          Al abrir la app en un nuevo mes, el mes anterior se archiva automáticamente en el histórico y los contadores se reinician a cero.
+        </p>
+      </div>
+
+      <div style="height:80px"></div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- MODAL HISTÓRICO DE FINANZAS -->
+<div class="modal-overlay hidden" id="modal-historico" onclick="closeHistoricoOverlay(event)">
+  <div class="modal-sheet">
+    <div class="modal-bar"></div>
+    <div class="modal-title">
+      <span>📊 Histórico Mensual</span>
+      <button class="modal-close" onclick="closeHistorico()">✕</button>
+    </div>
+    <div id="hist-list"></div>
+  </div>
+</div>
+
+<!-- FIXED SEND -->
+<div class="send-fixed" id="sendBar">
+  <div class="send-fixed-inner">
+    <button class="send-btn" onclick="enviarWA()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      ENVIAR COTIZACIÓN POR WHATSAPP
+    </button>
+  </div>
+</div>
+
+<script>
+const WA = '528712318050';
+let currentTab = 'pantallas';
+let pendingOptions = [];
+const STATIC_TABS = ['pantallas','camaras','alarmas','gps','luces'];
+
+// ══════════════════════════════════════════
+// CAPA DE DATOS — Firebase primero, localStorage como fallback
+// ══════════════════════════════════════════
+let _useFirebase = false;
+
+function updateFbBadge(online) {
+  _useFirebase = online;
+  const badge = document.getElementById('fb-status');
+  const note  = document.getElementById('admin-status-note');
+  const sync  = document.getElementById('sync-info-note');
+  if (badge) {
+    badge.textContent = online ? '● Firebase' : '● Local';
+    badge.style.cssText = online
+      ? 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;background:rgba(0,229,200,.1);border:1px solid rgba(0,229,200,.3);color:var(--cyan)'
+      : 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:20px;background:rgba(255,96,48,.08);border:1px solid rgba(255,96,48,.2);color:var(--orange)';
+  }
+  if (note) {
+    note.style.display = online ? 'none' : 'block';
+    if (!online) note.querySelector('p').innerHTML =
+      '<strong>📴 Modo local</strong><br>Firebase no disponible. Los datos se guardan en este dispositivo.';
+  }
+  if (sync) sync.style.display = online ? 'block' : 'none';
+}
+
+// ── localStorage fallback ──
+function loadServicesLocal() {
+  try { return JSON.parse(localStorage.getItem('bsla_services')||'[]'); } catch(e){ return []; }
+}
+function saveServicesLocal(arr) { localStorage.setItem('bsla_services', JSON.stringify(arr)); }
+function loadCustomItemsLocal(panel) {
+  try { return JSON.parse(localStorage.getItem('custom_'+panel)||'[]'); } catch(e){ return []; }
+}
+function saveCustomItemsLocal(panel, arr) { localStorage.setItem('custom_'+panel, JSON.stringify(arr)); }
+
+// Caché en memoria (se llena vía onSnapshot o localStorage)
+let _servicesCache = [];
+let _customCache   = {};  // { panel: [{id, label}] }
+
+function loadServices()              { return _servicesCache; }
+function loadCustomItems(panel)      { return _customCache[panel] || []; }
+function saveServices(arr)           { _servicesCache = arr; if(!_useFirebase) saveServicesLocal(arr); }
+function saveCustomItems(panel, arr) { _customCache[panel] = arr; if(!_useFirebase) saveCustomItemsLocal(panel, arr); }
+
+// ── ÍTEMS PERSONALIZADOS ──
+function toggleAddForm(panel) {
+  const head = document.querySelector('#custom-sect-'+panel+' .add-item-head');
+  const form = document.getElementById('add-form-'+panel);
+  if (!head || !form) return;
+  const open = form.classList.toggle('open');
+  head.classList.toggle('open', open);
+  if (open) document.getElementById('custom-input-'+panel)?.focus();
+}
+
+async function addCustomItem(panel) {
+  const inp = document.getElementById('custom-input-'+panel);
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) { inp.focus(); return; }
+  const itemId = Date.now();
+  const newItem = { id: itemId, label: val };
+  inp.value = '';
+
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, setDoc } = window._fs;
+      const docId = panel + '_' + itemId;
+      await setDoc(doc(window._db, 'checklist_custom_items', docId), { panel, ...newItem, createdAt: itemId });
+      // onSnapshot actualizará _customCache y re-renderizará
+    } catch(e) {
+      console.error(e);
+      const items = loadCustomItems(panel); items.push(newItem); saveCustomItems(panel, items);
+      renderCustomItems(panel); updateProgress(panel);
+    }
+  } else {
+    const items = loadCustomItems(panel); items.push(newItem); saveCustomItems(panel, items);
+    renderCustomItems(panel); updateProgress(panel);
+  }
+  inp.focus();
+}
+
+async function deleteCustomItem(panel, id) {
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, deleteDoc } = window._fs;
+      await deleteDoc(doc(window._db, 'checklist_custom_items', panel + '_' + id));
+    } catch(e) {
+      console.error(e);
+      saveCustomItems(panel, loadCustomItems(panel).filter(x => x.id !== id));
+      renderCustomItems(panel); updateProgress(panel);
+    }
+  } else {
+    saveCustomItems(panel, loadCustomItems(panel).filter(x => x.id !== id));
+    renderCustomItems(panel); updateProgress(panel);
+  }
+}
+
+function renderCustomItems(panel) {
+  const list = document.getElementById('custom-list-'+panel);
+  const countEl = document.getElementById('custom-count-'+panel);
+  if (!list) return;
+  const items = loadCustomItems(panel);
+  if (countEl) countEl.textContent = items.length + ' personalizado' + (items.length !== 1 ? 's' : '');
+  if (items.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = items.map(item => `
+    <div class="custom-item" id="ci-${panel}-${item.id}" data-label="${esc(item.label)}">
+      <div class="chk" onclick="selCustom(this,'${panel}')"></div>
+      <div class="item-text" onclick="selCustom(this.parentElement.querySelector('.chk'),'${panel}')">
+        <div class="item-name">${esc(item.label)}</div>
+      </div>
+      <span class="custom-badge">CUSTOM</span>
+      <button class="btn-del-item" onclick="deleteCustomItem('${panel}',${item.id})" title="Eliminar ítem">✕</button>
+    </div>`).join('');
+}
+
+function selCustom(chkEl, panel) {
+  const item = chkEl.closest('.custom-item');
+  if (!item) return;
+  item.classList.toggle('sel');
+  updateProgress(panel);
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── BUILD DYNAMIC TABS & PANELS ──
+function buildDynamicTabs() {
+  const services = loadServices();
+  const tabsScroll = document.querySelector('.tabs-scroll');
+  const addTab = document.getElementById('tab-agregar');
+  document.querySelectorAll('.tab-dynamic').forEach(el => el.remove());
+  document.querySelectorAll('.panel-dynamic').forEach(el => el.remove());
+
+  services.forEach(svc => {
+    const tab = document.createElement('div');
+    tab.className = 'tab tab-dynamic';
+    tab.id = 'tab-extra-'+svc.id;
+    tab.innerHTML = `<span class="tab-icon">${svc.icon}</span> ${svc.name}`;
+    tab.onclick = () => showTab('extra-'+svc.id);
+    tabsScroll.insertBefore(tab, addTab);
+
+    const panel = document.createElement('div');
+    panel.className = 'panel panel-dynamic';
+    panel.id = 'panel-extra-'+svc.id;
+    const tid = 'extra-'+svc.id;
+    panel.innerHTML = `
+      <div class="prog-wrap">
+        <div class="prog-info">
+          <div class="prog-label">Selección actual</div>
+          <div class="prog-track"><div class="prog-fill" id="fill-${tid}" style="width:0%"></div></div>
+        </div>
+        <div style="text-align:right">
+          <div class="prog-count" id="cnt-${tid}">0</div>
+          <div class="prog-sub">ITEMS</div>
+        </div>
+      </div>
+      <div class="client-card">
+        <div class="section-label">Datos del cliente</div>
+        <div class="fields-row">
+          <div class="field-g"><label>Nombre</label><input id="${tid}_nombre" placeholder="Tu nombre"></div>
+          <div class="field-g"><label>Teléfono</label><input id="${tid}_tel" placeholder="Cel / WA"></div>
+        </div>
+        <div class="fields-row">
+          <div class="field-g"><label>Vehículo</label><input id="${tid}_vehiculo" placeholder="Marca y modelo"></div>
+          <div class="field-g"><label>Año</label><input id="${tid}_anio" placeholder="Ej. 2022" type="number"></div>
+        </div>
+      </div>
+      <div class="sect">
+        <div class="sect-head">
+          <div class="sect-ico">${svc.icon}</div>
+          <div class="sect-title">${svc.name}</div>
+          <div class="sect-badge">${svc.options.length} OPC.</div>
+        </div>
+        <div class="items-list">
+          ${svc.options.map(opt => `
+            <div class="item" onclick="sel(this,'${tid}')" data-label="${esc(opt)}">
+              <div class="chk"></div>
+              <div class="item-text"><div class="item-name">${esc(opt)}</div></div>
+              <span class="item-tag tag-c">OPC</span>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="add-item-sect" id="custom-sect-${tid}">
+        <div class="add-item-head" onclick="toggleAddForm('${tid}')">
+          <div class="add-item-toggle">+</div>
+          <div class="add-item-label">Agregar ítem personalizado</div>
+          <div class="add-item-count" id="custom-count-${tid}">0 personalizados</div>
+        </div>
+        <div class="add-item-form" id="add-form-${tid}">
+          <div class="add-item-inputs">
+            <input id="custom-input-${tid}" placeholder="Escribe una opción extra" maxlength="80">
+            <button class="btn-add-item" onclick="addCustomItem('${tid}')">+ Agregar</button>
+          </div>
+          <div class="custom-items-list" id="custom-list-${tid}"></div>
+        </div>
+      </div>
+      <div class="notes-wrap">
+        <div class="section-label">Notas adicionales</div>
+        <div class="field-g"><textarea id="${tid}_notas" rows="2" placeholder="Detalles extra..."></textarea></div>
+      </div>
+      <div class="action-row">
+        <button class="reset-btn" onclick="resetPanel('${tid}')">🔄 Limpiar</button>
+        <button class="reset-btn" style="color:var(--orange);border-color:var(--orange)" onclick="deleteServiceFromTab(${svc.id})">🗑 Eliminar servicio</button>
+      </div>
+      <div style="height:80px"></div>`;
+    const agregarPanel = document.getElementById('panel-agregar');
+    agregarPanel.parentNode.insertBefore(panel, agregarPanel);
+    // render custom items for this dynamic panel
+    renderCustomItems(tid);
+  });
+}
+
+// ── TAB SWITCHING ──
+function allTabIds() {
+  return STATIC_TABS.concat(loadServices().map(s => 'extra-'+s.id)).concat(['agregar','ajustes']);
+}
+function showTab(name) {
+  currentTab = name;
+  allTabIds().forEach(t => {
+    const panel = document.getElementById('panel-'+t);
+    const tab   = document.getElementById('tab-'+t);
+    if(panel) panel.classList.toggle('active', t===name);
+    if(tab)   tab.classList.toggle('active', t===name);
+  });
+  const hideSend = name==='agregar' || name==='ajustes';
+  document.getElementById('sendBar').style.display = hideSend ? 'none' : 'block';
+  if (name==='ajustes') renderFinanceDashboard();
+}
+
+// ── CHECKBOX (ítems estáticos) ──
+function sel(el, panel) {
+  el.classList.toggle('sel');
+  updateProgress(panel);
+}
+
+function updateProgress(panel) {
+  // cuenta items estáticos + custom items
+  const staticSels = document.querySelectorAll('#panel-'+panel+' .item.sel').length;
+  const customSels = document.querySelectorAll('#panel-'+panel+' .custom-item.sel').length;
+  const staticAll  = document.querySelectorAll('#panel-'+panel+' .item').length;
+  const customAll  = document.querySelectorAll('#panel-'+panel+' .custom-item').length;
+  const total = staticAll + customAll;
+  const sels  = staticSels + customSels;
+  const pct   = total ? Math.round(sels/total*100) : 0;
+  const fill  = document.getElementById('fill-'+panel);
+  const cnt   = document.getElementById('cnt-'+panel);
+  if(fill) fill.style.width = pct+'%';
+  if(cnt)  cnt.textContent  = sels;
+}
+
+// ── RESET ──
+function resetPanel(panel) {
+  document.querySelectorAll('#panel-'+panel+' .item.sel, #panel-'+panel+' .custom-item.sel')
+    .forEach(el => el.classList.remove('sel'));
+  document.querySelectorAll('#panel-'+panel+' input, #panel-'+panel+' textarea')
+    .forEach(el => el.value='');
+  updateProgress(panel);
+}
+
+// ── FIELDS ──
+const STATIC_FIELDS = {
+  pantallas: ['p_nombre','p_tel','p_marca','p_modelo','p_anio','p_color','p_notas'],
+  camaras:   ['c_nombre','c_tel','c_marca','c_modelo','c_notas'],
+  alarmas:   ['a_nombre','a_tel','a_marca','a_modelo','a_notas'],
+  gps:       ['g_nombre','g_tel','g_marca','g_modelo','g_notas'],
+  luces:     ['l_nombre','l_tel','l_marca','l_modelo','l_notas'],
+};
+const PANEL_NAMES = {
+  pantallas:'🖥️ PANTALLA MULTIMEDIA',
+  camaras:'📷 CÁMARA',
+  alarmas:'🚨 ALARMA / SEGUROS',
+  gps:'📡 GPS',
+  luces:'💡 ILUMINACIÓN LED',
+};
+function getField(id) { const el=document.getElementById(id); return el?el.value.trim():''; }
+
+// ── WHATSAPP ──
+function enviarWA() {
+  const tab = currentTab;
+  if(tab==='agregar' || tab==='ajustes') return;
+
+  let nombre='', tel='', vehiculo='', notas='', panelLabel='';
+
+  if(STATIC_FIELDS[tab]) {
+    const f = STATIC_FIELDS[tab];
+    nombre   = getField(f[0]);
+    tel      = getField(f[1]);
+    const marca  = getField(f[2]);
+    const modelo = getField(f[3]);
+    vehiculo = [marca,modelo].filter(Boolean).join(' — ');
+    notas    = getField(f[f.length-1]);
+    panelLabel = PANEL_NAMES[tab] || tab.toUpperCase();
+  } else {
+    nombre   = getField(tab+'_nombre');
+    tel      = getField(tab+'_tel');
+    vehiculo = getField(tab+'_vehiculo');
+    notas    = getField(tab+'_notas');
+    const svc = loadServices().find(s=>'extra-'+s.id===tab);
+    panelLabel = svc ? svc.icon+' '+svc.name.toUpperCase() : tab.toUpperCase();
+  }
+
+  // Seleccionados estáticos + custom
+  const staticSel  = [...document.querySelectorAll('#panel-'+tab+' .item.sel')]
+    .map(el => '✅ '+el.getAttribute('data-label'));
+  const customSel  = [...document.querySelectorAll('#panel-'+tab+' .custom-item.sel')]
+    .map(el => '✅ '+el.getAttribute('data-label')+' _(personalizado)_');
+  const selected   = staticSel.concat(customSel);
+
+  if(!nombre && selected.length===0) {
+    alert('Llena al menos tu nombre o selecciona una opción.');
+    return;
+  }
+
+  let m = '🔧 *SOLICITUD DE COTIZACIÓN — ALARMAS RESET*\n';
+  m += '🏷️ *'+panelLabel+'*\n';
+  m += '━━━━━━━━━━━━━━━━━━\n\n';
+  m += '👤 *DATOS DEL CLIENTE*\n';
+  if(nombre)   m += '• Nombre: '+nombre+'\n';
+  if(tel)      m += '• Teléfono: '+tel+'\n';
+  if(vehiculo) m += '• Vehículo: '+vehiculo+'\n';
+  const anio  = getField('p_anio') || getField(tab+'_anio');
+  const color = getField('p_color');
+  if(anio)  m += '• Año: '+anio+'\n';
+  if(color) m += '• Color: '+color+'\n';
+  m += '\n📋 *LO QUE ME INTERESA*\n';
+  if(selected.length>0) m += selected.join('\n')+'\n';
+  else m += '_(Por definir con el técnico)_\n';
+  if(notas) m += '\n💬 *NOTAS*\n'+notas+'\n';
+  m += '\n━━━━━━━━━━━━━━━━━━\n';
+  m += '📲 _Ing. Luis Angel Díaz Bernal · Alarmas Reset / Solo Led Auto_\n';
+  m += '⏳ _Solicito cotización para los servicios indicados._';
+
+  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(m),'_blank');
+}
+
+// ── NUEVA CATEGORÍA ──
+function addOption() {
+  const inp = document.getElementById('new_option_input');
+  const val = inp.value.trim();
+  if(!val) return;
+  pendingOptions.push(val);
+  inp.value='';
+  renderOptionsPreview();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('new_option_input').addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); addOption(); }
+  });
+  // Enter en campos de custom items
+  STATIC_TABS.forEach(panel => {
+    const inp = document.getElementById('custom-input-'+panel);
+    if(inp) inp.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); addCustomItem(panel); }
+    });
+  });
+  // Enter en monto finanzas → foco a descripción, Enter en desc → registrar ganancia
+  const finMonto = document.getElementById('fin-monto');
+  const finDesc  = document.getElementById('fin-desc');
+  if(finMonto) finMonto.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); finDesc && finDesc.focus(); }
+  });
+  if(finDesc) finDesc.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); registrarMovimiento('ganancia'); }
+  });
+});
+
+function removeOption(idx) { pendingOptions.splice(idx,1); renderOptionsPreview(); }
+function renderOptionsPreview() {
+  const wrap = document.getElementById('options_preview');
+  if(pendingOptions.length===0){ wrap.innerHTML='<p>Las opciones aparecerán aquí</p>'; return; }
+  wrap.innerHTML = pendingOptions.map((o,i)=>
+    `<span class="preview-tag">${esc(o)}<button onclick="removeOption(${i})">×</button></span>`
+  ).join('');
+}
+
+async function saveService() {
+  const name = document.getElementById('new_service_name').value.trim();
+  const icon = document.getElementById('new_service_icon').value.trim() || '🔧';
+  if(!name || pendingOptions.length===0){
+    alert('Escribe el nombre y agrega al menos una opción.');
+    return;
+  }
+  const id = Date.now();
+  const svc = { id, name, icon, options:[...pendingOptions], createdAt: id };
+
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, setDoc } = window._fs;
+      await setDoc(doc(window._db, 'checklist_services', String(id)), svc);
+      // onSnapshot actualizará _servicesCache y re-renderizará
+    } catch(e) {
+      console.error(e);
+      // fallback local
+      const arr = loadServices(); arr.push(svc); saveServices(arr);
+      buildDynamicTabs(); renderSavedList();
+    }
+  } else {
+    const arr = loadServices(); arr.push(svc); saveServices(arr);
+    buildDynamicTabs(); renderSavedList();
+  }
+
+  document.getElementById('new_service_name').value='';
+  document.getElementById('new_service_icon').value='';
+  pendingOptions=[];
+  renderOptionsPreview();
+  showTab('extra-'+id);
+}
+
+async function deleteServiceFromTab(id) {
+  if(!confirm('¿Eliminar este servicio?')) return;
+  if (_useFirebase && window._db) {
+    try {
+      const { doc, deleteDoc } = window._fs;
+      await deleteDoc(doc(window._db, 'checklist_services', String(id)));
+    } catch(e) {
+      console.error(e);
+      saveServices(loadServices().filter(s=>s.id!==id));
+      buildDynamicTabs(); renderSavedList();
+    }
+  } else {
+    saveServices(loadServices().filter(s=>s.id!==id));
+    buildDynamicTabs(); renderSavedList();
+  }
+  showTab('pantallas');
+}
+function deleteService(id) { deleteServiceFromTab(id); }
+
+function renderSavedList() {
+  const list = document.getElementById('saved_services_list');
+  const services = loadServices();
+  if(services.length===0){ list.innerHTML=''; return; }
+  list.innerHTML = '<div class="section-label" style="margin-bottom:10px">Servicios activos</div>' +
+    services.map(s=>`
+      <div class="saved-item">
+        <div>
+          <div class="saved-item-name">${esc(s.icon)} ${esc(s.name)}</div>
+          <div class="saved-item-count">${s.options.length} opción(es)</div>
+        </div>
+        <button class="del-btn" onclick="deleteService(${s.id})">🗑</button>
+      </div>`).join('');
+}
+
+// ══════════════════════════════════════════
+// FINANZAS MENSUALES
+// ══════════════════════════════════════════
+const MONTH_NAMES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function getCurrentMonthKey() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+function formatMes(key) {
+  const parts = key.split('-');
+  return MONTH_NAMES_ES[parseInt(parts[1],10)-1]+' '+parts[0];
+}
+
+function formatMXN(n) {
+  return '$'+Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function loadFinCurrent() {
+  try { return JSON.parse(localStorage.getItem('fin_current')||'null'); } catch(e){ return null; }
+}
+function saveFinCurrent(obj) { localStorage.setItem('fin_current', JSON.stringify(obj)); }
+function loadFinHistorial() {
+  try { return JSON.parse(localStorage.getItem('fin_historial')||'[]'); } catch(e){ return []; }
+}
+function saveFinHistorial(arr) { localStorage.setItem('fin_historial', JSON.stringify(arr)); }
+
+function checkAndRotateMonth() {
+  const currentKey = getCurrentMonthKey();
+  let current = loadFinCurrent();
+  if (!current) {
+    current = {mes:currentKey,ganancia:0,inversion:0,movimientos:[]};
+    saveFinCurrent(current);
+  } else if (current.mes !== currentKey) {
+    // Mes anterior → archivar automáticamente
+    const hist = loadFinHistorial();
+    if (!hist.some(h=>h.mes===current.mes)) {
+      hist.unshift({
+        mes: current.mes,
+        ganancia: current.ganancia||0,
+        inversion: current.inversion||0,
+        cerradoEn: new Date().toISOString()
+      });
+      saveFinHistorial(hist);
+    }
+    current = {mes:currentKey,ganancia:0,inversion:0,movimientos:[]};
+    saveFinCurrent(current);
+  }
+  return current;
+}
+
+function getDiasLabel() {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const remain = lastDay - now.getDate();
+  if (remain === 0) return '🔴 Cierre hoy';
+  if (remain === 1) return '⚠️ Cierre mañana';
+  return remain+' días para cierre';
+}
+
+function registrarMovimiento(tipo) {
+  const montoEl = document.getElementById('fin-monto');
+  const descEl  = document.getElementById('fin-desc');
+  const monto = parseFloat(montoEl.value);
+  if (!monto || monto <= 0) { montoEl.focus(); return; }
+  const desc = descEl.value.trim() || (tipo==='ganancia'?'Ganancia':'Inversión');
+
+  let current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  current.movimientos = current.movimientos || [];
+  current.movimientos.unshift({
+    id: Date.now(), tipo, monto, desc,
+    fecha: new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+  });
+  if (tipo==='ganancia') current.ganancia = (current.ganancia||0)+monto;
+  else current.inversion = (current.inversion||0)+monto;
+  saveFinCurrent(current);
+
+  montoEl.value='';
+  descEl.value='';
+  renderFinanceDashboard();
+}
+
+function renderFinanceDashboard() {
+  const current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  const g = current.ganancia||0;
+  const i = current.inversion||0;
+  const b = g-i;
+
+  const mesEl = document.getElementById('fin-mes-label');
+  const diasEl = document.getElementById('fin-dias-label');
+  const ganEl  = document.getElementById('fin-ganancia-total');
+  const invEl  = document.getElementById('fin-inversion-total');
+  const balEl  = document.getElementById('fin-balance-total');
+  if (mesEl)  mesEl.textContent  = formatMes(current.mes).toUpperCase();
+  if (diasEl) diasEl.textContent = getDiasLabel();
+  if (ganEl)  ganEl.textContent  = formatMXN(g);
+  if (invEl)  invEl.textContent  = formatMXN(i);
+  if (balEl) {
+    balEl.textContent  = formatMXN(b);
+    balEl.className = 'finance-box-amount '+(b>=0?'gold':'red');
+  }
+
+  const movs = (current.movimientos||[]).slice(0,10);
+  const listEl = document.getElementById('fin-mov-list');
+  if (!listEl) return;
+  if (movs.length===0) {
+    listEl.innerHTML='<div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0">Sin movimientos este mes</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="section-label" style="margin-bottom:6px">Movimientos recientes</div>'+
+    movs.map(m=>`
+      <div class="mov-item">
+        <div class="mov-dot ${m.tipo==='ganancia'?'g':'i'}"></div>
+        <div class="mov-info">
+          <div class="mov-desc">${esc(m.desc)}</div>
+          <div class="mov-fecha">${m.fecha||''}</div>
+        </div>
+        <div class="mov-monto ${m.tipo==='ganancia'?'g':'i'}">${formatMXN(m.monto)}</div>
+      </div>`).join('');
+}
+
+function showHistorico() {
+  renderHistorico();
+  document.getElementById('modal-historico').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function closeHistorico() {
+  document.getElementById('modal-historico').classList.add('hidden');
+  document.body.style.overflow='';
+}
+function closeHistoricoOverlay(e) {
+  if (e.target === document.getElementById('modal-historico')) closeHistorico();
+}
+function renderHistorico() {
+  const hist = loadFinHistorial();
+  const el = document.getElementById('hist-list');
+  if (!el) return;
+  if (hist.length===0) {
+    el.innerHTML='<div class="hist-empty">Aún no hay meses cerrados.<br>Al abrir la app en un mes nuevo,<br>el anterior se archiva automáticamente.</div>';
+    return;
+  }
+  el.innerHTML = hist.map(h=>{
+    const g=h.ganancia||0, i=h.inversion||0, b=g-i;
+    return `
+      <div class="hist-month">
+        <div class="hist-month-title">${formatMes(h.mes)}</div>
+        <div class="hist-month-grid">
+          <div>
+            <div class="hist-col-label">Ganancias</div>
+            <div class="hist-col-val green">${formatMXN(g)}</div>
+          </div>
+          <div>
+            <div class="hist-col-label">Inversiones</div>
+            <div class="hist-col-val red">${formatMXN(i)}</div>
+          </div>
+          <div>
+            <div class="hist-col-label">Balance</div>
+            <div class="hist-col-val ${b>=0?'gold':'red'}">${formatMXN(b)}</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function initFinances() {
+  checkAndRotateMonth();
+  renderFinanceDashboard();
+}
+
+// ── INIT ──
+function initLocal() {
+  _servicesCache = loadServicesLocal();
+  STATIC_TABS.forEach(t => { _customCache[t] = loadCustomItemsLocal(t); });
+  updateFbBadge(false);
+  buildDynamicTabs();
+  STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
+  renderSavedList();
+  initFinances();
+}
+
+function initFirebase() {
+  if (!window._fbReady || !window._db) { initLocal(); return; }
+  const { collection, onSnapshot, query, orderBy } = window._fs;
+  const db = window._db;
+
+  let servicesReady = false;
+  let customReady   = false;
+  let initialRenderDone = false;
+
+  function checkReady() {
+    if (!servicesReady || !customReady) return;
+    updateFbBadge(true);
+    buildDynamicTabs();
+    STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
+    renderSavedList();
+    initFinances();
+    initialRenderDone = true;
+  }
+
+  // Listener — categorías de servicios
+  onSnapshot(
+    query(collection(db, 'checklist_services'), orderBy('createdAt', 'asc')),
+    snap => {
+      _servicesCache = snap.docs.map(d => d.data());
+      saveServicesLocal(_servicesCache);
+      servicesReady = true;
+      if (initialRenderDone) {
+        buildDynamicTabs();
+        renderSavedList();
+      } else {
+        checkReady();
+      }
+    },
+    err => {
+      console.warn('Firestore services error:', err);
+      if (!servicesReady) { servicesReady = true; checkReady(); }
+    }
+  );
+
+  // Listener — ítems personalizados
+  onSnapshot(
+    query(collection(db, 'checklist_custom_items'), orderBy('createdAt', 'asc')),
+    snap => {
+      const fresh = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (!fresh[data.panel]) fresh[data.panel] = [];
+        fresh[data.panel].push({ id: data.id, label: data.label });
+      });
+      _customCache = fresh;
+      STATIC_TABS.forEach(t => saveCustomItemsLocal(t, _customCache[t] || []));
+      customReady = true;
+      if (initialRenderDone) {
+        STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
+        _servicesCache.forEach(svc => {
+          const tid = 'extra-' + svc.id;
+          renderCustomItems(tid);
+          updateProgress(tid);
+        });
+      } else {
+        checkReady();
+      }
+    },
+    err => {
+      console.warn('Firestore custom items error:', err);
+      if (!customReady) { customReady = true; checkReady(); }
+    }
+  );
+}
+
+// Espera Firebase o arranca local si tarda más de 3s
+let fbInitDone = false;
+window.addEventListener('fbReady', () => {
+  if (fbInitDone) return;
+  fbInitDone = true;
+  initFirebase();
+});
+setTimeout(() => {
+  if (!fbInitDone) { fbInitDone = true; initLocal(); }
+}, 3000);
+// Si el DOM ya cargó y fbReady ya disparó antes del listener
+if (window._fbReady !== undefined && !fbInitDone) {
+  fbInitDone = true;
+  initFirebase();
+}
+</script>
+</body>
+</html>
