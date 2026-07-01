@@ -57,6 +57,18 @@ function sanitizeCell(v) {
   return /^[=+\-@\t\r\n]/.test(v) ? "'" + v : v;
 }
 
+// Devuelve "YYYY-MM" en la zona horaria de Monterrey, no en UTC
+function getMexicoMonth() {
+  const parts = new Intl.DateTimeFormat('es-MX', {
+    timeZone: 'America/Monterrey',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(new Date());
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  return `${y}-${m}`;
+}
+
 // ════════════════════════════════════════════════════════
 // FUNCIÓN PRINCIPAL — Exportación automática día 30
 // ════════════════════════════════════════════════════════
@@ -68,7 +80,7 @@ exports.exportMensualM365 = onSchedule({
 }, async (event) => {
   const db = getFirestore();
   const inicio = Date.now();
-  const mes = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const mes = getMexicoMonth(); // "YYYY-MM"
   const logRef = db.collection('export_logs').doc();
 
   // Verificar si ya se exportó este mes (evita duplicados en reintento)
@@ -161,7 +173,7 @@ exports.exportManual = require('firebase-functions/v2/https').onRequest({
     const db = getFirestore();
     const snapshot = await db.collection('ordenes').orderBy('fecha_creacion', 'desc').get();
     const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    const mes = new Date().toISOString().slice(0, 7);
+    const mes = getMexicoMonth();
     const buffer = await buildExcel(ordenes, mes);
     const filename = `AlarmasReset-${mes}-manual.xlsx`;
     const fileUrl = await uploadToOneDrive(buffer, filename);
