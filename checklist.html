@@ -1179,6 +1179,10 @@ body::before{
       <button class="btn-historico" onclick="showHistorico()">
         📊 Ver histórico de ganancias e inversiones
       </button>
+      <!-- Botón reset flujo de dinero -->
+      <button class="btn-reset-flujo" onclick="resetFlujoDinero()" style="width:100%;margin-top:8px;padding:10px 0;border-radius:10px;border:1.5px solid rgba(255,80,80,.35);background:rgba(255,80,80,.07);color:#ff6060;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.4px;">
+        🔄 Resetear flujo de dinero del mes
+      </button>
 
       <!-- Info cierre automático -->
       <div class="firebase-note" style="background:rgba(144,96,255,.06);border-color:rgba(144,96,255,.2);">
@@ -1792,6 +1796,14 @@ function showHistorico() {
   document.getElementById('modal-historico').classList.remove('hidden');
   document.body.style.overflow='hidden';
 }
+
+function resetFlujoDinero() {
+  if (!confirm('¿Resetear el flujo de dinero del mes?\nEsta acción borrará las ganancias, inversiones y movimientos del mes actual.\nEl historial de meses anteriores NO se modifica.')) return;
+  const currentKey = getCurrentMonthKey();
+  saveFinCurrent({mes: currentKey, ganancia: 0, inversion: 0, movimientos: []});
+  renderFinanceDashboard();
+}
+
 function closeHistorico() {
   document.getElementById('modal-historico').classList.add('hidden');
   document.body.style.overflow='';
