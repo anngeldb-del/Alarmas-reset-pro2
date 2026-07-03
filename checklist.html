@@ -1428,7 +1428,7 @@ function buildDynamicTabs() {
     const tab = document.createElement('div');
     tab.className = 'tab tab-dynamic';
     tab.id = 'tab-extra-'+svc.id;
-    tab.innerHTML = `<span class="tab-icon">${svc.icon}</span> ${svc.name}`;
+    tab.innerHTML = `<span class="tab-icon">${esc(svc.icon)}</span> ${esc(svc.name)}`;
     tab.onclick = () => showTab('extra-'+svc.id);
     tabsScroll.insertBefore(tab, addTab);
 
@@ -1460,8 +1460,8 @@ function buildDynamicTabs() {
       </div>
       <div class="sect">
         <div class="sect-head">
-          <div class="sect-ico">${svc.icon}</div>
-          <div class="sect-title">${svc.name}</div>
+          <div class="sect-ico">${esc(svc.icon)}</div>
+          <div class="sect-title">${esc(svc.name)}</div>
           <div class="sect-badge">${svc.options.length} OPC.</div>
         </div>
         <div class="items-list">
@@ -1806,7 +1806,8 @@ function registrarMovimiento(tipo) {
   if (!monto || monto <= 0) { montoEl.focus(); return; }
   const desc = descEl.value.trim() || (tipo==='ganancia'?'Ganancia':'Inversión');
 
-  let current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  // checkAndRotateMonth garantiza que estamos en el mes correcto aunque la app lleve días abierta
+  let current = checkAndRotateMonth();
   current.movimientos = current.movimientos || [];
   current.movimientos.unshift({
     id: Date.now(), tipo, monto, desc,
@@ -2107,7 +2108,12 @@ function initFirebase() {
         fresh[data.panel].push({ id: data.id, label: data.label });
       });
       _customCache = fresh;
+      // Persistir en localStorage tanto tabs estáticos como paneles dinámicos
       STATIC_TABS.forEach(t => saveCustomItemsLocal(t, _customCache[t] || []));
+      _servicesCache.forEach(svc => {
+        const tid = 'extra-' + svc.id;
+        saveCustomItemsLocal(tid, _customCache[tid] || []);
+      });
       customReady = true;
       if (initialRenderDone) {
         STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
