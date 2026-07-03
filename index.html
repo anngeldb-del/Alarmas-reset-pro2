@@ -350,6 +350,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <span id="si-fb-dot" style="font-size:10px;color:var(--muted)">●</span>
   </button>
 
+  <button class="sidebar-item" onclick="forzarActualizacion()" style="color:#ff6b35;border-top:1px solid var(--border);margin-top:4px">
+    <span class="si-icon">🔄</span><span class="si-label">Actualizar app</span>
+    <span style="font-size:10px;color:var(--muted)">v2.1</span>
+  </button>
+
   <div class="sidebar-footer">
     <div class="sb-avatar">AR</div>
     <div>
@@ -2124,6 +2129,16 @@ function toggleSidebar() {
 function closeSidebar() {
   document.getElementById('sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('open');
+}
+
+function forzarActualizacion() {
+  if (!confirm('¿Actualizar la app? Se recargará la página.')) return;
+  const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
+  } else {
+    limpiar();
+  }
 }
 
 function navTo(tab) {
