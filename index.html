@@ -678,6 +678,7 @@ function abrirDoc(titulo, bodyHTML) {
     styleEl.id = 'doc-preview-style';
     document.getElementById('doc-frame').appendChild(styleEl);
   }
+  styleEl.textContent = DOC_CSS;
   document.getElementById('doc-topbar-title').textContent = titulo;
   document.getElementById('doc-overlay').classList.add('open');
 }
@@ -1472,7 +1473,7 @@ function calcPartida(input) {
   const row=input.closest('.partida-row');
   const cant=parseFloat(row.querySelector('.cot-pcant').value)||1;
   const precio=parseFloat(row.querySelector('.cot-pprecio').value)||0;
-  const descto=parseFloat(row.querySelector('.cot-pdescto').value)||0;
+  const descto=Math.max(0,Math.min(100,parseFloat(row.querySelector('.cot-pdescto').value)||0));
   row.querySelector('.cot-psubtotal').value=(precio*cant*(1-descto/100)).toFixed(2)||'';
 }
 
@@ -1531,7 +1532,7 @@ function leerPartidas() {
     precio:parseFloat(r.querySelector('.cot-pprecio')?.value)||0,
     descto:parseFloat(r.querySelector('.cot-pdescto')?.value)||0,
     subtotal:parseFloat(r.querySelector('.cot-psubtotal')?.value)||0
-  })).filter(p=>p.nombre && (p.precio > 0));
+  })).filter(p=>p.nombre && (p.precio >= 0));
 }
 
 function verCotizacion() {

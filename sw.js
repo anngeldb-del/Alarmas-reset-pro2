@@ -1,4 +1,4 @@
-const CACHE = 'app-v4';
+const CACHE = 'app-v5';
 const STATIC = ['./', './index.html', './checklist.html', './manifest.json'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting()));
