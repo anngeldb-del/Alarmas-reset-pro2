@@ -1527,7 +1527,13 @@ function recalcCot() {
 }
 
 function agregarPartida(){ const cont=document.getElementById('cot-partidas'); if(!cont)return; const i=Date.now(); const div=document.createElement('div'); div.innerHTML=cotPartidaHTML({},i); cont.appendChild(div.firstElementChild); }
-function quitarPartida(i){ const r=document.getElementById('cot-p-'+i); if(r){r.remove();recalcCot();} }
+function quitarPartida(i){
+  const cont = document.getElementById('cot-partidas');
+  if (!cont) return;
+  if (cont.querySelectorAll('.partida-row').length <= 1) { toast('⚠️ Debe haber al menos una partida'); return; }
+  const r = document.getElementById('cot-p-'+i);
+  if(r){ r.remove(); recalcCot(); }
+}
 
 function leerPartidas() {
   return Array.from(document.querySelectorAll('#cot-partidas .partida-row')).map(r=>({
@@ -2269,16 +2275,29 @@ function procesarRestaurarJSON(event) {
   if (!file) return;
   event.target.value = '';
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
       const nuevas = data.ordenes || (Array.isArray(data) ? data : null);
       if (!nuevas || !Array.isArray(nuevas)) { toast('⚠️ Formato de archivo inválido'); return; }
-      if (!confirm('¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales actuales.')) return;
+      const ok = await confirmarAccion('Restaurar respaldo', '¿Restaurar ' + nuevas.length + ' órdenes? Se reemplazarán los datos actuales.', '📂', 'Restaurar');
+      if (!ok) return;
       ordenes = nuevas;
       guardarLocal();
       renderAll();
       toast('✅ ' + nuevas.length + ' órdenes restauradas');
+      // Si Firebase está activo, subir también para evitar que onSnapshot sobreescriba
+      if (window._useFirebase && window._firebaseDb) {
+        try {
+          const { collection, addDoc, updateDoc, doc } = window._firebaseModules;
+          for (const orden of nuevas) {
+            const d = {...orden}; const id = d.id; delete d.id;
+            if (id) await updateDoc(doc(window._firebaseDb,'ordenes',id), d).catch(() => addDoc(collection(window._firebaseDb,'ordenes'), d));
+            else await addDoc(collection(window._firebaseDb,'ordenes'), d);
+          }
+          toast('☁️ Respaldo sincronizado con Firebase');
+        } catch(err) { toast('⚠️ Local OK — Firebase no disponible'); }
+      }
     } catch(err) {
       toast('⚠️ Error al leer el archivo: ' + err.message);
     }

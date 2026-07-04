@@ -1398,8 +1398,10 @@ function renderCustomItems(panel) {
   const items = loadCustomItems(panel);
   if (countEl) countEl.textContent = items.length + ' personalizado' + (items.length !== 1 ? 's' : '');
   if (items.length === 0) { list.innerHTML = ''; return; }
+  // Preservar IDs de ítems actualmente seleccionados antes de re-renderizar
+  const selIds = new Set([...list.querySelectorAll('.custom-item.sel')].map(el => el.id));
   list.innerHTML = items.map(item => `
-    <div class="custom-item" id="ci-${panel}-${item.id}" data-label="${esc(item.label)}">
+    <div class="custom-item${selIds.has('ci-'+panel+'-'+item.id) ? ' sel' : ''}" id="ci-${panel}-${item.id}" data-label="${esc(item.label)}">
       <div class="chk" onclick="selCustom(this,'${panel}')"></div>
       <div class="item-text" onclick="selCustom(this.parentElement.querySelector('.chk'),'${panel}')">
         <div class="item-name">${esc(item.label)}</div>
@@ -1624,7 +1626,7 @@ function enviarWA() {
   if(tel)      m += '• Teléfono: '+tel+'\n';
   if(vehiculo) m += '• Vehículo: '+vehiculo+'\n';
   const anio  = getField('p_anio') || getField(tab+'_anio');
-  const color = getField('p_color');
+  const color = (tab === 'pantallas') ? getField('p_color') : '';
   if(anio)  m += '• Año: '+anio+'\n';
   if(color) m += '• Color: '+color+'\n';
   m += '\n📋 *LO QUE ME INTERESA*\n';
@@ -1788,7 +1790,8 @@ function saveFinHistorial(arr) {
 // Sube finanzas a Firebase con debounce para agrupar escrituras rápidas
 let _finSyncTimer = null;
 function _syncFinToFirebase() {
-  if (!window._useFirebase || !window._db) return;
+  // usa la variable LOCAL _useFirebase (no window._useFirebase que es de index.html)
+  if (!_useFirebase || !window._db) return;
   clearTimeout(_finSyncTimer);
   _finSyncTimer = setTimeout(() => {
     try {
@@ -1910,10 +1913,14 @@ function showHistorico() {
 }
 
 function resetFlujoDinero() {
-  if (!confirm('¿Resetear el flujo de dinero del mes?\nEsta acción borrará las ganancias, inversiones y movimientos del mes actual.\nEl historial de meses anteriores NO se modifica.')) return;
-  const currentKey = getCurrentMonthKey();
-  saveFinCurrent({mes: currentKey, ganancia: 0, inversion: 0, movimientos: []});
-  renderFinanceDashboard();
+  openConfirm('🔄 Resetear flujo del mes',
+    'Se borrarán ganancias, inversiones y movimientos del mes actual. El historial de meses anteriores NO se modifica.',
+    () => {
+      const currentKey = getCurrentMonthKey();
+      saveFinCurrent({mes: currentKey, ganancia: 0, inversion: 0, movimientos: []});
+      renderFinanceDashboard();
+    }
+  );
 }
 
 function closeHistorico() {
@@ -2090,6 +2097,13 @@ function initFinances() {
   checkAndRotateMonth();
   actualizarBtnOcultar();
   renderFinanceDashboard();
+  // Refresca finanzas si el usuario deja la app abierta y cambia de mes
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkAndRotateMonth();
+      renderFinanceDashboard();
+    }
+  });
 }
 
 // ── INIT ──
@@ -2142,21 +2156,40 @@ function initFirebase() {
     }
   );
 
-  // Listener — finanzas (sync bidireccional: carga de Firebase al abrir, sube al guardar)
+  // Listener — finanzas (sync bidireccional con merge inteligente)
   onSnapshot(doc(db, 'finanzas', 'datos'), snap => {
     if (!snap.exists()) {
-      // Primera vez: subir lo que hay en localStorage
-      _syncFinToFirebase();
+      _syncFinToFirebase(); // primera vez: subir lo que hay local
       return;
     }
     const data = snap.data();
-    // Solo actualiza si Firebase tiene datos válidos (evita sobreescribir con nulos)
+    const localCurrent = loadFinCurrent();
+    const localHist = loadFinHistorial();
+
+    // Mes actual: tomar el más reciente; si es el mismo mes, el que tiene más movimientos
     if (data.current && data.current.mes) {
-      localStorage.setItem('fin_current', JSON.stringify(data.current));
+      const fbMes = data.current.mes;
+      const localMes = localCurrent ? localCurrent.mes : '';
+      const mismoMes = fbMes === localMes;
+      const fbMasMovs = (data.current.movimientos||[]).length >= (localCurrent ? (localCurrent.movimientos||[]).length : 0);
+      if (!localMes || fbMes > localMes || (mismoMes && fbMasMovs)) {
+        localStorage.setItem('fin_current', JSON.stringify(data.current));
+      } else if (mismoMes && !fbMasMovs) {
+        // Local tiene más datos del mismo mes → subir a Firebase
+        _syncFinToFirebase();
+      }
     }
-    if (Array.isArray(data.historial)) {
-      localStorage.setItem('fin_historial', JSON.stringify(data.historial));
+
+    // Historial: merge por mes (union — no se pierden meses de ningún dispositivo)
+    if (Array.isArray(data.historial) && data.historial.length > 0) {
+      const merged = [...localHist];
+      data.historial.forEach(fbEntry => {
+        if (fbEntry.mes && !merged.some(h => h.mes === fbEntry.mes)) merged.push(fbEntry);
+      });
+      merged.sort((a, b) => b.mes.localeCompare(a.mes));
+      localStorage.setItem('fin_historial', JSON.stringify(merged));
     }
+
     if (initialRenderDone) renderFinanceDashboard();
   }, err => console.warn('Firestore finanzas error:', err));
 
