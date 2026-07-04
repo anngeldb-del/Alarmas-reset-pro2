@@ -1548,6 +1548,13 @@ function updateProgress(panel) {
 
 // ── RESET ──
 function resetPanel(panel) {
+  // Solo deselecciona ítems; no toca los campos del cliente
+  document.querySelectorAll('#panel-'+panel+' .item.sel, #panel-'+panel+' .custom-item.sel')
+    .forEach(el => el.classList.remove('sel'));
+  updateProgress(panel);
+}
+function resetPanelCompleto(panel) {
+  // Limpia todo incluyendo datos del cliente (llamado explícitamente)
   document.querySelectorAll('#panel-'+panel+' .item.sel, #panel-'+panel+' .custom-item.sel')
     .forEach(el => el.classList.remove('sel'));
   document.querySelectorAll('#panel-'+panel+' input, #panel-'+panel+' textarea')
@@ -1701,7 +1708,9 @@ async function saveService() {
   document.getElementById('new_service_icon').value='';
   pendingOptions=[];
   renderOptionsPreview();
-  showTab('extra-'+id);
+  // En modo Firebase el panel se crea cuando llega el onSnapshot; en local ya existe
+  if (document.getElementById('panel-extra-'+id)) showTab('extra-'+id);
+  else setTimeout(() => showTab('extra-'+id), 800);
 }
 
 async function deleteServiceFromTab(id) {
@@ -1764,11 +1773,32 @@ function formatMXN(n) {
 function loadFinCurrent() {
   try { return JSON.parse(localStorage.getItem('fin_current')||'null'); } catch(e){ return null; }
 }
-function saveFinCurrent(obj) { localStorage.setItem('fin_current', JSON.stringify(obj)); }
+function saveFinCurrent(obj) {
+  localStorage.setItem('fin_current', JSON.stringify(obj));
+  _syncFinToFirebase();
+}
 function loadFinHistorial() {
   try { return JSON.parse(localStorage.getItem('fin_historial')||'[]'); } catch(e){ return []; }
 }
-function saveFinHistorial(arr) { localStorage.setItem('fin_historial', JSON.stringify(arr)); }
+function saveFinHistorial(arr) {
+  localStorage.setItem('fin_historial', JSON.stringify(arr));
+  _syncFinToFirebase();
+}
+
+// Sube finanzas a Firebase con debounce para agrupar escrituras rápidas
+let _finSyncTimer = null;
+function _syncFinToFirebase() {
+  if (!window._useFirebase || !window._db) return;
+  clearTimeout(_finSyncTimer);
+  _finSyncTimer = setTimeout(() => {
+    try {
+      const { doc, setDoc } = window._fs;
+      const payload = { current: loadFinCurrent(), historial: loadFinHistorial() };
+      setDoc(doc(window._db, 'finanzas', 'datos'), payload)
+        .catch(e => console.warn('Finanzas sync error:', e));
+    } catch(e) { console.warn('Finanzas sync error:', e); }
+  }, 500);
+}
 
 function checkAndRotateMonth() {
   const currentKey = getCurrentMonthKey();
@@ -2111,6 +2141,24 @@ function initFirebase() {
       if (!servicesReady) { servicesReady = true; checkReady(); }
     }
   );
+
+  // Listener — finanzas (sync bidireccional: carga de Firebase al abrir, sube al guardar)
+  onSnapshot(doc(db, 'finanzas', 'datos'), snap => {
+    if (!snap.exists()) {
+      // Primera vez: subir lo que hay en localStorage
+      _syncFinToFirebase();
+      return;
+    }
+    const data = snap.data();
+    // Solo actualiza si Firebase tiene datos válidos (evita sobreescribir con nulos)
+    if (data.current && data.current.mes) {
+      localStorage.setItem('fin_current', JSON.stringify(data.current));
+    }
+    if (Array.isArray(data.historial)) {
+      localStorage.setItem('fin_historial', JSON.stringify(data.historial));
+    }
+    if (initialRenderDone) renderFinanceDashboard();
+  }, err => console.warn('Firestore finanzas error:', err));
 
   // Listener — ítems personalizados
   onSnapshot(
