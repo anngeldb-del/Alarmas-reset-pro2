@@ -2,13 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <title>Alarmas Reset — Cotizaciones</title>
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW error:', e)));
   }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1376,6 +1377,10 @@ async function addCustomItem(panel) {
 }
 
 async function deleteCustomItem(panel, id) {
+  // Eliminación optimista del DOM
+  const elToRemove = document.getElementById('ci-' + panel + '-' + id);
+  if (elToRemove) elToRemove.remove();
+  updateProgress(panel);
   if (_useFirebase && window._db) {
     try {
       const { doc, deleteDoc } = window._fs;
@@ -1507,6 +1512,11 @@ function buildDynamicTabs() {
     agregarPanel.parentNode.insertBefore(panel, agregarPanel);
     // render custom items for this dynamic panel
     renderCustomItems(tid);
+    // Bind Enter key for the custom-input of this dynamic panel
+    const dynInp = document.getElementById('custom-input-' + tid);
+    if (dynInp) dynInp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addCustomItem(tid); }
+    });
   });
 }
 
@@ -2054,13 +2064,14 @@ let _importesOcultos = localStorage.getItem('fin_ocultar') === '1';
 const MASK = '••••••';
 
 function forzarActualizacion() {
-  if (!confirm('¿Actualizar la app? Se recargará la página.')) return;
-  const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
-  } else {
-    limpiar();
-  }
+  openConfirm('Actualizar app', 'Se limpiará el caché y se recargará la app. Tus datos no se borran.', () => {
+    const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
+    } else {
+      limpiar();
+    }
+  });
 }
 
 function toggleOcultarImportes() {
@@ -2244,6 +2255,12 @@ if (window._fbReady !== undefined && !fbInitDone) {
   fbInitDone = true;
   initFirebase();
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeConfirm();
+  closeHistorico();
+});
 </script>
 </body>
 </html>

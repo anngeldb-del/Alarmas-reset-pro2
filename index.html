@@ -6,7 +6,7 @@
 <title>Alarmas Reset — Control de Órdenes</title>
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW error:', e)));
   }
 </script>
 
@@ -286,8 +286,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 /* PRINT */
 @media print{
   body > *{display:none !important}
-  #doc-print-frame{display:block !important;position:static !important;background:#fff !important}
-  #doc-print-frame *{display:revert !important}
+  #doc-overlay{display:block !important;position:static !important;background:#fff !important}
+  .doc-topbar{display:none !important}
+  #doc-frame{display:block !important}
+  #doc-frame *{display:revert !important}
 }
 
 @media(max-width:380px){
@@ -952,7 +954,8 @@ function irAOrden(id) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-ordenes').classList.add('active');
-  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  const ordenesBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Órdenes'));
+  if (ordenesBtn) ordenesBtn.classList.add('active');
   filtroEstado='todos'; renderOrdenes();
   setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
 }
@@ -1162,14 +1165,8 @@ function mountOrdenForm(orden, mount) {
 }
 
 function bindFormRowEvents() {
-  const root = getFormRoot();
-  if (!root) return;
-  const cont = root.querySelector('#productos-form');
-  if (!cont || cont._boundRows) return;
-  cont._boundRows = true;
-  cont.addEventListener('input', e => {
-    if (e.target.matches('.prod-costo, .prod-inversion')) calcGanancia(e.target);
-  });
+  // Los inputs .prod-costo y .prod-inversion ya tienen oninput="calcGanancia(this)" inline;
+  // no se agrega listener delegado para evitar doble ejecución.
 }
 
 function buildFormHTML(orden) {
@@ -1950,7 +1947,8 @@ function cargarLogsExport() {
   cont.innerHTML = logs.slice(0,8).map(l => {
     const fecha = new Date(l.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
     const icono = l.tipo === 'microsoft_365' ? '🔷' : '📊';
-    const link = l.url ? `<a href="${esc(l.url)}" target="_blank" style="color:var(--accent);text-decoration:none">Ver →</a>` : '';
+    const safeUrl = (l.url && l.url.startsWith('https://')) ? l.url : null;
+    const link = safeUrl ? `<a href="${safeUrl}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Ver →</a>` : '';
     return `<div class="export-log-row">
       <span>${icono} ${esc(l.filename||l.tipo)}</span>
       <span style="color:var(--muted)">${fecha} ${link}</span>
@@ -2063,6 +2061,7 @@ function _confirmCancel() {
 async function cambiarEstado(id, nuevoEstado) {
   const orden = ordenes.find(o => o.id === id);
   if (!orden || (orden.estado||'PENDIENTE').toUpperCase() === nuevoEstado) return;
+  const estadoAnterior = orden.estado;
   orden.estado = nuevoEstado;
   if (window._useFirebase && window._firebaseDb) {
     try {
@@ -2070,7 +2069,13 @@ async function cambiarEstado(id, nuevoEstado) {
       await updateDoc(doc(window._firebaseDb, 'ordenes', id), { estado: nuevoEstado });
       toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
       return;
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      orden.estado = estadoAnterior;
+      renderAll();
+      toast('⚠️ No se pudo actualizar — sin conexión');
+      return;
+    }
   }
   await guardarLocal();
   renderAll();
@@ -2137,8 +2142,9 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
 
-function forzarActualizacion() {
-  if (!confirm('¿Actualizar la app? Se recargará la página.')) return;
+async function forzarActualizacion() {
+  const ok = await confirmarAccion('Actualizar app', 'Se limpiará el caché y se recargará la app. Tus datos no se borran.', '🔄', 'Actualizar');
+  if (!ok) return;
   const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
