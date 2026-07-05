@@ -1607,8 +1607,20 @@ function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   setTimeout(initOnboarding, 800);
+  // Capturar resultado de loginRedirect de MSAL (iOS Safari)
+  M365.getInstance().then(inst => {
+    inst.handleRedirectPromise().then(resp => {
+      if (resp && resp.account) {
+        M365._account = resp.account;
+        actualizarUIm365();
+        toast('✅ Sesión Microsoft iniciada');
+      }
+    }).catch(() => {});
+  }).catch(() => {});
 }
+let _appInitialized = false;
 window.addEventListener('firebaseReady', () => {
+  _appInitialized = true;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAppData, { once: true });
   } else {
@@ -1616,7 +1628,8 @@ window.addEventListener('firebaseReady', () => {
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window._useFirebase) cargarOrdenesLocal();
+  // Espera 120ms para que Firebase se inicialice; si no llega, carga local
+  setTimeout(() => { if (!_appInitialized) cargarOrdenesLocal(); }, 120);
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
@@ -1678,9 +1691,29 @@ const M365 = {
 
   async login() {
     const inst = await this.getInstance();
-    const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES });
-    this._account = resp.account;
-    return resp.accessToken;
+    // Resolver cualquier redirect pendiente (resultado de loginRedirect en iOS)
+    try {
+      const redirectResp = await inst.handleRedirectPromise();
+      if (redirectResp && redirectResp.account) {
+        this._account = redirectResp.account;
+        return redirectResp.accessToken;
+      }
+    } catch(e) { /* sin redirect pendiente */ }
+    try {
+      const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES });
+      this._account = resp.account;
+      return resp.accessToken;
+    } catch(e) {
+      // Popup bloqueado (iOS Safari, algunos WebViews) → redirect
+      const esPopupBloqueado = e.errorCode === 'popup_window_error' ||
+        e.errorCode === 'empty_window_error' || (e.message||'').toLowerCase().includes('popup');
+      if (esPopupBloqueado) {
+        toast('📱 Redirigiendo a Microsoft...');
+        await inst.loginRedirect({ scopes: this.SCOPES });
+        return; // loginRedirect navega fuera de la app
+      }
+      throw e;
+    }
   },
 
   async getToken() {
@@ -1690,10 +1723,21 @@ const M365 = {
       const resp = await inst.acquireTokenSilent({ scopes: this.SCOPES, account: this._account });
       return resp.accessToken;
     } catch(e) {
-      // Token expirado — pedir interactivo
-      const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES, account: this._account });
-      this._account = resp.account;
-      return resp.accessToken;
+      // Token expirado — intentar popup, con fallback a redirect en iOS
+      try {
+        const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES, account: this._account });
+        this._account = resp.account;
+        return resp.accessToken;
+      } catch(e2) {
+        const esPopupBloqueado = e2.errorCode === 'popup_window_error' ||
+          e2.errorCode === 'empty_window_error' || (e2.message||'').toLowerCase().includes('popup');
+        if (esPopupBloqueado) {
+          toast('📱 Redirigiendo a Microsoft...');
+          await inst.acquireTokenRedirect({ scopes: this.SCOPES, account: this._account });
+          return;
+        }
+        throw e2;
+      }
     }
   },
 
@@ -2231,7 +2275,7 @@ function _doExportExcel() {
   // Hoja 3: Resumen financiero
   const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
   const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[]).reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
-  const porCobrar = ordenes.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
+  const porCobrar = ordenes.filter(o=>['PENDIENTE','EN_PROCESO'].includes((o.estado||'').toUpperCase()))
     .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
   const h3 = [
     ['Resumen Financiero — Alarmas y GPS Reset'],
