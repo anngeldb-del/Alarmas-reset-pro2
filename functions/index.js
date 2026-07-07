@@ -23,6 +23,13 @@
  * 4. Desplegar:
  *    cd functions && npm install
  *    firebase deploy --only functions
+ *
+ * 5. Las órdenes viven en usuarios/{uid}/ordenes (login por Google en la app).
+ *    Este archivo las lee con collectionGroup('ordenes'), que requiere un
+ *    índice de grupo de colecciones para el orderBy('fecha_creacion'). Si el
+ *    primer despliegue/ejecución falla con "requires an index", Firestore
+ *    imprime en el log un link para crearlo con un clic (Console → Firestore
+ *    → Indexes → Collection group).
  */
 
 const { onSchedule } = require('firebase-functions/v2/scheduler');
@@ -87,7 +94,9 @@ exports.exportMensualM365 = onSchedule({
   try {
     // 1. Obtener todas las órdenes de Firestore
     console.log('Leyendo órdenes de Firestore...');
-    const snapshot = await db.collection('ordenes')
+    // Las órdenes viven en usuarios/{uid}/ordenes desde que se agregó login;
+    // collectionGroup las encuentra sin importar de qué usuario sean.
+    const snapshot = await db.collectionGroup('ordenes')
       .orderBy('fecha_creacion', 'desc')
       .get();
     const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -151,7 +160,7 @@ exports.exportManual = require('firebase-functions/v2/https').onRequest({
 
   try {
     const db = getFirestore();
-    const snapshot = await db.collection('ordenes').orderBy('fecha_creacion', 'desc').get();
+    const snapshot = await db.collectionGroup('ordenes').orderBy('fecha_creacion', 'desc').get();
     const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     const mes = new Date().toISOString().slice(0, 7);
     const buffer = await buildExcel(ordenes, mes);

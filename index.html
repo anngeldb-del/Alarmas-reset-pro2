@@ -13,6 +13,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   // ══════════════════════════════════════════════════
   // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
   // ══════════════════════════════════════════════════
@@ -28,13 +29,28 @@
   const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
     && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
   window._useFirebase = false;
+  window._uid = null;
+  window._authUser = null;
   if (fbConfigured) {
     try {
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
       window._firebaseDb = db;
       window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query };
       window._useFirebase = true;
+      window._authModules = { signInWithPopup, signOut };
+      window._loginGoogle = async () => {
+        try { await signInWithPopup(auth, provider); }
+        catch(e) { console.error(e); window.dispatchEvent(new CustomEvent('authError', { detail: e })); }
+      };
+      window._logoutGoogle = () => signOut(auth);
+      onAuthStateChanged(auth, user => {
+        window._uid = user ? user.uid : null;
+        window._authUser = user;
+        window.dispatchEvent(new CustomEvent('authStateChanged', { detail: user }));
+      });
     } catch(e) {
       console.warn('Firebase no inicializado:', e);
       window._useFirebase = false;
@@ -272,6 +288,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .confirm-msg{color:var(--muted);font-size:14px;line-height:1.55;margin-bottom:24px}
 .confirm-btns{display:flex;gap:10px}
 
+/* AUTH GATE */
+.auth-gate{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-gate.hidden{display:none}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 28px;max-width:360px;width:100%;text-align:center}
+.auth-ico{font-size:44px;margin-bottom:14px}
+.auth-title{font-family:var(--font-display);font-weight:800;font-size:20px;margin-bottom:8px}
+.auth-desc{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:24px}
+.btn-google{width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;color:#333;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--font-body)}
+.btn-google:hover{background:#f2f2f2}
+.auth-err{color:var(--red);font-size:12px;margin-top:14px;display:none}
+#app-root{display:none}
+#app-root.ready{display:block}
+.sb-avatar-img{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0}
+
 /* ONBOARDING */
 .onboard-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:700;align-items:center;justify-content:center;padding:20px}
 .onboard-overlay.open{display:flex}
@@ -300,6 +330,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </style>
 </head>
 <body>
+
+<!-- AUTH GATE -->
+<div class="auth-gate" id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-ico">🔐</div>
+    <div class="auth-title">Alarmas <span style="color:var(--accent)">Reset</span></div>
+    <div class="auth-desc">Inicia sesión con tu cuenta de Google para ver y editar tus órdenes. Tus datos quedan privados, solo tú puedes acceder a ellos.</div>
+    <button class="btn-google" onclick="window._loginGoogle && window._loginGoogle()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Iniciar sesión con Google
+    </button>
+    <div class="auth-err" id="auth-err">No se pudo iniciar sesión. Intenta de nuevo.</div>
+  </div>
+</div>
+
+<div id="app-root">
 
 <!-- SIDEBAR OVERLAY -->
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -358,11 +404,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </button>
 
   <div class="sidebar-footer">
-    <div class="sb-avatar">AR</div>
-    <div>
-      <div class="sb-user-name">Alarmas y GPS Reset</div>
+    <div class="sb-avatar" id="sb-avatar">AR</div>
+    <div style="flex:1;min-width:0">
+      <div class="sb-user-name" id="sb-user-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Alarmas y GPS Reset</div>
       <div class="sb-user-status" id="sb-user-status">● Local</div>
     </div>
+    <button class="btn-sm" id="sb-logout-btn" onclick="window._logoutGoogle && window._logoutGoogle()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;display:none">Salir</button>
   </div>
 </nav>
 
@@ -541,6 +588,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+</div><!-- /app-root -->
+
 <script>
 // ═══════════════════════════════════════
 // ESTADO
@@ -556,6 +605,22 @@ let activeFormMount = null;
 let fsListenerStarted = false;
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
+
+// ═══════════════════════════════════════
+// RUTAS FIRESTORE — datos privados por usuario (usuarios/{uid}/...)
+// ═══════════════════════════════════════
+function colOrdenes() {
+  const { collection } = window._firebaseModules;
+  return collection(window._firebaseDb, 'usuarios', window._uid, 'ordenes');
+}
+function docOrden(id) {
+  const { doc } = window._firebaseModules;
+  return doc(window._firebaseDb, 'usuarios', window._uid, 'ordenes', id);
+}
+function colExportLogs() {
+  const { collection } = window._firebaseModules;
+  return collection(window._firebaseDb, 'usuarios', window._uid, 'export_logs');
+}
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
 const EMPRESA = {
@@ -795,10 +860,10 @@ async function cargarOrdenesLocal() {
 }
 
 async function cargarOrdenes() {
-  if (window._useFirebase && window._firebaseDb && window._firebaseModules) {
+  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
     try {
-      const { collection, onSnapshot, orderBy, query } = window._firebaseModules;
-      const q = query(collection(window._firebaseDb,'ordenes'), orderBy('fecha_creacion','desc'));
+      const { onSnapshot, orderBy, query } = window._firebaseModules;
+      const q = query(colOrdenes(), orderBy('fecha_creacion','desc'));
       if (!fsListenerStarted) {
         fsListenerStarted = true;
         onSnapshot(q, snap => {
@@ -844,17 +909,17 @@ async function guardarLocal() {
 }
 
 async function guardarOrden(orden) {
-  if (window._useFirebase && window._firebaseDb) {
+  if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
-      const { collection, addDoc, updateDoc, doc } = window._firebaseModules;
+      const { addDoc, updateDoc } = window._firebaseModules;
       if (orden.id) {
         const id = orden.id;
         const data = {...orden};
         delete data.id;
-        await updateDoc(doc(window._firebaseDb,'ordenes',id), data);
+        await updateDoc(docOrden(id), data);
       } else {
         orden.fecha_creacion = Date.now();
-        await addDoc(collection(window._firebaseDb,'ordenes'), orden);
+        await addDoc(colOrdenes(), orden);
       }
       return;
     } catch(e) {
@@ -880,10 +945,10 @@ async function guardarOrden(orden) {
 async function eliminarOrden(id) {
   const ok = await confirmarAccion('Eliminar orden', '¿Eliminar esta orden? Esta acción no se puede deshacer.', '🗑️', 'Eliminar');
   if (!ok) return;
-  if (window._useFirebase && window._firebaseDb) {
+  if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
-      const { deleteDoc, doc } = window._firebaseModules;
-      await deleteDoc(doc(window._firebaseDb,'ordenes',id));
+      const { deleteDoc } = window._firebaseModules;
+      await deleteDoc(docOrden(id));
       toast('Orden eliminada');
       return;
     } catch(e) {
@@ -1618,18 +1683,78 @@ function initAppData() {
     }).catch(() => {});
   }).catch(() => {});
 }
+
+// ═══════════════════════════════════════
+// AUTENTICACIÓN — muestra la app solo con sesión iniciada
+// (si Firebase no está configurado, la app corre en modo local sin login)
+// ═══════════════════════════════════════
 let _appInitialized = false;
-window.addEventListener('firebaseReady', () => {
-  _appInitialized = true;
+function showApp() {
+  document.getElementById('auth-gate').classList.add('hidden');
+  document.getElementById('app-root').classList.add('ready');
+}
+function showAuthGate() {
+  document.getElementById('app-root').classList.remove('ready');
+  document.getElementById('auth-gate').classList.remove('hidden');
+}
+function updateUserUI(user) {
+  const nameEl = document.getElementById('sb-user-name');
+  const avatarEl = document.getElementById('sb-avatar');
+  const statusEl = document.getElementById('sb-user-status');
+  const logoutBtn = document.getElementById('sb-logout-btn');
+  if (!nameEl) return;
+  if (user) {
+    nameEl.textContent = user.displayName || user.email || 'Mi cuenta';
+    avatarEl.innerHTML = user.photoURL
+      ? '<img class="sb-avatar-img" src="'+user.photoURL+'" onerror="this.remove()">'
+      : (user.displayName || user.email || '?').slice(0,2).toUpperCase();
+    statusEl.textContent = '● Conectado';
+    statusEl.classList.add('connected');
+    logoutBtn.style.display = 'inline-block';
+  } else {
+    nameEl.textContent = 'Alarmas y GPS Reset';
+    avatarEl.textContent = 'AR';
+    statusEl.textContent = '● Local';
+    statusEl.classList.remove('connected');
+    logoutBtn.style.display = 'none';
+  }
+}
+function _runInitAppData() {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAppData, { once: true });
   } else {
     initAppData();
   }
+}
+window.addEventListener('authStateChanged', e => {
+  const user = e.detail;
+  updateUserUI(user);
+  if (user) {
+    showApp();
+    if (!_appInitialized) { _appInitialized = true; _runInitAppData(); }
+    else { fsListenerStarted = false; ordenes = []; cargarOrdenes(); }
+  } else {
+    ordenes = []; fsListenerStarted = false;
+    renderAll();
+    showAuthGate();
+  }
+});
+window.addEventListener('authError', () => {
+  const err = document.getElementById('auth-err');
+  if (err) err.style.display = 'block';
+});
+window.addEventListener('firebaseReady', () => {
+  if (!window._useFirebase) {
+    // Firebase no configurado — modo local sin login
+    showApp();
+    _appInitialized = true;
+    _runInitAppData();
+  }
+  // Si Firebase sí está configurado, esperamos 'authStateChanged' para decidir.
 });
 document.addEventListener('DOMContentLoaded', () => {
-  // Espera 120ms para que Firebase se inicialice; si no llega, carga local
-  setTimeout(() => { if (!_appInitialized) cargarOrdenesLocal(); }, 120);
+  // Espera 300ms para que Firebase/Auth se inicialicen; si no llega ninguna señal, corre en local
+  setTimeout(() => { if (!_appInitialized && !window._useFirebase) { showApp(); _appInitialized = true; initAppData(); } }, 300);
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
@@ -1975,10 +2100,10 @@ async function _logExportM365(filename, url) {
   const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
   logs.unshift(log);
   localStorage.setItem('alarmas_export_logs', JSON.stringify(logs.slice(0,30)));
-  if (window._useFirebase && window._firebaseDb) {
+  if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
-      const { collection, addDoc } = window._firebaseModules;
-      await addDoc(collection(window._firebaseDb, 'export_logs'), log);
+      const { addDoc } = window._firebaseModules;
+      await addDoc(colExportLogs(), log);
     } catch(e) { /* no crítico */ }
   }
 }
@@ -2107,10 +2232,10 @@ async function cambiarEstado(id, nuevoEstado) {
   if (!orden || (orden.estado||'PENDIENTE').toUpperCase() === nuevoEstado) return;
   const estadoAnterior = orden.estado;
   orden.estado = nuevoEstado;
-  if (window._useFirebase && window._firebaseDb) {
+  if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
-      const { updateDoc, doc } = window._firebaseModules;
-      await updateDoc(doc(window._firebaseDb, 'ordenes', id), { estado: nuevoEstado });
+      const { updateDoc } = window._firebaseModules;
+      await updateDoc(docOrden(id), { estado: nuevoEstado });
       toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
       return;
     } catch(e) {
@@ -2337,13 +2462,13 @@ function procesarRestaurarJSON(event) {
       renderAll();
       toast('✅ ' + nuevas.length + ' órdenes restauradas');
       // Si Firebase está activo, subir también para evitar que onSnapshot sobreescriba
-      if (window._useFirebase && window._firebaseDb) {
+      if (window._useFirebase && window._firebaseDb && window._uid) {
         try {
-          const { collection, addDoc, updateDoc, doc } = window._firebaseModules;
+          const { addDoc, updateDoc } = window._firebaseModules;
           for (const orden of nuevas) {
             const d = {...orden}; const id = d.id; delete d.id;
-            if (id) await updateDoc(doc(window._firebaseDb,'ordenes',id), d).catch(() => addDoc(collection(window._firebaseDb,'ordenes'), d));
-            else await addDoc(collection(window._firebaseDb,'ordenes'), d);
+            if (id) await updateDoc(docOrden(id), d).catch(() => addDoc(colOrdenes(), d));
+            else await addDoc(colOrdenes(), d);
           }
           toast('☁️ Respaldo sincronizado con Firebase');
         } catch(err) { toast('⚠️ Local OK — Firebase no disponible'); }
