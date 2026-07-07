@@ -376,6 +376,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="sidebar-item" id="si-cotizaciones" onclick="navTo('cotizaciones')">
     <span class="si-icon">📄</span><span class="si-label">Cotizar</span>
   </button>
+  <button class="sidebar-item" id="si-clientes" onclick="navTo('clientes')">
+    <span class="si-icon">👤</span><span class="si-label">Clientes</span>
+  </button>
 
   <div class="sidebar-section-label">HERRAMIENTAS</div>
   <button class="sidebar-item" onclick="exportarExcel()">
@@ -429,6 +432,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="tab-btn" onclick="showTab('ordenes',this)">📋 Órdenes</button>
   <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
   <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
+  <button class="tab-btn" onclick="showTab('clientes',this)">👤 Clientes</button>
 </nav>
 
 <!-- BANNER DÍA 30 -->
@@ -481,8 +485,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <div id="cot-form-wrapper"></div>
 </div>
 
+<!-- CLIENTES (CRM) -->
+<div class="view" id="tab-clientes">
+  <input class="search-box" type="text" id="cliente-search-input" placeholder="🔍 Buscar por nombre o teléfono..." oninput="renderClientes()">
+  <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="abrirModalCliente()">+ Nuevo cliente</button>
+  <div id="clientes-lista"></div>
+</div>
+
 <!-- FAB -->
 <button class="fab" onclick="abrirModalNueva()">+</button>
+
+<!-- MODAL CLIENTE -->
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-cliente-title">Nuevo cliente</div>
+      <button class="modal-close" onclick="cerrarModalCliente()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-cliente-body"></div>
+  </div>
+</div>
 
 <!-- MODAL ORDEN -->
 <div class="modal-overlay" id="modal-orden">
@@ -595,14 +617,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 // ESTADO
 // ═══════════════════════════════════════
 let ordenes = [];
+let clientes = [];
 let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
+let editandoClienteId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
+let clientesListenerStarted = false;
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 
@@ -620,6 +645,14 @@ function docOrden(id) {
 function colExportLogs() {
   const { collection } = window._firebaseModules;
   return collection(window._firebaseDb, 'usuarios', window._uid, 'export_logs');
+}
+function colClientes() {
+  const { collection } = window._firebaseModules;
+  return collection(window._firebaseDb, 'usuarios', window._uid, 'clientes');
+}
+function docCliente(id) {
+  const { doc } = window._firebaseModules;
+  return doc(window._firebaseDb, 'usuarios', window._uid, 'clientes', id);
 }
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
@@ -722,6 +755,7 @@ function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function renderAll(){
   renderDashboard(); renderOrdenes(); updateSidebarStatus();
+  if (document.getElementById('tab-clientes')?.classList.contains('active')) renderClientes();
   if (!_autoExportChecked && ordenes.length > 0) {
     _autoExportChecked = true;
     setTimeout(intentarAutoExportM365, 800);
@@ -964,6 +998,115 @@ async function eliminarOrden(id) {
 }
 
 // ═══════════════════════════════════════
+// CRM — CLIENTES (usuarios/{uid}/clientes)
+// ═══════════════════════════════════════
+async function cargarClientesLocal() {
+  try {
+    const data = localStorage.getItem('alarmas_clientes');
+    clientes = data ? JSON.parse(data) : [];
+  } catch(e) { clientes = []; }
+  renderClientes();
+}
+
+function guardarClientesLocal() {
+  try { localStorage.setItem('alarmas_clientes', JSON.stringify(clientes)); } catch(e) {}
+}
+
+async function cargarClientes() {
+  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
+    try {
+      const { onSnapshot, orderBy, query } = window._firebaseModules;
+      const q = query(colClientes(), orderBy('nombre_lower','asc'));
+      if (!clientesListenerStarted) {
+        clientesListenerStarted = true;
+        onSnapshot(q, snap => {
+          clientes = snap.docs.map(d=>({id:d.id,...d.data()}));
+          renderClientes();
+        }, err => {
+          console.error(err);
+          clientesListenerStarted = false;
+          cargarClientesLocal();
+        });
+      }
+      return;
+    } catch(e) { console.error(e); }
+  }
+  cargarClientesLocal();
+}
+
+async function guardarCliente(cliente) {
+  const data = {...cliente};
+  data.nombre_lower = (data.nombre||'').trim().toLowerCase();
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { addDoc, updateDoc } = window._firebaseModules;
+      if (data.id) {
+        const id = data.id; delete data.id;
+        await updateDoc(docCliente(id), data);
+        return id;
+      } else {
+        const ref = await addDoc(colClientes(), data);
+        return ref.id;
+      }
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ No se pudo guardar el cliente en Firebase');
+      return null;
+    }
+  }
+  if (data.id) {
+    const idx = clientes.findIndex(c=>c.id===data.id);
+    if (idx>=0) clientes[idx] = data;
+  } else {
+    data.id = 'local_cli_'+Date.now();
+    clientes.unshift(data);
+  }
+  guardarClientesLocal();
+  renderClientes();
+  return data.id;
+}
+
+async function eliminarCliente(id) {
+  const ok = await confirmarAccion('Eliminar cliente', '¿Eliminar este cliente? Sus órdenes no se borran, mantienen su historial.', '🗑️', 'Eliminar');
+  if (!ok) return;
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { deleteDoc } = window._firebaseModules;
+      await deleteDoc(docCliente(id));
+      toast('Cliente eliminado');
+      cerrarModalCliente();
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Error al eliminar: ' + (e.message || e));
+      return;
+    }
+  }
+  clientes = clientes.filter(c => c.id !== id);
+  guardarClientesLocal();
+  renderClientes();
+  toast('Cliente eliminado');
+  cerrarModalCliente();
+}
+
+// Vincula (o crea) el cliente dueño de una orden, buscando por teléfono y luego por nombre.
+async function resolverClienteId(nombre, telefono) {
+  const nombreN = (nombre||'').trim();
+  const telN = (telefono||'').replace(/\D/g,'');
+  if (!nombreN) return null;
+  let match = null;
+  if (telN.length >= 8) match = clientes.find(c => (c.telefono||'').replace(/\D/g,'') === telN);
+  if (!match) match = clientes.find(c => (c.nombre||'').trim().toLowerCase() === nombreN.toLowerCase());
+  if (match) {
+    if (telefono && !match.telefono) {
+      await guardarCliente({ id: match.id, nombre: match.nombre, telefono, email: match.email||'', notas: match.notas||'', fecha_creacion: match.fecha_creacion||Date.now() });
+    }
+    return match.id;
+  }
+  return await guardarCliente({ nombre: nombreN, telefono: telefono||'', email: '', notas: '', fecha_creacion: Date.now() });
+}
+
+// ═══════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════
 function showTab(id, btn) {
@@ -983,6 +1126,7 @@ function showTab(id, btn) {
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
   }
+  if (id==='clientes') renderClientes();
 }
 
 // ═══════════════════════════════════════
@@ -1147,6 +1291,132 @@ function ordenCard(o) {
 function toggleOrden(id){ document.getElementById('body-'+id).classList.toggle('open'); }
 
 // ═══════════════════════════════════════
+// CRM — RENDER CLIENTES
+// ═══════════════════════════════════════
+function ordenesDeCliente(c) {
+  return ordenes.filter(o => (c.id && o.cliente_id === c.id) || (!o.cliente_id && (o.cliente||'').trim().toLowerCase() === (c.nombre||'').trim().toLowerCase()));
+}
+
+function statsCliente(c) {
+  const ords = ordenesDeCliente(c);
+  const total = ords.reduce((s,o)=>s+(o.total||0),0);
+  const saldo = ords.filter(o=>['PENDIENTE','EN_PROCESO'].includes((o.estado||'').toUpperCase()))
+    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  return { count: ords.length, total, saldo, ordenes: ords };
+}
+
+function filtrarClientes() {
+  const q = (document.getElementById('cliente-search-input')?.value||'').toLowerCase();
+  if (!q) return clientes;
+  return clientes.filter(c => (c.nombre||'').toLowerCase().includes(q) || (c.telefono||'').includes(q));
+}
+
+function renderClientes() {
+  const cont = document.getElementById('clientes-lista');
+  if (!cont) return;
+  const lista = filtrarClientes();
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-icon">👤</div><div class="empty-text">'
+      + (clientes.length ? 'Sin resultados' : 'Aún no tienes clientes — se crean solos al guardar una orden, o agrega uno manual')
+      + '</div></div>';
+    return;
+  }
+  cont.innerHTML = lista.map(c => clienteCard(c)).join('');
+}
+
+function clienteCard(c) {
+  const { count, total, saldo } = statsCliente(c);
+  return `<div class="orden-card" onclick="verClienteDetalle('${c.id}')">
+    <div class="orden-header">
+      <div><div class="orden-title">👤 ${esc(c.nombre||'—')}</div>
+      <div class="orden-sub">${esc(c.telefono||'sin teléfono')} · ${count} orden${count!==1?'es':''}</div></div>
+      ${saldo>0 ? `<span class="estado-badge pendiente">Debe ${fmt(saldo)}</span>` : `<span class="estado-badge pagado">Al corriente</span>`}
+    </div>
+  </div>`;
+}
+
+function abrirModalCliente(id) {
+  editandoClienteId = id || null;
+  const c = id ? clientes.find(x=>x.id===id) : null;
+  document.getElementById('modal-cliente-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+  document.getElementById('modal-cliente-body').innerHTML = buildClienteFormHTML(c);
+  document.getElementById('modal-cliente').classList.add('open');
+}
+
+function cerrarModalCliente() {
+  document.getElementById('modal-cliente').classList.remove('open');
+  document.getElementById('modal-cliente-body').innerHTML = '';
+  editandoClienteId = null;
+}
+
+function buildClienteFormHTML(c) {
+  const o = c || {};
+  return `
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Nombre *</label>
+      <input class="form-input" id="cl-nombre" placeholder="Nombre del cliente" value="${esc(o.nombre||'')}"></div>
+    <div class="form-group"><label class="form-label">Teléfono</label>
+      <input class="form-input" id="cl-telefono" type="tel" placeholder="871 231 8050" value="${esc(o.telefono||'')}"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label class="form-label">Email</label>
+      <input class="form-input" id="cl-email" type="email" placeholder="cliente@correo.com" value="${esc(o.email||'')}"></div>
+  </div>
+  <div class="form-row" style="margin-bottom:20px">
+    <div class="form-group"><label class="form-label">Notas</label>
+      <textarea class="form-textarea" id="cl-notas" rows="3" placeholder="Notas del cliente...">${esc(o.notas||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn btn-primary" style="flex:1" onclick="submitCliente()">💾 Guardar</button>
+    <button class="btn btn-ghost" onclick="cerrarModalCliente()">Cancelar</button>
+  </div>`;
+}
+
+async function submitCliente() {
+  const nombre = document.getElementById('cl-nombre')?.value?.trim();
+  if (!nombre) { toast('⚠️ El nombre es obligatorio'); return; }
+  const cliente = {
+    nombre,
+    telefono: document.getElementById('cl-telefono')?.value?.trim() || '',
+    email: document.getElementById('cl-email')?.value?.trim() || '',
+    notas: document.getElementById('cl-notas')?.value?.trim() || '',
+    fecha_creacion: Date.now()
+  };
+  if (editandoClienteId) cliente.id = editandoClienteId;
+  await guardarCliente(cliente);
+  toast('✅ Cliente guardado');
+  cerrarModalCliente();
+}
+
+function verClienteDetalle(id) {
+  const c = clientes.find(x=>x.id===id);
+  if (!c) return;
+  const { count, total, saldo, ordenes: ords } = statsCliente(c);
+  const telDigits = (c.telefono||'').replace(/\D/g,'');
+  const waHref = telDigits ? `https://wa.me/52${telDigits.replace(/^52/,'')}` : '';
+  document.getElementById('modal-cliente-title').textContent = c.nombre || 'Cliente';
+  document.getElementById('modal-cliente-body').innerHTML = `
+    <div class="dash-grid" style="margin-bottom:20px">
+      <div class="stat-card yellow"><div class="stat-label">Órdenes</div><div class="stat-value">${count}</div></div>
+      <div class="stat-card green"><div class="stat-label">Facturado</div><div class="stat-value">${fmt(total)}</div></div>
+      <div class="stat-card ${saldo>0?'red':'green'}"><div class="stat-label">Saldo</div><div class="stat-value">${fmt(saldo)}</div></div>
+    </div>
+    ${c.telefono ? `<div style="display:flex;gap:8px;margin-bottom:16px">
+      <a class="btn btn-ghost btn-sm" href="tel:${esc(c.telefono)}">📞 Llamar</a>
+      ${waHref?`<a class="btn btn-green btn-sm" href="${waHref}" target="_blank" rel="noopener">💬 WhatsApp</a>`:''}
+    </div>` : ''}
+    ${c.notas ? `<div class="nota-box" style="background:var(--surface2);border-left:3px solid var(--accent);padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px">${esc(c.notas)}</div>` : ''}
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalCliente('${c.id}')">✏️ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarCliente('${c.id}')">🗑️ Eliminar</button>
+    </div>
+    <div class="form-section">Historial de órdenes</div>
+    ${ords.length ? ords.map(o=>ordenCard(o)).join('') : '<div class="empty" style="padding:24px"><div class="empty-text">Sin órdenes aún</div></div>'}
+  `;
+  document.getElementById('modal-cliente').classList.add('open');
+}
+
+// ═══════════════════════════════════════
 // BOLETA
 // ═══════════════════════════════════════
 function verBoleta(id) {
@@ -1243,7 +1513,12 @@ function buildFormHTML(orden) {
     <div class="form-group"><label class="form-label">Vehículo *</label>
       <input class="form-input" id="f-vehiculo" placeholder="Ej: Chevrolet Beat" value="${esc(o.vehiculo||'')}"></div>
     <div class="form-group"><label class="form-label">Cliente *</label>
-      <input class="form-input" id="f-cliente" placeholder="Nombre del cliente" value="${esc(o.cliente||'')}"></div>
+      <input class="form-input" id="f-cliente" placeholder="Nombre del cliente" list="clientes-datalist" value="${esc(o.cliente||'')}"></div>
+  </div>
+  <datalist id="clientes-datalist">${clientes.map(c=>`<option value="${esc(c.nombre||'')}">`).join('')}</datalist>
+  <div class="form-row">
+    <div class="form-group"><label class="form-label">Teléfono (WhatsApp)</label>
+      <input class="form-input" id="f-telefono" type="tel" placeholder="871 231 8050" value="${esc(o.telefono||'')}"></div>
   </div>
   <div class="form-row cols-2">
     <div class="form-group"><label class="form-label">F. Instalación</label>
@@ -1373,11 +1648,13 @@ async function submitOrden() {
   if (!root) { toast('⚠️ Formulario no encontrado'); return; }
   const vehiculo = root.querySelector('#f-vehiculo')?.value?.trim();
   const cliente = root.querySelector('#f-cliente')?.value?.trim();
+  const telefono = root.querySelector('#f-telefono')?.value?.trim() || '';
   if (!vehiculo || !cliente) { toast('⚠️ Vehículo y cliente son obligatorios'); return; }
   const prods = leerProductos();
   if (!prods.length) { toast('⚠️ Agrega al menos un servicio'); return; }
+  const cliente_id = await resolverClienteId(cliente, telefono);
   const orden = {
-    vehiculo, cliente,
+    vehiculo, cliente, telefono, cliente_id,
     fecha_instalacion: root.querySelector('#f-fecha-inst')?.value || '',
     fecha_pago: root.querySelector('#f-fecha-pago')?.value || '',
     total: parseFloat(root.querySelector('#f-total')?.value) || 0,
@@ -1665,12 +1942,14 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();_confirmCancel();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();cerrarModalCliente();_confirmCancel();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
+document.getElementById('modal-cliente').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-cliente'))cerrarModalCliente(); });
 
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
+  cargarClientes();
   setTimeout(initOnboarding, 800);
   // Capturar resultado de loginRedirect de MSAL (iOS Safari)
   M365.getInstance().then(inst => {
@@ -1732,10 +2011,14 @@ window.addEventListener('authStateChanged', e => {
   if (user) {
     showApp();
     if (!_appInitialized) { _appInitialized = true; _runInitAppData(); }
-    else { fsListenerStarted = false; ordenes = []; cargarOrdenes(); }
+    else {
+      fsListenerStarted = false; ordenes = []; cargarOrdenes();
+      clientesListenerStarted = false; clientes = []; cargarClientes();
+    }
   } else {
     ordenes = []; fsListenerStarted = false;
-    renderAll();
+    clientes = []; clientesListenerStarted = false;
+    renderAll(); renderClientes();
     showAuthGate();
   }
 });
@@ -2325,7 +2608,7 @@ async function forzarActualizacion() {
 function navTo(tab) {
   closeSidebar();
   const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3 };
+  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3, clientes: 4 };
   showTab(tab, tabBtns[tabMap[tab]]);
   document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
   const si = document.getElementById('si-' + tab);
@@ -2336,7 +2619,10 @@ function updateSidebarStatus() {
   const status = document.getElementById('sb-user-status');
   const dot = document.getElementById('si-fb-dot');
   if (status) {
-    if (window._useFirebase) {
+    if (window._authUser) {
+      status.textContent = '● Conectado';
+      status.className = 'sb-user-status connected';
+    } else if (window._useFirebase) {
       status.textContent = '● Firebase';
       status.className = 'sb-user-status connected';
     } else {
