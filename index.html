@@ -379,6 +379,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="sidebar-item" id="si-clientes" onclick="navTo('clientes')">
     <span class="si-icon">👤</span><span class="si-label">Clientes</span>
   </button>
+  <button class="sidebar-item" id="si-agenda" onclick="navTo('agenda')">
+    <span class="si-icon">🗓️</span><span class="si-label">Agenda</span>
+    <span class="si-badge" id="si-agenda-badge" style="display:none">0</span>
+  </button>
 
   <div class="sidebar-section-label">HERRAMIENTAS</div>
   <button class="sidebar-item" onclick="exportarExcel()">
@@ -433,6 +437,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
   <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
   <button class="tab-btn" onclick="showTab('clientes',this)">👤 Clientes</button>
+  <button class="tab-btn" onclick="showTab('agenda',this)">🗓️ Agenda</button>
 </nav>
 
 <!-- BANNER DÍA 30 -->
@@ -492,6 +497,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <div id="clientes-lista"></div>
 </div>
 
+<!-- AGENDA (CITAS) -->
+<div class="view" id="tab-agenda">
+  <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="abrirModalCita()">+ Nueva cita</button>
+  <div id="agenda-lista"></div>
+</div>
+
 <!-- FAB -->
 <button class="fab" onclick="abrirModalNueva()">+</button>
 
@@ -503,6 +514,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <button class="modal-close" onclick="cerrarModalCliente()">✕</button>
     </div>
     <div class="modal-body" id="modal-cliente-body"></div>
+  </div>
+</div>
+
+<!-- MODAL CITA -->
+<div class="modal-overlay" id="modal-cita">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-cita-title">Nueva cita</div>
+      <button class="modal-close" onclick="cerrarModalCita()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-cita-body"></div>
   </div>
 </div>
 
@@ -618,18 +640,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 // ═══════════════════════════════════════
 let ordenes = [];
 let clientes = [];
+let citas = [];
 let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
 let editandoClienteId = null;
+let editandoCitaId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
 let clientesListenerStarted = false;
+let citasListenerStarted = false;
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
+const AGENDA_ESTADO_LABELS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
 
 // ═══════════════════════════════════════
 // RUTAS FIRESTORE — datos privados por usuario (usuarios/{uid}/...)
@@ -653,6 +679,14 @@ function colClientes() {
 function docCliente(id) {
   const { doc } = window._firebaseModules;
   return doc(window._firebaseDb, 'usuarios', window._uid, 'clientes', id);
+}
+function colCitas() {
+  const { collection } = window._firebaseModules;
+  return collection(window._firebaseDb, 'usuarios', window._uid, 'citas');
+}
+function docCita(id) {
+  const { doc } = window._firebaseModules;
+  return doc(window._firebaseDb, 'usuarios', window._uid, 'citas', id);
 }
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
@@ -756,6 +790,7 @@ function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg
 function renderAll(){
   renderDashboard(); renderOrdenes(); updateSidebarStatus();
   if (document.getElementById('tab-clientes')?.classList.contains('active')) renderClientes();
+  if (document.getElementById('tab-agenda')?.classList.contains('active')) renderAgenda();
   if (!_autoExportChecked && ordenes.length > 0) {
     _autoExportChecked = true;
     setTimeout(intentarAutoExportM365, 800);
@@ -1107,6 +1142,128 @@ async function resolverClienteId(nombre, telefono) {
 }
 
 // ═══════════════════════════════════════
+// AGENDA — CITAS (usuarios/{uid}/citas)
+// ═══════════════════════════════════════
+async function cargarCitasLocal() {
+  try {
+    const data = localStorage.getItem('alarmas_citas');
+    citas = data ? JSON.parse(data) : [];
+  } catch(e) { citas = []; }
+  renderAgenda();
+}
+
+function guardarCitasLocal() {
+  try { localStorage.setItem('alarmas_citas', JSON.stringify(citas)); } catch(e) {}
+}
+
+async function cargarCitas() {
+  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
+    try {
+      const { onSnapshot, orderBy, query } = window._firebaseModules;
+      const q = query(colCitas(), orderBy('fecha','asc'));
+      if (!citasListenerStarted) {
+        citasListenerStarted = true;
+        onSnapshot(q, snap => {
+          citas = snap.docs.map(d=>({id:d.id,...d.data()}));
+          renderAgenda();
+        }, err => {
+          console.error(err);
+          citasListenerStarted = false;
+          cargarCitasLocal();
+        });
+      }
+      return;
+    } catch(e) { console.error(e); }
+  }
+  cargarCitasLocal();
+}
+
+async function guardarCita(cita) {
+  const data = {...cita};
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { addDoc, updateDoc } = window._firebaseModules;
+      if (data.id) {
+        const id = data.id; delete data.id;
+        await updateDoc(docCita(id), data);
+        return id;
+      } else {
+        const ref = await addDoc(colCitas(), data);
+        return ref.id;
+      }
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ No se pudo guardar la cita en Firebase');
+      return null;
+    }
+  }
+  if (data.id) {
+    const idx = citas.findIndex(c=>c.id===data.id);
+    if (idx>=0) citas[idx] = data;
+  } else {
+    data.id = 'local_cita_'+Date.now();
+    citas.push(data);
+  }
+  guardarCitasLocal();
+  renderAgenda();
+  return data.id;
+}
+
+async function eliminarCita(id) {
+  const ok = await confirmarAccion('Eliminar cita', '¿Eliminar esta cita?', '🗑️', 'Eliminar');
+  if (!ok) return;
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { deleteDoc } = window._firebaseModules;
+      await deleteDoc(docCita(id));
+      toast('Cita eliminada');
+      cerrarModalCita();
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Error al eliminar: ' + (e.message || e));
+      return;
+    }
+  }
+  citas = citas.filter(c => c.id !== id);
+  guardarCitasLocal();
+  renderAgenda();
+  toast('Cita eliminada');
+  cerrarModalCita();
+}
+
+async function cambiarEstadoCita(id, estado) {
+  const cita = citas.find(c=>c.id===id);
+  if (!cita) return;
+  cita.estado = estado;
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { updateDoc } = window._firebaseModules;
+      await updateDoc(docCita(id), { estado });
+      toast('✅ Cita: ' + AGENDA_ESTADO_LABELS[estado]);
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Error al actualizar: ' + (e.message || e));
+      return;
+    }
+  }
+  guardarCitasLocal();
+  renderAgenda();
+  toast('✅ Cita: ' + AGENDA_ESTADO_LABELS[estado]);
+}
+
+// Construye el link "Agregar a Google Calendar" — no requiere OAuth ni configuración.
+function linkGoogleCalendar(cita) {
+  const inicio = new Date(cita.fecha + 'T' + (cita.hora||'09:00') + ':00');
+  const fin = new Date(inicio.getTime() + 60*60*1000);
+  const fmtUTC = d => d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+  const texto = encodeURIComponent('Cita: ' + (cita.cliente||'Cliente') + (cita.vehiculo?' — '+cita.vehiculo:''));
+  const detalles = encodeURIComponent((cita.tipo_servicio||'') + (cita.notas?'\n'+cita.notas:''));
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${texto}&dates=${fmtUTC(inicio)}/${fmtUTC(fin)}&details=${detalles}`;
+}
+
+// ═══════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════
 function showTab(id, btn) {
@@ -1127,6 +1284,7 @@ function showTab(id, btn) {
     setTimeout(recalcCot, 0);
   }
   if (id==='clientes') renderClientes();
+  if (id==='agenda') renderAgenda();
 }
 
 // ═══════════════════════════════════════
@@ -1414,6 +1572,128 @@ function verClienteDetalle(id) {
     ${ords.length ? ords.map(o=>ordenCard(o)).join('') : '<div class="empty" style="padding:24px"><div class="empty-text">Sin órdenes aún</div></div>'}
   `;
   document.getElementById('modal-cliente').classList.add('open');
+}
+
+// ═══════════════════════════════════════
+// AGENDA — RENDER CITAS
+// ═══════════════════════════════════════
+function fechaLabel(fechaStr) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const manana = new Date(hoy.getTime()+86400000);
+  const [y,m,d] = fechaStr.split('-').map(Number);
+  const fecha = new Date(y, m-1, d);
+  if (fecha.getTime() === hoy.getTime()) return 'Hoy';
+  if (fecha.getTime() === manana.getTime()) return 'Mañana';
+  return fecha.toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+}
+
+function renderAgenda() {
+  const cont = document.getElementById('agenda-lista');
+  if (!cont) return;
+  const pendientes = citas.filter(c => c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA').length;
+  const badge = document.getElementById('si-agenda-badge');
+  if (badge) { badge.textContent = pendientes; badge.style.display = pendientes>0 ? '' : 'none'; }
+
+  if (!citas.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-icon">🗓️</div><div class="empty-text">Aún no tienes citas agendadas</div></div>';
+    return;
+  }
+  const ordenadas = [...citas].sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const grupos = {};
+  ordenadas.forEach(c => { (grupos[c.fecha] = grupos[c.fecha]||[]).push(c); });
+  cont.innerHTML = Object.keys(grupos).map(fecha => `
+    <div class="cliente-group">
+      <div class="cliente-group-header" style="cursor:default">
+        <div class="cliente-group-name"><span class="icon">📅</span><span class="nombre">${fechaLabel(fecha)}</span></div>
+        <div class="cliente-group-stats"><span class="cg-badge count">${grupos[fecha].length}</span></div>
+      </div>
+      <div class="cliente-group-body">${grupos[fecha].map(c=>citaCard(c)).join('')}</div>
+    </div>`).join('');
+}
+
+function citaCard(c) {
+  const est = c.estado || 'AGENDADA';
+  const estColorClass = { AGENDADA:'pendiente', CONFIRMADA:'en_proceso', COMPLETADA:'pagado', CANCELADA:'termo' }[est] || 'pendiente';
+  return `<div class="orden-card">
+    <div class="orden-header">
+      <div><div class="orden-title">🕐 ${esc(c.hora||'--:--')} · ${esc(c.cliente||'—')}</div>
+      <div class="orden-sub">${esc(c.vehiculo||'')}${c.vehiculo&&c.tipo_servicio?' · ':''}${esc(c.tipo_servicio||'')}</div></div>
+      <span class="estado-badge ${estColorClass}">${AGENDA_ESTADO_LABELS[est]||est}</span>
+    </div>
+    <div class="orden-body open">
+      ${c.notas?`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">📌 ${esc(c.notas)}</div>`:''}
+      <div class="orden-actions">
+        <a class="btn btn-ghost btn-sm" href="${linkGoogleCalendar(c)}" target="_blank" rel="noopener">📅 Agregar a Google Calendar</a>
+        ${est!=='COMPLETADA'?`<button class="btn btn-green btn-sm" onclick="cambiarEstadoCita('${c.id}','COMPLETADA')">✅ Completada</button>`:''}
+        ${est!=='CANCELADA'?`<button class="btn btn-ghost btn-sm" onclick="cambiarEstadoCita('${c.id}','CANCELADA')">✕ Cancelar</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="abrirModalCita('${c.id}')">✏️ Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarCita('${c.id}')">🗑️ Borrar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function abrirModalCita(id) {
+  editandoCitaId = id || null;
+  const c = id ? citas.find(x=>x.id===id) : null;
+  document.getElementById('modal-cita-title').textContent = c ? 'Editar cita' : 'Nueva cita';
+  document.getElementById('modal-cita-body').innerHTML = buildCitaFormHTML(c);
+  document.getElementById('modal-cita').classList.add('open');
+}
+
+function cerrarModalCita() {
+  document.getElementById('modal-cita').classList.remove('open');
+  document.getElementById('modal-cita-body').innerHTML = '';
+  editandoCitaId = null;
+}
+
+function buildCitaFormHTML(c) {
+  const o = c || {};
+  const hoy = new Date().toISOString().split('T')[0];
+  return `
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Fecha *</label>
+      <input class="form-input" type="date" id="ci-fecha" value="${esc(o.fecha||hoy)}"></div>
+    <div class="form-group"><label class="form-label">Hora *</label>
+      <input class="form-input" type="time" id="ci-hora" value="${esc(o.hora||'09:00')}"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Cliente *</label>
+      <input class="form-input" id="ci-cliente" placeholder="Nombre del cliente" list="clientes-datalist-cita" value="${esc(o.cliente||'')}"></div>
+    <div class="form-group"><label class="form-label">Vehículo</label>
+      <input class="form-input" id="ci-vehiculo" placeholder="Ej: Chevrolet Beat" value="${esc(o.vehiculo||'')}"></div>
+  </div>
+  <datalist id="clientes-datalist-cita">${clientes.map(cl=>`<option value="${esc(cl.nombre||'')}">`).join('')}</datalist>
+  <div class="form-row">
+    <div class="form-group"><label class="form-label">Tipo de servicio</label>
+      <input class="form-input" id="ci-servicio" placeholder="Ej: Instalación de alarma" value="${esc(o.tipo_servicio||'')}"></div>
+  </div>
+  <div class="form-row" style="margin-bottom:20px">
+    <div class="form-group"><label class="form-label">Notas</label>
+      <input class="form-input" id="ci-notas" placeholder="Notas de la cita..." value="${esc(o.notas||'')}"></div>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn btn-primary" style="flex:1" onclick="submitCita()">💾 Guardar</button>
+    <button class="btn btn-ghost" onclick="cerrarModalCita()">Cancelar</button>
+  </div>`;
+}
+
+async function submitCita() {
+  const fecha = document.getElementById('ci-fecha')?.value;
+  const hora = document.getElementById('ci-hora')?.value;
+  const cliente = document.getElementById('ci-cliente')?.value?.trim();
+  if (!fecha || !hora || !cliente) { toast('⚠️ Fecha, hora y cliente son obligatorios'); return; }
+  const cita = {
+    fecha, hora, cliente,
+    vehiculo: document.getElementById('ci-vehiculo')?.value?.trim() || '',
+    tipo_servicio: document.getElementById('ci-servicio')?.value?.trim() || '',
+    notas: document.getElementById('ci-notas')?.value?.trim() || '',
+    estado: (editandoCitaId && citas.find(c=>c.id===editandoCitaId)?.estado) || 'AGENDADA'
+  };
+  if (editandoCitaId) cita.id = editandoCitaId;
+  await guardarCita(cita);
+  toast('✅ Cita guardada');
+  cerrarModalCita();
 }
 
 // ═══════════════════════════════════════
@@ -1942,14 +2222,16 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();cerrarModalCliente();_confirmCancel();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();cerrarModalCliente();cerrarModalCita();_confirmCancel();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 document.getElementById('modal-cliente').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-cliente'))cerrarModalCliente(); });
+document.getElementById('modal-cita').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-cita'))cerrarModalCita(); });
 
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   cargarClientes();
+  cargarCitas();
   setTimeout(initOnboarding, 800);
   // Capturar resultado de loginRedirect de MSAL (iOS Safari)
   M365.getInstance().then(inst => {
@@ -2014,11 +2296,13 @@ window.addEventListener('authStateChanged', e => {
     else {
       fsListenerStarted = false; ordenes = []; cargarOrdenes();
       clientesListenerStarted = false; clientes = []; cargarClientes();
+      citasListenerStarted = false; citas = []; cargarCitas();
     }
   } else {
     ordenes = []; fsListenerStarted = false;
     clientes = []; clientesListenerStarted = false;
-    renderAll(); renderClientes();
+    citas = []; citasListenerStarted = false;
+    renderAll(); renderClientes(); renderAgenda();
     showAuthGate();
   }
 });
@@ -2608,7 +2892,7 @@ async function forzarActualizacion() {
 function navTo(tab) {
   closeSidebar();
   const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3, clientes: 4 };
+  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3, clientes: 4, agenda: 5 };
   showTab(tab, tabBtns[tabMap[tab]]);
   document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
   const si = document.getElementById('si-' + tab);
