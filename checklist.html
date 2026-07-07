@@ -23,7 +23,7 @@
     onSnapshot, setDoc, deleteDoc,
     query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
@@ -44,13 +44,9 @@
     window._fs = { collection, doc, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp };
     window._fbReady = true;
     window._loginGoogle = async () => {
-      try { await signInWithRedirect(auth, provider); }
+      try { await signInWithPopup(auth, provider); }
       catch(e) { console.error(e); window.dispatchEvent(new CustomEvent('authError', { detail: e })); }
     };
-    getRedirectResult(auth).catch(e => {
-      console.error(e);
-      window.dispatchEvent(new CustomEvent('authError', { detail: e }));
-    });
     window._logoutGoogle = () => signOut(auth);
     onAuthStateChanged(auth, user => {
       window._uid = user ? user.uid : null;
