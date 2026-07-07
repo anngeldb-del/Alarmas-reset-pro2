@@ -12,8 +12,9 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
   // ══════════════════════════════════════════════════
   // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
   // ══════════════════════════════════════════════════
@@ -26,6 +27,10 @@
     appId: "1:1096561116547:web:b13df05c092785723aa2b6",
     measurementId: "G-TJD208HVFB"
   };
+  // 🔔 NOTIFICACIONES PUSH — genera esta clave en:
+  // Firebase Console → Configuración del proyecto → Cloud Messaging →
+  // "Certificados push web" → Generar par de claves. Pega aquí la clave pública.
+  const VAPID_KEY = 'PEGA_AQUI_TU_VAPID_KEY';
   const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
     && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
   window._useFirebase = false;
@@ -38,7 +43,7 @@
       const auth = getAuth(app);
       const provider = new GoogleAuthProvider();
       window._firebaseDb = db;
-      window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query };
+      window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query };
       window._useFirebase = true;
       window._authModules = { signInWithPopup, signOut };
       window._loginGoogle = async () => {
@@ -51,6 +56,29 @@
         window._authUser = user;
         window.dispatchEvent(new CustomEvent('authStateChanged', { detail: user }));
       });
+
+      // 🔔 Notificaciones push (FCM) — requiere VAPID_KEY configurada arriba.
+      window._activarNotificaciones = async () => {
+        if (!(await isSupported().catch(()=>false))) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Este navegador no soporta notificaciones push.' } })); return; }
+        if (String(VAPID_KEY).includes('PEGA_AQUI')) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Falta configurar la VAPID key (ver comentario en el código).' } })); return; }
+        if (!window._uid) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Inicia sesión primero.' } })); return; }
+        try {
+          const permiso = await Notification.requestPermission();
+          if (permiso !== 'granted') { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Permiso de notificaciones denegado.' } })); return; }
+          const reg = await navigator.serviceWorker.ready;
+          const messaging = getMessaging(app);
+          const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+          if (!token) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'No se pudo obtener el token de notificaciones.' } })); return; }
+          await setDoc(doc(db, 'usuarios', window._uid, 'fcm_tokens', token), { token, ua: navigator.userAgent, fecha: Date.now() });
+          onMessage(messaging, payload => {
+            window.dispatchEvent(new CustomEvent('pushForeground', { detail: payload }));
+          });
+          window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:true, msg:'✅ Notificaciones activadas' } }));
+        } catch(e) {
+          console.error(e);
+          window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Error: ' + e.message } }));
+        }
+      };
     } catch(e) {
       console.warn('Firebase no inicializado:', e);
       window._useFirebase = false;
@@ -397,6 +425,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </button>
   <button class="sidebar-item" onclick="restaurarJSON()">
     <span class="si-icon">📤</span><span class="si-label">Restaurar JSON</span>
+  </button>
+  <button class="sidebar-item" onclick="activarNotificaciones()">
+    <span class="si-icon">🔔</span><span class="si-label">Notificaciones</span>
+    <span id="si-push-dot" style="font-size:10px;color:var(--muted)">●</span>
   </button>
 
   <div class="sidebar-section-label">CONFIG</div>
@@ -2310,6 +2342,33 @@ window.addEventListener('authError', () => {
   const err = document.getElementById('auth-err');
   if (err) err.style.display = 'block';
 });
+
+// ═══════════════════════════════════════
+// NOTIFICACIONES PUSH (FCM)
+// ═══════════════════════════════════════
+function activarNotificaciones() {
+  closeSidebar();
+  if (!window._activarNotificaciones) { toast('⚠️ Firebase no disponible'); return; }
+  toast('⏳ Activando notificaciones...');
+  window._activarNotificaciones();
+}
+function updatePushDot() {
+  const dot = document.getElementById('si-push-dot');
+  if (!dot) return;
+  const activo = typeof Notification !== 'undefined' && Notification.permission === 'granted' && localStorage.getItem('push_activado') === '1';
+  dot.style.color = activo ? 'var(--green)' : 'var(--muted)';
+}
+window.addEventListener('pushResult', e => {
+  const { ok, msg } = e.detail;
+  toast(msg);
+  if (ok) localStorage.setItem('push_activado', '1');
+  updatePushDot();
+});
+window.addEventListener('pushForeground', e => {
+  const n = e.detail?.notification;
+  if (n) toast('🔔 ' + (n.title||'') + (n.body?' — '+n.body:''));
+});
+document.addEventListener('DOMContentLoaded', updatePushDot);
 window.addEventListener('firebaseReady', () => {
   if (!window._useFirebase) {
     // Firebase no configurado — modo local sin login

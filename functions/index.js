@@ -36,6 +36,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+const { getMessaging } = require('firebase-admin/messaging');
 const { ClientSecretCredential } = require('@azure/identity');
 const { Client } = require('@microsoft/microsoft-graph-client');
 const { TokenCredentialAuthenticationProvider } = require('@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials');
@@ -423,3 +424,101 @@ async function uploadToOneDrive(buffer, filename) {
 
   return response.webUrl || '';
 }
+
+// ════════════════════════════════════════════════════════
+// NOTIFICACIONES PUSH — cobros vencidos y garantías por vencer
+// ════════════════════════════════════════════════════════
+// Requiere que el usuario active las notificaciones en la app (botón
+// "🔔 Notificaciones" del menú), lo que registra su token en
+// usuarios/{uid}/fcm_tokens. No necesita secrets adicionales: usa las
+// mismas credenciales de Admin SDK que el resto de este archivo.
+const GARANTIA_MESES = { 'GARANTIA 6 MESES': 6, 'GARANTIA 1 AÑO': 12 };
+const DIAS_AVISO_GARANTIA = 7;   // avisar cuando falten <= N días para vencer
+const DIAS_AVISO_COBRO = 15;     // avisar si el saldo lleva pendiente >= N días
+
+function sumarMeses(fechaStr, meses) {
+  const d = new Date(fechaStr + 'T00:00:00Z');
+  d.setUTCMonth(d.getUTCMonth() + meses);
+  return d;
+}
+
+exports.notificarPendientes = onSchedule({
+  schedule: '0 9 * * *', // todos los días a las 9:00 AM
+  timeZone: 'America/Monterrey'
+}, async () => {
+  const db = getFirestore();
+  const hoy = new Date();
+
+  // Agrupar las órdenes de todos los negocios por uid dueño (usuarios/{uid}/ordenes/...)
+  const ordenesSnap = await db.collectionGroup('ordenes').get();
+  const porUsuario = {};
+  ordenesSnap.forEach(doc => {
+    const uid = doc.ref.parent.parent.id;
+    (porUsuario[uid] = porUsuario[uid] || []).push({ id: doc.id, ...doc.data() });
+  });
+
+  for (const uid of Object.keys(porUsuario)) {
+    const ordenes = porUsuario[uid];
+    const avisos = [];
+
+    // Cobros pendientes con más de DIAS_AVISO_COBRO días de antigüedad
+    const pendientes = ordenes.filter(o => {
+      if (!['PENDIENTE', 'EN_PROCESO'].includes((o.estado || '').toUpperCase())) return false;
+      const saldo = (o.total || 0) - (o.a_cuenta_total || 0);
+      if (saldo <= 0 || !o.fecha_instalacion) return false;
+      const dias = (hoy - new Date(o.fecha_instalacion + 'T00:00:00Z')) / 86400000;
+      return dias >= DIAS_AVISO_COBRO;
+    });
+    if (pendientes.length) {
+      const totalPend = pendientes.reduce((s, o) => s + (o.total || 0) - (o.a_cuenta_total || 0), 0);
+      avisos.push({
+        title: `💰 ${pendientes.length} cobro(s) pendiente(s)`,
+        body: `${pendientes.slice(0, 3).map(o => o.cliente || 'Cliente').join(', ')} — por cobrar: $${totalPend.toLocaleString('es-MX')}`
+      });
+    }
+
+    // Garantías próximas a vencer
+    const garantiasPorVencer = [];
+    ordenes.forEach(o => {
+      (o.productos || []).forEach(p => {
+        const meses = GARANTIA_MESES[p.garantia];
+        if (!meses || !o.fecha_instalacion) return;
+        const vencimiento = sumarMeses(o.fecha_instalacion, meses);
+        const diasParaVencer = (vencimiento - hoy) / 86400000;
+        if (diasParaVencer >= 0 && diasParaVencer <= DIAS_AVISO_GARANTIA) {
+          garantiasPorVencer.push({ cliente: o.cliente || 'Cliente', dias: Math.ceil(diasParaVencer) });
+        }
+      });
+    });
+    if (garantiasPorVencer.length) {
+      avisos.push({
+        title: `🛡️ ${garantiasPorVencer.length} garantía(s) por vencer`,
+        body: garantiasPorVencer.slice(0, 3).map(g => `${g.cliente} (${g.dias}d)`).join(', ')
+      });
+    }
+
+    if (!avisos.length) continue;
+
+    const tokensSnap = await db.collection('usuarios').doc(uid).collection('fcm_tokens').get();
+    if (tokensSnap.empty) continue;
+    const tokens = tokensSnap.docs.map(d => d.id);
+
+    for (const aviso of avisos) {
+      try {
+        const resp = await getMessaging().sendEachForMulticast({
+          tokens,
+          notification: { title: aviso.title, body: aviso.body },
+          webpush: { fcmOptions: { link: '/' } }
+        });
+        resp.responses.forEach((r, i) => {
+          const code = r.error?.code;
+          if (!r.success && (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token')) {
+            db.collection('usuarios').doc(uid).collection('fcm_tokens').doc(tokens[i]).delete().catch(() => {});
+          }
+        });
+      } catch (e) {
+        console.error(`Error enviando push a uid ${uid}:`, e.message);
+      }
+    }
+  }
+});
