@@ -1840,8 +1840,12 @@ function verBoleta(id) {
 function verEstadoCuenta(clienteId) {
   const c = clientes.find(x=>x.id===clienteId);
   if (!c) return;
-  const ords = ordenesDeCliente(c).slice().sort((a,b)=>(a.fecha_instalacion||'').localeCompare(b.fecha_instalacion||''));
-  if (!ords.length) { toast('⚠️ Este cliente no tiene órdenes registradas'); return; }
+  // Solo se incluyen las órdenes con saldo pendiente — el estado de cuenta
+  // que se le manda al cliente no debe mostrarle lo que ya pagó.
+  const ords = ordenesDeCliente(c)
+    .filter(o => (o.total||0) - (o.a_cuenta_total||0) > 0)
+    .sort((a,b)=>(a.fecha_instalacion||'').localeCompare(b.fecha_instalacion||''));
+  if (!ords.length) { toast('✅ Este cliente no tiene saldo pendiente'); return; }
 
   const folio = 'EC-' + new Date().getFullYear() + '-' + String(c.id||'').replace(/[^a-zA-Z0-9]/g,'').slice(-4).toUpperCase();
   const hoy = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
@@ -1863,16 +1867,14 @@ function verEstadoCuenta(clienteId) {
       + '</tr>';
   }).join('');
 
-  const notaFinal = saldoTotal > 0
-    ? '<div class="nota-box">Agradecemos su preferencia. Le recordamos amablemente que tiene un saldo pendiente de <strong>'+fmt(saldoTotal)+'</strong>. Quedamos a sus órdenes para coordinar el pago.</div>'
-    : '<div class="nota-box" style="border-left-color:#06d6a0">✅ No tiene saldo pendiente — su cuenta está al corriente. ¡Gracias por su preferencia!</div>';
+  const notaFinal = '<div class="nota-box">Agradecemos su preferencia. Le recordamos amablemente que tiene un saldo pendiente de <strong>'+fmt(saldoTotal)+'</strong>. Quedamos a sus órdenes para coordinar el pago.</div>';
 
   const bodyHTML =
     headerEmpresa('ESTADO DE CUENTA', folio, hoy)
     + '<div class="info-grid">'
     +   '<div><div class="info-label">Cliente</div><div class="info-val">'+esc(c.nombre||'—')+'</div></div>'
     +   '<div><div class="info-label">Teléfono</div><div class="info-val">'+esc(c.telefono||'—')+'</div></div>'
-    +   '<div><div class="info-label">Órdenes incluidas</div><div class="info-val">'+ords.length+'</div></div>'
+    +   '<div><div class="info-label">Órdenes con saldo pendiente</div><div class="info-val">'+ords.length+'</div></div>'
     +   '<div><div class="info-label">Periodo</div><div class="info-val">'+esc(ords[0].fecha_instalacion||'—')+' a '+esc(ords[ords.length-1].fecha_instalacion||'—')+'</div></div>'
     + '</div>'
     + '<table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Servicio(s)</th><th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo</th></tr></thead><tbody>'
@@ -1881,7 +1883,7 @@ function verEstadoCuenta(clienteId) {
     + '<div style="display:flex;justify-content:flex-end"><div class="totales" style="width:280px">'
     +   '<div class="total-row"><span>Total facturado</span><span>'+fmt(totalFacturado)+'</span></div>'
     +   '<div class="total-row verde"><span>Total abonado</span><span>'+fmt(totalAbonado)+'</span></div>'
-    +   '<div class="total-row main '+(saldoTotal>0?'rojo':'verde')+'"><span>SALDO A PAGAR</span><span>'+fmt(saldoTotal)+'</span></div>'
+    +   '<div class="total-row main rojo"><span>SALDO A PAGAR</span><span>'+fmt(saldoTotal)+'</span></div>'
     + '</div></div>'
     + notaFinal
     + '<div class="footer">'+EMPRESA.nombre+' · '+EMPRESA.subtitulo+' · '+EMPRESA.tel+'<br>Este documento es un resumen informativo de su cuenta con nosotros</div>';
