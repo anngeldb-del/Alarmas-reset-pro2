@@ -2160,6 +2160,7 @@ function initLocal() {
   initFinances();
 }
 
+let _unsubServices = null, _unsubFinanzas = null, _unsubCustomItems = null;
 function initFirebase() {
   if (!window._fbReady || !window._db || !window._uid) { initLocal(); return; }
   const { collection, doc, onSnapshot, query, orderBy } = window._fs;
@@ -2184,7 +2185,7 @@ function initFirebase() {
   }
 
   // Listener — categorías de servicios
-  onSnapshot(
+  _unsubServices = onSnapshot(
     query(colServices, orderBy('createdAt', 'asc')),
     snap => {
       _servicesCache = snap.docs.map(d => d.data());
@@ -2204,7 +2205,7 @@ function initFirebase() {
   );
 
   // Listener — finanzas (sync bidireccional con merge inteligente)
-  onSnapshot(docFinanzas, snap => {
+  _unsubFinanzas = onSnapshot(docFinanzas, snap => {
     if (!snap.exists()) {
       _syncFinToFirebase(); // primera vez: subir lo que hay local
       return;
@@ -2241,7 +2242,7 @@ function initFirebase() {
   }, err => console.warn('Firestore finanzas error:', err));
 
   // Listener — ítems personalizados
-  onSnapshot(
+  _unsubCustomItems = onSnapshot(
     query(colCustomItems, orderBy('createdAt', 'asc')),
     snap => {
       const fresh = {};
@@ -2295,12 +2296,20 @@ window.addEventListener('authError', e => {
 });
 
 let fbInitDone = false;
+function _detenerListenersFirebase() {
+  if (_unsubServices) { _unsubServices(); _unsubServices = null; }
+  if (_unsubFinanzas) { _unsubFinanzas(); _unsubFinanzas = null; }
+  if (_unsubCustomItems) { _unsubCustomItems(); _unsubCustomItems = null; }
+}
 window.addEventListener('authStateChanged', e => {
   const user = e.detail;
   if (user) {
     showApp();
     if (!fbInitDone) { fbInitDone = true; initFirebase(); }
+    else { _detenerListenersFirebase(); initFirebase(); }
   } else {
+    _detenerListenersFirebase();
+    fbInitDone = false;
     showAuthGate();
   }
 });

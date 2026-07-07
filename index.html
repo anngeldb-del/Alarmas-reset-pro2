@@ -685,6 +685,9 @@ let activeFormMount = null;
 let fsListenerStarted = false;
 let clientesListenerStarted = false;
 let citasListenerStarted = false;
+let _unsubOrdenes = null;
+let _unsubClientes = null;
+let _unsubCitas = null;
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 const AGENDA_ESTADO_LABELS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
@@ -967,11 +970,12 @@ async function cargarOrdenes() {
       const q = query(colOrdenes(), orderBy('fecha_creacion','desc'));
       if (!fsListenerStarted) {
         fsListenerStarted = true;
-        onSnapshot(q, snap => {
+        _unsubOrdenes = onSnapshot(q, snap => {
           ordenes = snap.docs.map(d=>({id:d.id,...d.data()}));
           renderAll();
         }, err => {
           console.error(err);
+          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
           toast('⚠️ Firestore no disponible — modo local');
           window._useFirebase = false;
           fsListenerStarted = false;
@@ -1086,11 +1090,12 @@ async function cargarClientes() {
       const q = query(colClientes(), orderBy('nombre_lower','asc'));
       if (!clientesListenerStarted) {
         clientesListenerStarted = true;
-        onSnapshot(q, snap => {
+        _unsubClientes = onSnapshot(q, snap => {
           clientes = snap.docs.map(d=>({id:d.id,...d.data()}));
           renderClientes();
         }, err => {
           console.error(err);
+          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
           clientesListenerStarted = false;
           cargarClientesLocal();
         });
@@ -1161,15 +1166,13 @@ async function resolverClienteId(nombre, telefono) {
   const nombreN = (nombre||'').trim();
   const telN = (telefono||'').replace(/\D/g,'');
   if (!nombreN) return null;
+  // Solo se empareja por teléfono (identificador confiable). El nombre por sí
+  // solo NO se usa para emparejar: dos clientes distintos pueden compartir
+  // nombre, y fusionarlos por coincidencia de texto mezclaría su historial y
+  // saldo sin que nadie lo note. Sin teléfono, siempre se crea un cliente nuevo.
   let match = null;
   if (telN.length >= 8) match = clientes.find(c => (c.telefono||'').replace(/\D/g,'') === telN);
-  if (!match) match = clientes.find(c => (c.nombre||'').trim().toLowerCase() === nombreN.toLowerCase());
-  if (match) {
-    if (telefono && !match.telefono) {
-      await guardarCliente({ id: match.id, nombre: match.nombre, telefono, email: match.email||'', notas: match.notas||'', fecha_creacion: match.fecha_creacion||Date.now() });
-    }
-    return match.id;
-  }
+  if (match) return match.id;
   return await guardarCliente({ nombre: nombreN, telefono: telefono||'', email: '', notas: '', fecha_creacion: Date.now() });
 }
 
@@ -1195,11 +1198,12 @@ async function cargarCitas() {
       const q = query(colCitas(), orderBy('fecha','asc'));
       if (!citasListenerStarted) {
         citasListenerStarted = true;
-        onSnapshot(q, snap => {
+        _unsubCitas = onSnapshot(q, snap => {
           citas = snap.docs.map(d=>({id:d.id,...d.data()}));
           renderAgenda();
         }, err => {
           console.error(err);
+          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
           citasListenerStarted = false;
           cargarCitasLocal();
         });
@@ -2319,6 +2323,11 @@ function _runInitAppData() {
     initAppData();
   }
 }
+function _detenerListenersFirestore() {
+  if (_unsubOrdenes) { _unsubOrdenes(); _unsubOrdenes = null; }
+  if (_unsubClientes) { _unsubClientes(); _unsubClientes = null; }
+  if (_unsubCitas) { _unsubCitas(); _unsubCitas = null; }
+}
 window.addEventListener('authStateChanged', e => {
   const user = e.detail;
   updateUserUI(user);
@@ -2326,11 +2335,13 @@ window.addEventListener('authStateChanged', e => {
     showApp();
     if (!_appInitialized) { _appInitialized = true; _runInitAppData(); }
     else {
+      _detenerListenersFirestore();
       fsListenerStarted = false; ordenes = []; cargarOrdenes();
       clientesListenerStarted = false; clientes = []; cargarClientes();
       citasListenerStarted = false; citas = []; cargarCitas();
     }
   } else {
+    _detenerListenersFirestore();
     ordenes = []; fsListenerStarted = false;
     clientes = []; clientesListenerStarted = false;
     citas = []; citasListenerStarted = false;

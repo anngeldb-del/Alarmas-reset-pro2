@@ -100,7 +100,12 @@ exports.exportMensualM365 = onSchedule({
     const snapshot = await db.collectionGroup('ordenes')
       .orderBy('fecha_creacion', 'desc')
       .get();
-    const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Ignora documentos sueltos que hayan quedado en /ordenes de nivel raíz
+    // (colección antigua, previa a usuarios/{uid}/ordenes) — no tienen
+    // documento padre, así que d.ref.parent.parent sería null.
+    const ordenes = snapshot.docs
+      .filter(d => d.ref.parent.parent)
+      .map(d => ({ id: d.id, ...d.data() }));
     console.log(`${ordenes.length} órdenes encontradas.`);
 
     // 2. Construir archivo Excel
@@ -162,7 +167,9 @@ exports.exportManual = require('firebase-functions/v2/https').onRequest({
   try {
     const db = getFirestore();
     const snapshot = await db.collectionGroup('ordenes').orderBy('fecha_creacion', 'desc').get();
-    const ordenes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const ordenes = snapshot.docs
+      .filter(d => d.ref.parent.parent)
+      .map(d => ({ id: d.id, ...d.data() }));
     const mes = new Date().toISOString().slice(0, 7);
     const buffer = await buildExcel(ordenes, mes);
     const filename = `AlarmasReset-${mes}-manual.xlsx`;
@@ -453,6 +460,9 @@ exports.notificarPendientes = onSchedule({
   const ordenesSnap = await db.collectionGroup('ordenes').get();
   const porUsuario = {};
   ordenesSnap.forEach(doc => {
+    // Ignora documentos sueltos que hayan quedado en /ordenes de nivel raíz
+    // (no tienen documento padre, así que doc.ref.parent.parent es null).
+    if (!doc.ref.parent.parent) return;
     const uid = doc.ref.parent.parent.id;
     (porUsuario[uid] = porUsuario[uid] || []).push({ id: doc.id, ...doc.data() });
   });
