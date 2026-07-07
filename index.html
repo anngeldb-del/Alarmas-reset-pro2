@@ -525,7 +525,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- CLIENTES (CRM) -->
 <div class="view" id="tab-clientes">
   <input class="search-box" type="text" id="cliente-search-input" placeholder="🔍 Buscar por nombre o teléfono..." oninput="renderClientes()">
-  <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="abrirModalCliente()">+ Nuevo cliente</button>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary" style="flex:1" onclick="abrirModalCliente()">+ Nuevo cliente</button>
+    <button class="btn btn-ghost" onclick="fusionarClientesDuplicados()">🔧 Fusionar duplicados</button>
+  </div>
   <div id="clientes-lista"></div>
 </div>
 
@@ -1141,24 +1144,80 @@ async function guardarCliente(cliente) {
 async function eliminarCliente(id) {
   const ok = await confirmarAccion('Eliminar cliente', '¿Eliminar este cliente? Sus órdenes no se borran, mantienen su historial.', '🗑️', 'Eliminar');
   if (!ok) return;
+  const okBorrado = await _borrarClienteSilencioso(id);
+  if (okBorrado) toast('Cliente eliminado');
+  cerrarModalCliente();
+}
+
+// Borra un cliente sin pedir confirmación (para uso interno, p.ej. fusión de duplicados)
+async function _borrarClienteSilencioso(id) {
   if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
       const { deleteDoc } = window._firebaseModules;
       await deleteDoc(docCliente(id));
-      toast('Cliente eliminado');
-      cerrarModalCliente();
-      return;
+      return true;
     } catch(e) {
       console.error(e);
       toast('⚠️ Error al eliminar: ' + (e.message || e));
-      return;
+      return false;
     }
   }
   clientes = clientes.filter(c => c.id !== id);
   guardarClientesLocal();
   renderClientes();
-  toast('Cliente eliminado');
-  cerrarModalCliente();
+  return true;
+}
+
+// Detecta clientes con el mismo nombre (creados por el bug de duplicados) y los
+// fusiona en un solo registro, reasignando sus órdenes al cliente que quede.
+async function fusionarClientesDuplicados() {
+  const grupos = {};
+  clientes.forEach(c => {
+    const key = (c.nombre||'').trim().toLowerCase();
+    if (!key) return;
+    (grupos[key] = grupos[key] || []).push(c);
+  });
+  const gruposDuplicados = Object.values(grupos).filter(g => g.length > 1);
+  if (!gruposDuplicados.length) { toast('✅ No hay clientes duplicados'); return; }
+
+  const ok = await confirmarAccion(
+    'Fusionar duplicados',
+    `Se encontraron ${gruposDuplicados.length} nombre(s) con clientes repetidos. Se van a unir en un solo registro cada uno y sus órdenes se reasignan. Esta acción no se puede deshacer. ¿Continuar?`,
+    '🔧', 'Fusionar'
+  );
+  if (!ok) return;
+
+  let ordenesReasignadas = 0;
+  const { updateDoc } = window._firebaseModules || {};
+  for (const grupo of gruposDuplicados) {
+    // Cliente canónico: el que ya tenga teléfono capturado; si ninguno, el más antiguo
+    const conTelefono = grupo.find(c => c.telefono);
+    const canonico = conTelefono || grupo.slice().sort((a,b)=>(a.fecha_creacion||0)-(b.fecha_creacion||0))[0];
+    let telefono = canonico.telefono || '';
+    let notas = canonico.notas || '';
+
+    for (const dup of grupo) {
+      if (dup.id === canonico.id) continue;
+      if (!telefono && dup.telefono) telefono = dup.telefono;
+      if (dup.notas && !notas.includes(dup.notas)) notas = notas ? notas + ' / ' + dup.notas : dup.notas;
+
+      const ordsDelDup = ordenes.filter(o => o.cliente_id === dup.id);
+      for (const o of ordsDelDup) {
+        if (window._useFirebase && window._firebaseDb && window._uid && updateDoc) {
+          try { await updateDoc(docOrden(o.id), { cliente_id: canonico.id }); }
+          catch(e) { console.error(e); }
+        } else {
+          o.cliente_id = canonico.id;
+        }
+        ordenesReasignadas++;
+      }
+      await _borrarClienteSilencioso(dup.id);
+    }
+    await guardarCliente({ id: canonico.id, nombre: canonico.nombre, telefono, email: canonico.email||'', notas, fecha_creacion: canonico.fecha_creacion||Date.now() });
+  }
+  if (!window._useFirebase) { guardarLocal(); }
+  renderAll(); renderClientes();
+  toast(`✅ Fusionados ${gruposDuplicados.length} grupo(s) — ${ordenesReasignadas} orden(es) reasignada(s)`);
 }
 
 // Vincula (o crea) el cliente dueño de una orden, buscando por teléfono y luego por nombre.
@@ -1166,12 +1225,14 @@ async function resolverClienteId(nombre, telefono) {
   const nombreN = (nombre||'').trim();
   const telN = (telefono||'').replace(/\D/g,'');
   if (!nombreN) return null;
-  // Solo se empareja por teléfono (identificador confiable). El nombre por sí
-  // solo NO se usa para emparejar: dos clientes distintos pueden compartir
-  // nombre, y fusionarlos por coincidencia de texto mezclaría su historial y
-  // saldo sin que nadie lo note. Sin teléfono, siempre se crea un cliente nuevo.
+  // Primero por teléfono (más confiable), y si no hay coincidencia, por
+  // nombre exacto — sin esto, un mismo cliente sin teléfono capturado
+  // genera un cliente nuevo en cada orden. Ya no se sobreescribe el
+  // teléfono del cliente encontrado (eso sí podía mezclar datos si el
+  // match era por nombre y resultaba ser otra persona).
   let match = null;
   if (telN.length >= 8) match = clientes.find(c => (c.telefono||'').replace(/\D/g,'') === telN);
+  if (!match) match = clientes.find(c => (c.nombre||'').trim().toLowerCase() === nombreN.toLowerCase());
   if (match) return match.id;
   return await guardarCliente({ nombre: nombreN, telefono: telefono||'', email: '', notas: '', fecha_creacion: Date.now() });
 }
