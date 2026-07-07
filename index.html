@@ -1840,10 +1840,12 @@ function verBoleta(id) {
 function verEstadoCuenta(clienteId) {
   const c = clientes.find(x=>x.id===clienteId);
   if (!c) return;
-  // Solo se incluyen las órdenes con saldo pendiente — el estado de cuenta
-  // que se le manda al cliente no debe mostrarle lo que ya pagó.
+  // Solo se incluyen las órdenes pendientes/en proceso — misma regla que usa
+  // el resto de la app (statsCliente, dashboard) para decidir qué se "debe".
+  // No basta con total-abonado>0: una orden marcada como Pagado o Termo no
+  // cuenta como pendiente aunque nunca se haya llenado el campo "A cuenta".
   const ords = ordenesDeCliente(c)
-    .filter(o => (o.total||0) - (o.a_cuenta_total||0) > 0)
+    .filter(o => ['PENDIENTE','EN_PROCESO'].includes((o.estado||'').toUpperCase()))
     .sort((a,b)=>(a.fecha_instalacion||'').localeCompare(b.fecha_instalacion||''));
   if (!ords.length) { toast('✅ Este cliente no tiene saldo pendiente'); return; }
 
