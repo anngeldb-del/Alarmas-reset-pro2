@@ -2338,9 +2338,13 @@ window.addEventListener('authStateChanged', e => {
     showAuthGate();
   }
 });
-window.addEventListener('authError', () => {
+window.addEventListener('authError', e => {
   const err = document.getElementById('auth-err');
-  if (err) err.style.display = 'block';
+  if (err) {
+    const detalle = e.detail?.code || e.detail?.message || '';
+    err.textContent = 'No se pudo iniciar sesión' + (detalle ? ': ' + detalle : '. Intenta de nuevo.');
+    err.style.display = 'block';
+  }
 });
 
 // ═══════════════════════════════════════
