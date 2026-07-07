@@ -13,7 +13,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
   // ══════════════════════════════════════════════════
   // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
@@ -45,11 +45,17 @@
       window._firebaseDb = db;
       window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query };
       window._useFirebase = true;
-      window._authModules = { signInWithPopup, signOut };
+      window._authModules = { signInWithRedirect, signOut };
       window._loginGoogle = async () => {
-        try { await signInWithPopup(auth, provider); }
+        try { await signInWithRedirect(auth, provider); }
         catch(e) { console.error(e); window.dispatchEvent(new CustomEvent('authError', { detail: e })); }
       };
+      // Al volver del login por redirección, revisa si hubo error
+      // (si fue exitoso, onAuthStateChanged ya se encarga de todo).
+      getRedirectResult(auth).catch(e => {
+        console.error(e);
+        window.dispatchEvent(new CustomEvent('authError', { detail: e }));
+      });
       window._logoutGoogle = () => signOut(auth);
       onAuthStateChanged(auth, user => {
         window._uid = user ? user.uid : null;
