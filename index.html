@@ -45,6 +45,9 @@
       window._firebaseDb = db;
       window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query };
       window._useFirebase = true;
+      // Sin login: todos los dispositivos comparten la misma ruta de datos,
+      // protegida solo por reglas de Firestore abiertas (ver README)
+      window._uid = 'compartido';
       window._authModules = { signInWithPopup, signInWithRedirect, signOut };
       // Recoge el resultado si venimos de vuelta de signInWithRedirect
       getRedirectResult(auth).catch(e => { console.error(e); window.dispatchEvent(new CustomEvent('authError', { detail: e })); });
@@ -2465,25 +2468,10 @@ function _detenerListenersFirestore() {
   if (_unsubCitas) { _unsubCitas(); _unsubCitas = null; }
 }
 window.addEventListener('authStateChanged', e => {
-  const user = e.detail;
-  updateUserUI(user);
-  if (user) {
-    showApp();
-    if (!_appInitialized) { _appInitialized = true; _runInitAppData(); }
-    else {
-      _detenerListenersFirestore();
-      fsListenerStarted = false; ordenes = []; cargarOrdenes();
-      clientesListenerStarted = false; clientes = []; cargarClientes();
-      citasListenerStarted = false; citas = []; cargarCitas();
-    }
-  } else {
-    _detenerListenersFirestore();
-    ordenes = []; fsListenerStarted = false;
-    clientes = []; clientesListenerStarted = false;
-    citas = []; citasListenerStarted = false;
-    renderAll(); renderClientes(); renderAgenda();
-    showAuthGate();
-  }
+  // El acceso a los datos ya no depende de haber iniciado sesión (ruta
+  // compartida abierta) — este listener solo actualiza el nombre/avatar
+  // si el usuario decide iniciar sesión con Google de forma opcional
+  updateUserUI(e.detail);
 });
 window.addEventListener('authError', e => {
   const err = document.getElementById('auth-err');
@@ -2521,17 +2509,14 @@ window.addEventListener('pushForeground', e => {
 });
 document.addEventListener('DOMContentLoaded', updatePushDot);
 window.addEventListener('firebaseReady', () => {
-  if (!window._useFirebase) {
-    // Firebase no configurado — modo local sin login
-    showApp();
-    _appInitialized = true;
-    _runInitAppData();
-  }
-  // Si Firebase sí está configurado, esperamos 'authStateChanged' para decidir.
+  // Con o sin Firebase configurado, la app arranca directo — ya no requiere
+  // iniciar sesión para ver/editar los datos (ruta compartida abierta)
+  showApp();
+  if (!_appInitialized) { _appInitialized = true; _runInitAppData(); }
 });
 document.addEventListener('DOMContentLoaded', () => {
-  // Espera 300ms para que Firebase/Auth se inicialicen; si no llega ninguna señal, corre en local
-  setTimeout(() => { if (!_appInitialized && !window._useFirebase) { showApp(); _appInitialized = true; initAppData(); } }, 300);
+  // Respaldo: si por algún motivo 'firebaseReady' no llegó en 300ms, arranca igual
+  setTimeout(() => { if (!_appInitialized) { showApp(); _appInitialized = true; initAppData(); } }, 300);
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();

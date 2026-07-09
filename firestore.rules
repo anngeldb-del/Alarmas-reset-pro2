@@ -1,10 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Colecciones antiguas (previas al login) — la migración ya se hizo,
-    // quedan completamente cerradas. No cambiar a "if request.auth != null":
-    // eso permite que CUALQUIER cuenta de Google lea el historial completo
-    // de clientes de este negocio, no solo el dueño.
+    // Colecciones antiguas (previas al login) — quedan completamente cerradas.
     match /ordenes/{document=**} {
       allow read, write: if false;
     }
@@ -17,10 +14,11 @@ service cloud.firestore {
     match /export_logs/{document=**} {
       allow read, write: if false;
     }
-    // Datos privados por usuario — solo el propietario autenticado
-    // (ordenes, checklist_services, checklist_custom_items, export_logs, finanzas, clientes, citas, ...)
-    match /usuarios/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    // Sin inicio de sesión: todos los dispositivos comparten la misma ruta
+    // (usuarios/compartido/...), abierta a cualquiera que conozca el proyecto.
+    // Decisión explícita para evitar bloqueos de login (ver README).
+    match /usuarios/{document=**} {
+      allow read, write: if true;
     }
   }
 }
