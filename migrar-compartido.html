@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Migrar a modo sin login — Alarmas Reset</title>
+<style>
+:root{--bg:#0a0c10;--card:#14171c;--border:#262b33;--text:#eef0f3;--muted:#8a92a3;--accent:#ff6b35;--ok:#22c55e;--err:#ff4560;--warn:#ffb800;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;max-width:520px;width:100%}
+h1{font-size:1.3rem;color:var(--accent);margin-bottom:8px;font-weight:800}
+p{color:var(--muted);font-size:.86rem;line-height:1.6;margin-bottom:18px}
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:inherit}
+.btn-p{background:var(--accent);color:#fff}
+.btn-p:disabled{background:var(--border);color:var(--muted);cursor:not-allowed}
+.btn-google{background:#fff;color:#333;display:flex;align-items:center;justify-content:center;gap:10px}
+.log{background:#0d0f13;border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:14px;font-family:monospace;font-size:.76rem;max-height:280px;overflow-y:auto;display:none;line-height:1.7}
+.ok{color:var(--ok)} .err{color:var(--err)} .info{color:var(--muted)} .warn{color:var(--warn)}
+.user-bar{display:flex;align-items:center;background:#0d0f13;border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:18px;gap:10px}
+.avatar{width:32px;height:32px;border-radius:50%}
+.user-name{font-size:.83rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#login-section,#user-section{display:none}
+.eyebrow{font-family:monospace;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="eyebrow">Una sola vez · quitar login</div>
+  <h1>🔓 Pasar a modo sin inicio de sesión</h1>
+  <p>Si alguna vez guardaste órdenes, clientes o citas con tu cuenta de Google en esta app, esta herramienta los copia a una ruta compartida que ya no pide iniciar sesión. Si nunca lograste entrar antes, no hay nada que copiar y no pasa nada.</p>
+  <p style="color:var(--warn)">Inicia sesión con la cuenta de Google que hayas usado antes en esta app.</p>
+
+  <div id="login-section">
+    <button class="btn btn-google" id="btn-login">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Iniciar sesión con Google
+    </button>
+  </div>
+
+  <div id="user-section">
+    <div class="user-bar">
+      <img id="user-avatar" class="avatar" src="" onerror="this.style.display='none'">
+      <span class="user-name" id="user-name"></span>
+    </div>
+    <button class="btn btn-p" id="btn-migrate">🚀 Copiar mis datos a modo sin login</button>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+  authDomain: "alarmas-reset-e3484.firebaseapp.com",
+  projectId: "alarmas-reset-e3484",
+  storageBucket: "alarmas-reset-e3484.firebasestorage.app",
+  messagingSenderId: "1096561116547",
+  appId: "1:1096561116547:web:b13df05c092785723aa2b6"
+};
+const UID_COMPARTIDO = 'compartido';
+const COLECCIONES = ['ordenes', 'clientes', 'citas', 'export_logs'];
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+let currentUser = null;
+
+function log(msg, type = 'info') {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  const line = document.createElement('div');
+  line.className = type;
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  try { await signInWithPopup(auth, provider); }
+  catch(e) {
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(e.code)) {
+      signInWithRedirect(auth, provider);
+    } else if (e.code !== 'auth/popup-closed-by-user') {
+      alert('Error al iniciar sesión: ' + e.message);
+    }
+  }
+});
+
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  document.getElementById('login-section').style.display = user ? 'none' : 'block';
+  document.getElementById('user-section').style.display = user ? 'block' : 'none';
+  if (user) {
+    document.getElementById('user-name').textContent = user.displayName || user.email;
+    document.getElementById('user-avatar').src = user.photoURL || '';
+  }
+});
+
+document.getElementById('btn-migrate').addEventListener('click', async () => {
+  if (!currentUser) return;
+  const btn = document.getElementById('btn-migrate');
+  btn.disabled = true;
+  btn.textContent = 'Copiando...';
+  const uid = currentUser.uid;
+  let total = 0, errores = 0;
+
+  for (const nombreCol of COLECCIONES) {
+    log(`📂 Leyendo "${nombreCol}"...`);
+    try {
+      const snap = await getDocs(collection(db, 'usuarios', uid, nombreCol));
+      log(`   Encontrados: ${snap.size}`, 'ok');
+      for (const d of snap.docs) {
+        try {
+          await setDoc(doc(db, 'usuarios', UID_COMPARTIDO, nombreCol, d.id), d.data());
+          total++;
+        } catch(e) { log(`   ✗ Error en ${d.id}: ${e.message}`, 'err'); errores++; }
+      }
+    } catch(e) { log(`   Error leyendo ${nombreCol}: ${e.message}`, 'err'); errores++; }
+  }
+
+  log('─────────────────────────', 'info');
+  if (errores === 0) {
+    log(`✅ Copia completa: ${total} registros`, 'ok');
+    log('Ya puedes abrir la app normalmente — no volverá a pedir inicio de sesión.', 'ok');
+    btn.textContent = '✅ Listo';
+  } else {
+    log(`⚠️ Completado con ${errores} errores. ${total} registros copiados.`, 'warn');
+    btn.disabled = false;
+    btn.textContent = '🔄 Reintentar';
+  }
+});
+</script>
+</body>
+</html>
