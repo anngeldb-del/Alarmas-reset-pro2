@@ -13,7 +13,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
   // ══════════════════════════════════════════════════
   // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
@@ -46,9 +46,28 @@
       window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query };
       window._useFirebase = true;
       window._authModules = { signInWithPopup, signOut };
+      // Recoge el resultado si venimos de vuelta de signInWithRedirect
+      getRedirectResult(auth).catch(e => { console.error(e); window.dispatchEvent(new CustomEvent('authError', { detail: e })); });
+      let _loginEnCurso = false;
       window._loginGoogle = async () => {
-        try { await signInWithPopup(auth, provider); }
-        catch(e) { console.error(e); window.dispatchEvent(new CustomEvent('authError', { detail: e })); }
+        // Evita doble disparo (doble toque en el celular dispara dos popups a
+        // la vez y el segundo cancela al primero con auth/cancelled-popup-request)
+        if (_loginEnCurso) return;
+        _loginEnCurso = true;
+        try {
+          await signInWithPopup(auth, provider);
+        } catch(e) {
+          const necesitaRedirect = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(e.code);
+          if (necesitaRedirect) {
+            try { await signInWithRedirect(auth, provider); }
+            catch(e2) { console.error(e2); window.dispatchEvent(new CustomEvent('authError', { detail: e2 })); }
+          } else if (!['auth/cancelled-popup-request', 'auth/popup-closed-by-user'].includes(e.code)) {
+            console.error(e);
+            window.dispatchEvent(new CustomEvent('authError', { detail: e }));
+          }
+        } finally {
+          _loginEnCurso = false;
+        }
       };
       window._logoutGoogle = () => signOut(auth);
       onAuthStateChanged(auth, user => {
