@@ -69,6 +69,9 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 let currentUser = null;
+// Mostrar el botón de inmediato, sin esperar a que Firebase confirme el
+// estado de sesión (esa confirmación puede tardar o no llegar en algunas redes)
+document.getElementById('login-section').style.display = 'block';
 
 function log(msg, type = 'info') {
   const el = document.getElementById('log');
