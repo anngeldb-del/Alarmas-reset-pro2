@@ -2147,6 +2147,10 @@ function initFinances() {
       renderFinanceDashboard();
     }
   });
+  // Actualiza en tiempo real si index.html registra un ingreso desde otra pestaña
+  window.addEventListener('storage', e => {
+    if (e.key === 'fin_current') renderFinanceDashboard();
+  });
 }
 
 // ── INIT ──

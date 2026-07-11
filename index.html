@@ -359,6 +359,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .onboard-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .3s}
 .onboard-dot.on{background:var(--accent)}
 
+/* HISTORIAL MESES */
+.historial-section{margin-top:24px}
+.historial-mes-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;transition:border-color .2s}
+.historial-mes-card:hover{border-color:var(--accent)}
+.historial-mes-info{flex:1;min-width:0}
+.historial-mes-nombre{font-family:var(--font-display);font-weight:700;font-size:14px}
+.historial-mes-stats{font-size:12px;color:var(--muted);margin-top:3px}
+.historial-mes-total{font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--green);white-space:nowrap}
+.offline-banner{display:none;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);border-radius:var(--radius);padding:10px 14px;margin:0 20px 12px;font-size:12px;color:var(--accent);font-weight:600;text-align:center}
+.offline-banner.show{display:block}
+
 /* PRINT */
 @media print{
   body > *{display:none !important}
@@ -490,6 +501,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="tab-btn" onclick="showTab('agenda',this)">🗓️ Agenda</button>
 </nav>
 
+<div class="offline-banner" id="offline-banner">📴 Sin conexión — los cambios se guardarán local y sincronizarán al reconectar</div>
+
 <!-- BANNER DÍA 30 -->
 <div class="export-banner" id="export-banner">
   <span style="font-size:24px">🔷</span>
@@ -511,6 +524,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </div>
   <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Últimas órdenes</div>
   <div id="recientes-lista"></div>
+  <div class="historial-section" id="historial-section" style="display:none">
+    <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📦 Historial de meses</div>
+    <div id="historial-lista"></div>
+  </div>
 </div>
 
 <!-- LISTA ÓRDENES -->
@@ -679,6 +696,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <button class="btn btn-ghost btn-sm" onclick="skipOnboarding()">Omitir</button>
       <button class="btn btn-primary" style="flex:1" id="onboard-next-btn" onclick="nextOnboardStep()">Siguiente →</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL HISTORIAL ÓRDENES -->
+<div class="modal-overlay" id="modal-historial">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="historial-modal-title">Órdenes archivadas</div>
+      <button class="modal-close" onclick="cerrarHistorialModal()">✕</button>
+    </div>
+    <div class="modal-body" id="historial-modal-body"></div>
   </div>
 </div>
 
@@ -852,6 +880,67 @@ function renderAll(){
     setTimeout(intentarAutoExportM365, 800);
   }
 }
+
+function _getMesActual() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function _calcFinancialSummary(lista) {
+  let totalFac=0, totalGan=0, porCobrar=0;
+  lista.forEach(o=>{
+    const t=o.total||0, a=o.a_cuenta_total||0;
+    totalGan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
+    totalFac+=t;
+    const est=(o.estado||'').toUpperCase();
+    if(est==='PENDIENTE'||est==='EN_PROCESO') porCobrar+=t-a;
+  });
+  return { totalFac, totalGan, porCobrar };
+}
+async function _ensureXLSX() {
+  if (typeof XLSX !== 'undefined') return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+const OFFLINE_QUEUE_KEY = 'alarmas_offline_queue';
+function _addToOfflineQueue(op) {
+  const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY)||'[]');
+  q.push({...op, _ts: Date.now()});
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+}
+async function _processOfflineQueue() {
+  if (!window._useFirebase || !window._firebaseDb) return;
+  const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY)||'[]');
+  if (!q.length) return;
+  const { addDoc, updateDoc, deleteDoc } = window._firebaseModules;
+  const pendientes = [];
+  for (const op of q) {
+    try {
+      if (op.tipo === 'guardar' && op.orden) {
+        const d = {...op.orden}; const id = d.id; delete d.id; delete d._ts;
+        if (id && !id.startsWith('local_')) await updateDoc(docOrden(id), d);
+        else await addDoc(colOrdenes(), d);
+      } else if (op.tipo === 'eliminar' && op.id) {
+        await deleteDoc(docOrden(op.id));
+      }
+    } catch(e) { pendientes.push(op); }
+  }
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(pendientes));
+  if (pendientes.length < q.length) toast('☁️ ' + (q.length - pendientes.length) + ' cambio(s) sincronizados');
+}
+window.addEventListener('online', () => {
+  document.getElementById('offline-banner')?.classList.remove('show');
+  window._useFirebase = !!window._firebaseDb;
+  updateFirebaseBadge();
+  _processOfflineQueue();
+});
+window.addEventListener('offline', () => {
+  document.getElementById('offline-banner')?.classList.add('show');
+});
 
 // ═══════════════════════════════════════
 // DOCUMENTO OVERLAY — imprimir / compartir
@@ -1053,6 +1142,7 @@ async function guardarOrden(orden) {
       toast('⚠️ Firebase no disponible — guardando local');
       window._useFirebase = false;
       updateFirebaseBadge();
+      _addToOfflineQueue({ tipo: 'guardar', orden: {...orden} });
     }
   }
   if (orden.id) {
@@ -1406,18 +1496,14 @@ function showTab(id, btn) {
 // DASHBOARD
 // ═══════════════════════════════════════
 function renderDashboard() {
-  let gan=0,cob=0,fac=0,pend=0;
-  ordenes.forEach(o=>{
-    const t=o.total||0, a=o.a_cuenta_total||0;
-    gan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
-    fac+=t;
-    const _est=(o.estado||'').toUpperCase();
-    if(_est==='PENDIENTE'||_est==='EN_PROCESO'){cob+=t-a;pend++;}
-  });
-  document.getElementById('stat-ganancia').textContent=fmt(gan);
-  document.getElementById('stat-pendiente').textContent=fmt(cob);
-  document.getElementById('stat-total').textContent=fmt(fac);
+  const {totalFac,totalGan,porCobrar} = _calcFinancialSummary(ordenes);
+  let pend=0;
+  ordenes.forEach(o=>{ const e=(o.estado||'').toUpperCase(); if(e==='PENDIENTE'||e==='EN_PROCESO') pend++; });
+  document.getElementById('stat-ganancia').textContent=fmt(totalGan);
+  document.getElementById('stat-pendiente').textContent=fmt(porCobrar);
+  document.getElementById('stat-total').textContent=fmt(totalFac);
   document.getElementById('stat-ordpend').textContent=pend;
+  renderHistorialOrdenes();
   const cont=document.getElementById('recientes-lista');
   const rec=ordenes.slice(0,5);
   if(!rec.length){cont.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin órdenes aún</div></div>';return;}
@@ -1950,13 +2036,7 @@ function mountOrdenForm(orden, mount) {
     document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal-orden').classList.add('open');
   }
-  bindFormRowEvents();
   recalcTotal();
-}
-
-function bindFormRowEvents() {
-  // Los inputs .prod-costo y .prod-inversion ya tienen oninput="calcGanancia(this)" inline;
-  // no se agrega listener delegado para evitar doble ejecución.
 }
 
 function buildFormHTML(orden) {
@@ -2407,6 +2487,7 @@ function initAppData() {
   cargarOrdenes();
   cargarClientes();
   cargarCitas();
+  setTimeout(checkAndRotateMonthOrders, 1200);
   setTimeout(initOnboarding, 800);
   // Capturar resultado de loginRedirect de MSAL (iOS Safari)
   M365.getInstance().then(inst => {
@@ -2752,14 +2833,7 @@ async function exportarM365() {
 
   try {
     toast('⏳ Generando Excel...');
-    if (typeof XLSX === 'undefined') {
-      await new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
+    await _ensureXLSX();
 
     const buffer = _buildExcelBuffer();
     const mes = new Date().toISOString().slice(0, 7);
@@ -2819,12 +2893,7 @@ function _buildExcelBuffer() {
   XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
 
   // Hoja 3: Resumen financiero
-  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
-  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[])
-    .reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
-  const porCobrar = ordenes.filter(o=>['PENDIENTE','EN_PROCESO']
-    .includes((o.estado||'').toUpperCase()))
-    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const {totalFac, totalGan, porCobrar} = _calcFinancialSummary(ordenes);
   const mes = new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'});
   const h3 = [
     ['RESUMEN FINANCIERO MENSUAL — ALARMAS Y GPS RESET'],
@@ -2919,14 +2988,7 @@ async function intentarAutoExportM365() {
     // ¡Sesión activa! Exportar sin que el usuario haga nada
     toast('📅 Día ' + diaExport + ' — Exportando respaldo mensual a OneDrive...');
 
-    if (typeof XLSX === 'undefined') {
-      await new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
+    await _ensureXLSX();
 
     const buffer = _buildExcelBuffer();
     const filename = `AlarmasReset-${mes}.xlsx`;
@@ -2994,6 +3056,7 @@ async function cambiarEstado(id, nuevoEstado) {
   if (!orden || (orden.estado||'PENDIENTE').toUpperCase() === nuevoEstado) return;
   const estadoAnterior = orden.estado;
   orden.estado = nuevoEstado;
+  if (nuevoEstado === 'PAGADO') _registrarIngresoOrden(orden);
   if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
       const { updateDoc } = window._firebaseModules;
@@ -3015,6 +3078,27 @@ async function cambiarEstado(id, nuevoEstado) {
     const body = document.getElementById('body-' + id);
     if (body) body.classList.add('open');
   }, 40);
+}
+
+function _registrarIngresoOrden(orden) {
+  try {
+    const mesKey = _getMesActual();
+    let current = JSON.parse(localStorage.getItem('fin_current')||'null');
+    if (!current || current.mes !== mesKey) {
+      current = { mes: mesKey, ganancia: 0, inversion: 0, movimientos: [] };
+    }
+    current.movimientos = current.movimientos || [];
+    const monto = orden.total || 0;
+    if (monto <= 0) return;
+    current.movimientos.unshift({
+      id: Date.now(), tipo: 'ganancia', monto,
+      desc: 'Orden pagada: ' + (orden.vehiculo||'') + ' — ' + (orden.cliente||''),
+      fecha: new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+    });
+    if (current.movimientos.length > 200) current.movimientos = current.movimientos.slice(0,200);
+    current.ganancia = (current.ganancia||0) + monto;
+    localStorage.setItem('fin_current', JSON.stringify(current));
+  } catch(e) { console.warn('_registrarIngresoOrden:', e); }
 }
 
 // ═══════════════════════════════════════
@@ -3121,18 +3205,14 @@ function updateSidebarStatus() {
 // ═══════════════════════════════════════
 // EXPORTAR EXCEL
 // ═══════════════════════════════════════
-function exportarExcel() {
+async function exportarExcel() {
   closeSidebar();
   if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
-  if (typeof XLSX === 'undefined') {
-    toast('⏳ Cargando librería...');
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = _doExportExcel;
-    document.head.appendChild(s);
-  } else {
+  try {
+    if (typeof XLSX === 'undefined') toast('⏳ Cargando librería...');
+    await _ensureXLSX();
     _doExportExcel();
-  }
+  } catch(e) { toast('⚠️ Error al cargar Excel: ' + e.message); }
 }
 
 function _doExportExcel() {
@@ -3163,10 +3243,7 @@ function _doExportExcel() {
   XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
 
   // Hoja 3: Resumen financiero
-  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
-  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[]).reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
-  const porCobrar = ordenes.filter(o=>['PENDIENTE','EN_PROCESO'].includes((o.estado||'').toUpperCase()))
-    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const {totalFac, totalGan, porCobrar} = _calcFinancialSummary(ordenes);
   const h3 = [
     ['Resumen Financiero — Alarmas y GPS Reset'],
     ['Generado:', new Date().toLocaleDateString('es-MX',{dateStyle:'long'})],
@@ -3250,6 +3327,122 @@ function mostrarInfoFirebase() {
   toast(window._useFirebase ? '🔥 Firebase activo — alarmas-reset-e3484' : '💾 Modo local activo');
 }
 
+// ═══════════════════════════════════════
+// FASE 5 — HISTORIAL MENSUAL DE ÓRDENES
+// ═══════════════════════════════════════
+const ORDENES_HIST_KEY = 'ordenes_historial';
+const ORDENES_MES_KEY  = 'ordenes_ultimo_reset_mes';
+
+async function checkAndRotateMonthOrders() {
+  const mesActual = _getMesActual();
+  const ultimoMes = localStorage.getItem(ORDENES_MES_KEY);
+  if (ultimoMes === mesActual) return;
+  const archivables = ordenes.filter(o => {
+    const e = (o.estado||'').toUpperCase();
+    return e === 'PAGADO' || e === 'TERMO';
+  });
+  if (!archivables.length) {
+    localStorage.setItem(ORDENES_MES_KEY, mesActual);
+    return;
+  }
+  const mesLabel = ultimoMes
+    ? new Date(ultimoMes + '-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'})
+    : 'del mes anterior';
+  const ok = await confirmarAccion(
+    'Nuevo mes — archivar órdenes',
+    `Hay ${archivables.length} orden(es) PAGADA(S)/TERMO de ${mesLabel}. ¿Archivarlas para limpiar la lista activa?`,
+    '📦', 'Archivar'
+  );
+  if (ok) await archivarOrdenesDelMes(ultimoMes || mesActual, archivables);
+  localStorage.setItem(ORDENES_MES_KEY, mesActual);
+}
+
+async function archivarOrdenesDelMes(mes, archivables) {
+  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const idx = hist.findIndex(h=>h.mes===mes);
+  const entrada = {
+    mes,
+    ordenes: archivables,
+    archivadasEn: new Date().toISOString(),
+    total: archivables.reduce((s,o)=>s+(o.total||0),0)
+  };
+  if (idx >= 0) hist[idx] = entrada;
+  else hist.unshift(entrada);
+  localStorage.setItem(ORDENES_HIST_KEY, JSON.stringify(hist));
+
+  ordenes = ordenes.filter(o => {
+    const e = (o.estado||'').toUpperCase();
+    return e !== 'PAGADO' && e !== 'TERMO';
+  });
+  guardarLocal();
+  renderAll();
+
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { addDoc, deleteDoc } = window._firebaseModules;
+      await addDoc(colArchivados ? colArchivados() : colOrdenes(), entrada).catch(()=>{});
+      for (const o of archivables) {
+        if (o.id && !o.id.startsWith('local_')) {
+          await deleteDoc(docOrden(o.id)).catch(()=>{});
+        }
+      }
+    } catch(e) { console.warn('archivar firebase:', e); }
+  }
+  toast('📦 ' + archivables.length + ' órdenes archivadas');
+}
+
+function renderHistorialOrdenes() {
+  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const sec = document.getElementById('historial-section');
+  const lista = document.getElementById('historial-lista');
+  if (!sec || !lista) return;
+  if (!hist.length) { sec.style.display='none'; return; }
+  sec.style.display='block';
+  lista.innerHTML = hist.slice(0,12).map(h=>{
+    const label = new Date(h.mes+'-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+    const pagadas = (h.ordenes||[]).filter(o=>(o.estado||'').toUpperCase()==='PAGADO').length;
+    const termos  = (h.ordenes||[]).filter(o=>(o.estado||'').toUpperCase()==='TERMO').length;
+    return `<div class="historial-mes-card" onclick="verHistorialMes('${h.mes}')">
+      <div class="historial-mes-info">
+        <div class="historial-mes-nombre">${label}</div>
+        <div class="historial-mes-stats">${(h.ordenes||[]).length} órdenes · ${pagadas} pagadas · ${termos} termo</div>
+      </div>
+      <div class="historial-mes-total">${fmt(h.total||0)}</div>
+    </div>`;
+  }).join('');
+}
+
+function verHistorialMes(mes) {
+  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const entrada = hist.find(h=>h.mes===mes);
+  if (!entrada) return;
+  const label = new Date(mes+'-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  document.getElementById('historial-modal-title').textContent = '📦 ' + label;
+  const ords = entrada.ordenes || [];
+  document.getElementById('historial-modal-body').innerHTML = ords.length
+    ? ords.map(o=>{
+        const est=(o.estado||'PENDIENTE').toUpperCase();
+        return `<div class="orden-card" style="margin-bottom:8px">
+          <div class="orden-header">
+            <div>
+              <div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
+              <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div>
+            </div>
+            <div style="text-align:right">
+              <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
+              <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--green);margin-top:4px">${fmt(o.total||0)}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty"><div class="empty-text">Sin órdenes archivadas</div></div>';
+  document.getElementById('modal-historial').classList.add('open');
+}
+
+function cerrarHistorialModal() {
+  document.getElementById('modal-historial').classList.remove('open');
+}
+
 // Globales para onclick en HTML dinámico (GitHub Pages / móvil)
 window.setVista = setVista;
 window.toggleClienteGroup = toggleClienteGroup;
@@ -3292,6 +3485,9 @@ window.cambiarEstado = cambiarEstado;
 window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;
 window.skipOnboarding = skipOnboarding;
+window.verHistorialMes = verHistorialMes;
+window.cerrarHistorialModal = cerrarHistorialModal;
+window.checkAndRotateMonthOrders = checkAndRotateMonthOrders;
 </script>
 </body>
 </html>
