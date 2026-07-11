@@ -3158,8 +3158,11 @@ function closeSidebar() {
 }
 
 async function forzarActualizacion() {
+  closeSidebar();
+  await new Promise(r => setTimeout(r, 200)); // espera que cierre el sidebar
   const ok = await confirmarAccion('Actualizar app', 'Se limpiará el caché y se recargará la app. Tus datos no se borran.', '🔄', 'Actualizar');
   if (!ok) return;
+  toast('⏳ Limpiando caché...');
   const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);

@@ -1,4 +1,4 @@
-const CACHE = 'app-v11';
+const CACHE = 'app-v12';
 const STATIC = ['./', './index.html', './checklist.html', './manifest.json'];
 
 // ── Firebase Cloud Messaging (notificaciones push) ──
