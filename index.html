@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Alarmas Reset — Control de Órdenes</title>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW error:', e)));
+  }
+</script>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -175,6 +180,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .form-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
 .form-input,.form-select,.form-textarea{padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;transition:border-color .2s;width:100%;-webkit-appearance:none}
 .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-input.input-updated{border-color:var(--green);transition:border-color .1s}
 .form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237a7a95' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 .producto-form-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;position:relative;margin-bottom:8px}
 .producto-form-row .remove-btn{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;line-height:1}
@@ -233,6 +239,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .sb-user-status{font-size:11px;color:var(--muted);margin-top:2px}
 .sb-user-status.connected{color:var(--green)}
 
+/* BANNER DÍA 30 */
+.export-banner{display:none;background:linear-gradient(135deg,rgba(255,107,53,.15),rgba(255,209,102,.1));border:1px solid rgba(255,107,53,.35);border-radius:var(--radius);padding:14px 16px;margin:16px 20px 0;gap:12px;align-items:center}
+.export-banner.show{display:flex}
+.export-banner-text{flex:1;font-size:13px;font-family:var(--font-display);font-weight:700}
+.export-banner-sub{font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+
+/* M365 MODAL */
+.m365-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:12px;font-size:13px}
+.m365-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.m365-dot.on{background:var(--green)}
+.m365-dot.err{background:var(--red)}
+.export-log-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+.export-log-row:last-child{border-bottom:none}
+
 /* ESTADO EN PROCESO */
 .estado-badge.en_proceso{background:rgba(67,97,238,.15);color:#4361ee}
 
@@ -266,8 +286,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 /* PRINT */
 @media print{
   body > *{display:none !important}
-  #doc-print-frame{display:block !important;position:static !important;background:#fff !important}
-  #doc-print-frame *{display:revert !important}
+  #doc-overlay{display:block !important;position:static !important;background:#fff !important}
+  .doc-topbar{display:none !important}
+  #doc-frame{display:block !important}
+  #doc-frame *{display:revert !important}
 }
 
 @media(max-width:380px){
@@ -275,6 +297,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   .form-row.cols-3{grid-template-columns:1fr 1fr}
   .stat-value{font-size:18px}
 }
+
+/* HISTORIAL ÓRDENES */
+.historial-section{margin-top:24px}
+.historial-mes-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;transition:border-color .2s}
+.historial-mes-card:hover{border-color:var(--accent)}
+.historial-mes-info{flex:1;min-width:0}
+.historial-mes-nombre{font-family:var(--font-display);font-weight:700;font-size:14px}
+.historial-mes-stats{font-size:12px;color:var(--muted);margin-top:3px}
+.historial-mes-total{font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--green);white-space:nowrap}
+
+/* OFFLINE BANNER */
+.offline-banner{display:none;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);border-radius:var(--radius);padding:10px 14px;margin:0 20px 12px;font-size:12px;color:var(--accent);font-weight:600;text-align:center}
+.offline-banner.show{display:block}
 </style>
 </head>
 <body>
@@ -311,7 +346,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
   <div class="sidebar-section-label">HERRAMIENTAS</div>
   <button class="sidebar-item" onclick="exportarExcel()">
-    <span class="si-icon">📊</span><span class="si-label">Exportar Excel</span>
+    <span class="si-icon">📊</span><span class="si-label">Exportar Excel local</span>
+  </button>
+  <button class="sidebar-item" onclick="abrirModalM365()">
+    <span class="si-icon" style="font-size:13px">🔷</span><span class="si-label">Microsoft 365</span>
+    <span id="si-m365-dot" style="font-size:10px;color:var(--muted)">●</span>
   </button>
   <button class="sidebar-item" onclick="respaldoJSON()">
     <span class="si-icon">📥</span><span class="si-label">Respaldo JSON</span>
@@ -324,6 +363,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="sidebar-item" onclick="mostrarInfoFirebase()">
     <span class="si-icon">🔥</span><span class="si-label">Firebase</span>
     <span id="si-fb-dot" style="font-size:10px;color:var(--muted)">●</span>
+  </button>
+
+  <button class="sidebar-item" onclick="forzarActualizacion()" style="color:#ff6b35;border-top:1px solid var(--border);margin-top:4px">
+    <span class="si-icon">🔄</span><span class="si-label">Actualizar app</span>
+    <span style="font-size:10px;color:var(--muted)">v2.1</span>
   </button>
 
   <div class="sidebar-footer">
@@ -353,6 +397,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
 </nav>
 
+<!-- OFFLINE BANNER -->
+<div class="offline-banner" id="offline-banner">📴 Sin conexión — los cambios se guardarán local y sincronizarán al reconectar</div>
+
+<!-- BANNER DÍA 30 -->
+<div class="export-banner" id="export-banner">
+  <span style="font-size:24px">🔷</span>
+  <div>
+    <div class="export-banner-text">Exportación mensual Microsoft 365</div>
+    <div class="export-banner-sub">Hoy es día 30 — ¿Exportar respaldo a OneDrive?</div>
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="abrirModalM365()">Exportar</button>
+  <button class="btn btn-ghost btn-sm" onclick="cerrarBannerExport()" style="padding:6px 8px">✕</button>
+</div>
+
 <!-- DASHBOARD -->
 <div class="view active" id="tab-dashboard">
   <div class="dash-grid">
@@ -363,6 +421,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </div>
   <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Últimas órdenes</div>
   <div id="recientes-lista"></div>
+  <div class="historial-section" id="historial-section" style="display:none">
+    <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📦 Historial de meses</div>
+    <div id="historial-lista"></div>
+  </div>
 </div>
 
 <!-- LISTA ÓRDENES -->
@@ -419,6 +481,54 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <div class="doc-frame" id="doc-frame"></div>
 </div>
 
+<!-- MODAL MICROSOFT 365 -->
+<div class="modal-overlay" id="modal-m365">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">🔷 Microsoft 365 — OneDrive</div>
+      <button class="modal-close" onclick="cerrarModalM365()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Estado de conexión -->
+      <div class="m365-status" id="m365-conn-status">
+        <div class="m365-dot" id="m365-dot"></div>
+        <span id="m365-conn-text">Sin sesión iniciada</span>
+      </div>
+
+      <!-- Configuración -->
+      <div class="form-section">Configuración Azure AD</div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Client ID (Azure App Registration)</label>
+        <input class="form-input" id="m365-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          value="" style="font-family:monospace;font-size:12px">
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        ℹ️ Registra tu app en <strong>portal.azure.com</strong> → Azure AD → App registrations.<br>
+        Permisos necesarios: <code>Files.ReadWrite</code> · <code>User.Read</code><br>
+        Redirect URI: <code id="m365-redirect-hint" style="color:var(--accent)">cargando...</code>
+      </div>
+
+      <!-- Acciones -->
+      <div class="form-section">Acciones</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="iniciarSesionM365()" id="btn-m365-login">
+          🔷 Iniciar sesión con Microsoft
+        </button>
+        <button class="btn btn-ghost" id="btn-m365-export" onclick="exportarM365()" disabled style="opacity:.5">
+          📊 Exportar ahora a OneDrive
+        </button>
+        <button class="btn btn-ghost" onclick="cerrarSesionM365()" id="btn-m365-logout" style="display:none">
+          Cerrar sesión Microsoft
+        </button>
+      </div>
+
+      <!-- Historial de exportaciones -->
+      <div class="form-section">Historial de exportaciones</div>
+      <div id="m365-log-lista" style="font-size:12px;color:var(--muted)">Sin exportaciones registradas.</div>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL -->
 <div class="modal-overlay" id="modal-confirm">
   <div class="modal" style="max-width:360px">
@@ -448,6 +558,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </div>
 </div>
 
+<!-- MODAL HISTORIAL ÓRDENES -->
+<div class="modal-overlay" id="modal-historial">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="historial-modal-title">Órdenes archivadas</div>
+      <button class="modal-close" onclick="cerrarHistorialModal()">✕</button>
+    </div>
+    <div class="modal-body" id="historial-modal-body"></div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -460,9 +581,11 @@ let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
+let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
+let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
@@ -563,7 +686,76 @@ const IDB = {
 function fmt(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
-function renderAll(){ renderDashboard(); renderOrdenes(); updateSidebarStatus(); }
+function renderAll(){
+  renderDashboard(); renderOrdenes(); updateSidebarStatus();
+  if (!_autoExportChecked && ordenes.length > 0) {
+    _autoExportChecked = true;
+    setTimeout(intentarAutoExportM365, 800);
+  }
+}
+
+function _getMesActual() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function _calcFinancialSummary(lista) {
+  let totalFac=0, totalGan=0, porCobrar=0;
+  lista.forEach(o=>{
+    const t=o.total||0, a=o.a_cuenta_total||0;
+    totalGan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
+    totalFac+=t;
+    const est=(o.estado||'').toUpperCase();
+    if(est==='PENDIENTE'||est==='EN_PROCESO') porCobrar+=t-a;
+  });
+  return { totalFac, totalGan, porCobrar };
+}
+async function _ensureXLSX() {
+  if (typeof XLSX !== 'undefined') return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+const OFFLINE_QUEUE_KEY = 'alarmas_offline_queue';
+function _addToOfflineQueue(op) {
+  const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY)||'[]');
+  q.push({...op, _ts: Date.now()});
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+}
+async function _processOfflineQueue() {
+  if (!window._useFirebase || !window._firebaseDb) return;
+  const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY)||'[]');
+  if (!q.length) return;
+  const { collection, addDoc, updateDoc, deleteDoc, doc } = window._firebaseModules;
+  const pendientes = [];
+  for (const op of q) {
+    try {
+      if (op.tipo === 'guardar' && op.orden) {
+        const d = {...op.orden}; const id = d.id; delete d.id; delete d._ts;
+        if (id && !id.startsWith('local_')) await updateDoc(doc(window._firebaseDb,'ordenes',id), d);
+        else await addDoc(collection(window._firebaseDb,'ordenes'), d);
+      } else if (op.tipo === 'eliminar' && op.id) {
+        await deleteDoc(doc(window._firebaseDb,'ordenes',op.id));
+      }
+    } catch(e) {
+      pendientes.push(op);
+    }
+  }
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(pendientes));
+  if (pendientes.length < q.length) toast('☁️ ' + (q.length - pendientes.length) + ' cambio(s) sincronizados');
+}
+window.addEventListener('online', () => {
+  document.getElementById('offline-banner')?.classList.remove('show');
+  window._useFirebase = !!window._firebaseDb;
+  updateFirebaseBadge();
+  _processOfflineQueue();
+});
+window.addEventListener('offline', () => {
+  document.getElementById('offline-banner')?.classList.add('show');
+});
 
 // ═══════════════════════════════════════
 // DOCUMENTO OVERLAY — imprimir / compartir
@@ -587,6 +779,7 @@ function abrirDoc(titulo, bodyHTML) {
     styleEl.id = 'doc-preview-style';
     document.getElementById('doc-frame').appendChild(styleEl);
   }
+  styleEl.textContent = DOC_CSS;
   document.getElementById('doc-topbar-title').textContent = titulo;
   document.getElementById('doc-overlay').classList.add('open');
 }
@@ -607,14 +800,15 @@ function docImprimir() {
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open(); doc.write(_docHTML); doc.close();
-  iframe.onload = function() {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  };
-  // Fallback extra por si onload no dispara en algunos móviles
-  setTimeout(function() {
+  let _printed = false;
+  function _doPrint() {
+    if (_printed) return;
+    _printed = true;
     try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
-  }, 800);
+  }
+  iframe.onload = _doPrint;
+  // Fallback si onload no dispara en algunos móviles
+  setTimeout(_doPrint, 800);
 }
 
 // 📤 COMPARTIR
@@ -762,6 +956,7 @@ async function guardarOrden(orden) {
       toast('⚠️ Firebase no disponible — guardando local');
       window._useFirebase = false;
       updateFirebaseBadge();
+      _addToOfflineQueue({ tipo: 'guardar', orden: {...orden} });
     }
   }
   if (orden.id) {
@@ -824,18 +1019,14 @@ function showTab(id, btn) {
 // DASHBOARD
 // ═══════════════════════════════════════
 function renderDashboard() {
-  let gan=0,cob=0,fac=0,pend=0;
-  ordenes.forEach(o=>{
-    const t=o.total||0, a=o.a_cuenta_total||0;
-    gan+=(o.productos||[]).reduce((s,p)=>s+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0);
-    fac+=t;
-    const _est=(o.estado||'').toUpperCase();
-    if(_est==='PENDIENTE'||_est==='EN_PROCESO'){cob+=t-a;pend++;}
-  });
-  document.getElementById('stat-ganancia').textContent=fmt(gan);
-  document.getElementById('stat-pendiente').textContent=fmt(cob);
-  document.getElementById('stat-total').textContent=fmt(fac);
+  const {totalFac,totalGan,porCobrar} = _calcFinancialSummary(ordenes);
+  let pend=0;
+  ordenes.forEach(o=>{ const e=(o.estado||'').toUpperCase(); if(e==='PENDIENTE'||e==='EN_PROCESO') pend++; });
+  document.getElementById('stat-ganancia').textContent=fmt(totalGan);
+  document.getElementById('stat-pendiente').textContent=fmt(porCobrar);
+  document.getElementById('stat-total').textContent=fmt(totalFac);
   document.getElementById('stat-ordpend').textContent=pend;
+  renderHistorialOrdenes();
   const cont=document.getElementById('recientes-lista');
   const rec=ordenes.slice(0,5);
   if(!rec.length){cont.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin órdenes aún</div></div>';return;}
@@ -854,7 +1045,8 @@ function irAOrden(id) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-ordenes').classList.add('active');
-  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  const ordenesBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Órdenes'));
+  if (ordenesBtn) ordenesBtn.classList.add('active');
   filtroEstado='todos'; renderOrdenes();
   setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
 }
@@ -1059,19 +1251,7 @@ function mountOrdenForm(orden, mount) {
     document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal-orden').classList.add('open');
   }
-  bindFormRowEvents();
   recalcTotal();
-}
-
-function bindFormRowEvents() {
-  const root = getFormRoot();
-  if (!root) return;
-  const cont = root.querySelector('#productos-form');
-  if (!cont || cont._boundRows) return;
-  cont._boundRows = true;
-  cont.addEventListener('input', e => {
-    if (e.target.matches('.prod-costo, .prod-inversion')) calcGanancia(e.target);
-  });
 }
 
 function buildFormHTML(orden) {
@@ -1159,8 +1339,8 @@ function recalcTotal() {
   const el = root.querySelector('#f-total');
   if (el) {
     el.value = suma || '';
-    el.style.borderColor = 'var(--green)';
-    setTimeout(() => { el.style.borderColor = ''; }, 800);
+    el.classList.add('input-updated');
+    setTimeout(() => el.classList.remove('input-updated'), 800);
   }
 }
 
@@ -1264,6 +1444,7 @@ function cerrarModal() {
 // COTIZACIONES
 // ═══════════════════════════════════════
 function buildCotFormHTML() {
+  cotFolioRegistrado = false;
   const folio='COT-'+new Date().getFullYear()+'-'+String(cotFolioNum).padStart(3,'0');
   const hoy=new Date().toISOString().split('T')[0];
   const vigencia=new Date(Date.now()+15*24*60*60*1000).toISOString().split('T')[0];
@@ -1362,7 +1543,7 @@ function cotPartidaHTML(p,i) {
       <div class="form-group"><label class="form-label">Marca / Modelo</label>
         <input class="form-input cot-pmarca" placeholder="Marca" value="${esc(p.marca||'')}"></div>
       <div class="form-group"><label class="form-label">Cant.</label>
-        <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" oninput="calcPartida(this);recalcCot()"></div>
+        <input class="form-input cot-pcant" type="number" value="${p.cant||1}" min="1" step="1" oninput="calcPartida(this);recalcCot()"></div>
       <div class="form-group"><label class="form-label">P. Unitario ($)</label>
         <input class="form-input cot-pprecio" type="number" placeholder="0" value="${p.precio||''}" oninput="calcPartida(this);recalcCot()"></div>
     </div>
@@ -1379,7 +1560,7 @@ function calcPartida(input) {
   const row=input.closest('.partida-row');
   const cant=parseFloat(row.querySelector('.cot-pcant').value)||1;
   const precio=parseFloat(row.querySelector('.cot-pprecio').value)||0;
-  const descto=parseFloat(row.querySelector('.cot-pdescto').value)||0;
+  const descto=Math.max(0,Math.min(100,parseFloat(row.querySelector('.cot-pdescto').value)||0));
   row.querySelector('.cot-psubtotal').value=(precio*cant*(1-descto/100)).toFixed(2)||'';
 }
 
@@ -1428,7 +1609,13 @@ function recalcCot() {
 }
 
 function agregarPartida(){ const cont=document.getElementById('cot-partidas'); if(!cont)return; const i=Date.now(); const div=document.createElement('div'); div.innerHTML=cotPartidaHTML({},i); cont.appendChild(div.firstElementChild); }
-function quitarPartida(i){ const r=document.getElementById('cot-p-'+i); if(r){r.remove();recalcCot();} }
+function quitarPartida(i){
+  const cont = document.getElementById('cot-partidas');
+  if (!cont) return;
+  if (cont.querySelectorAll('.partida-row').length <= 1) { toast('⚠️ Debe haber al menos una partida'); return; }
+  const r = document.getElementById('cot-p-'+i);
+  if(r){ r.remove(); recalcCot(); }
+}
 
 function leerPartidas() {
   return Array.from(document.querySelectorAll('#cot-partidas .partida-row')).map(r=>({
@@ -1438,7 +1625,7 @@ function leerPartidas() {
     precio:parseFloat(r.querySelector('.cot-pprecio')?.value)||0,
     descto:parseFloat(r.querySelector('.cot-pdescto')?.value)||0,
     subtotal:parseFloat(r.querySelector('.cot-psubtotal')?.value)||0
-  })).filter(p=>p.nombre||p.precio);
+  })).filter(p=>p.nombre && (p.precio >= 0));
 }
 
 function verCotizacion() {
@@ -1449,7 +1636,10 @@ function verCotizacion() {
   const folio=document.getElementById('c-folio')?.value||'';
   const fecha=document.getElementById('c-fecha')?.value||'';
   const vigencia=document.getElementById('c-vigencia')?.value||'';
-  cotFolioNum++; localStorage.setItem('cot_folio',cotFolioNum);
+  if (!cotFolioRegistrado) {
+    cotFolioRegistrado = true;
+    cotFolioNum++; localStorage.setItem('cot_folio', cotFolioNum);
+  }
 
   const bodyHTML =
     headerEmpresa('COTIZACIÓN', folio, fecha)
@@ -1495,15 +1685,28 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();_confirmCancel();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();_confirmCancel();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
+  setTimeout(checkAndRotateMonthOrders, 1200);
   setTimeout(initOnboarding, 800);
+  // Capturar resultado de loginRedirect de MSAL (iOS Safari)
+  M365.getInstance().then(inst => {
+    inst.handleRedirectPromise().then(resp => {
+      if (resp && resp.account) {
+        M365._account = resp.account;
+        actualizarUIm365();
+        toast('✅ Sesión Microsoft iniciada');
+      }
+    }).catch(() => {});
+  }).catch(() => {});
 }
+let _appInitialized = false;
 window.addEventListener('firebaseReady', () => {
+  _appInitialized = true;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAppData, { once: true });
   } else {
@@ -1511,7 +1714,8 @@ window.addEventListener('firebaseReady', () => {
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window._useFirebase) cargarOrdenesLocal();
+  // Espera 120ms para que Firebase se inicialice; si no llega, carga local
+  setTimeout(() => { if (!_appInitialized) cargarOrdenesLocal(); }, 120);
   document.addEventListener('click', e => {
     if (e.target.closest('[data-action="add-servicio"]')) {
       e.preventDefault();
@@ -1524,6 +1728,420 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('modal-confirm')) _confirmCancel();
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// MICROSOFT 365 — INTEGRACIÓN GRAPH API (FASE 1)
+// ═══════════════════════════════════════════════════════
+
+const M365 = {
+  _instance: null,
+  _account: null,
+  SCOPES: ['Files.ReadWrite', 'User.Read'],
+
+  get clientId() {
+    return localStorage.getItem('m365_client_id') || '';
+  },
+
+  async loadMSAL() {
+    if (window.msal) return true;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+      s.onload = () => resolve(true);
+      s.onerror = () => reject(new Error('No se pudo cargar MSAL.js'));
+      document.head.appendChild(s);
+    });
+  },
+
+  async getInstance() {
+    if (this._instance) return this._instance;
+    if (!this.clientId) throw new Error('Configura tu Client ID de Azure primero.');
+    await this.loadMSAL();
+    this._instance = new msal.PublicClientApplication({
+      auth: {
+        clientId: this.clientId,
+        authority: 'https://login.microsoftonline.com/common',
+        redirectUri: window.location.origin + window.location.pathname
+      },
+      cache: {
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: false
+      }
+    });
+    await this._instance.initialize();
+    // Restaurar cuenta activa si hay
+    const accounts = this._instance.getAllAccounts();
+    if (accounts.length > 0) this._account = accounts[0];
+    return this._instance;
+  },
+
+  async login() {
+    const inst = await this.getInstance();
+    // Resolver cualquier redirect pendiente (resultado de loginRedirect en iOS)
+    try {
+      const redirectResp = await inst.handleRedirectPromise();
+      if (redirectResp && redirectResp.account) {
+        this._account = redirectResp.account;
+        return redirectResp.accessToken;
+      }
+    } catch(e) { /* sin redirect pendiente */ }
+    try {
+      const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES });
+      this._account = resp.account;
+      return resp.accessToken;
+    } catch(e) {
+      // Popup bloqueado (iOS Safari, algunos WebViews) → redirect
+      const esPopupBloqueado = e.errorCode === 'popup_window_error' ||
+        e.errorCode === 'empty_window_error' || (e.message||'').toLowerCase().includes('popup');
+      if (esPopupBloqueado) {
+        toast('📱 Redirigiendo a Microsoft...');
+        await inst.loginRedirect({ scopes: this.SCOPES });
+        return; // loginRedirect navega fuera de la app
+      }
+      throw e;
+    }
+  },
+
+  async getToken() {
+    const inst = await this.getInstance();
+    if (!this._account) throw new Error('Inicia sesión con Microsoft primero.');
+    try {
+      const resp = await inst.acquireTokenSilent({ scopes: this.SCOPES, account: this._account });
+      return resp.accessToken;
+    } catch(e) {
+      // Token expirado — intentar popup, con fallback a redirect en iOS
+      try {
+        const resp = await inst.acquireTokenPopup({ scopes: this.SCOPES, account: this._account });
+        this._account = resp.account;
+        return resp.accessToken;
+      } catch(e2) {
+        const esPopupBloqueado = e2.errorCode === 'popup_window_error' ||
+          e2.errorCode === 'empty_window_error' || (e2.message||'').toLowerCase().includes('popup');
+        if (esPopupBloqueado) {
+          toast('📱 Redirigiendo a Microsoft...');
+          await inst.acquireTokenRedirect({ scopes: this.SCOPES, account: this._account });
+          return;
+        }
+        throw e2;
+      }
+    }
+  },
+
+  logout() {
+    this._account = null;
+    this._instance = null;
+    localStorage.removeItem('m365_client_id');
+  },
+
+  isLoggedIn() {
+    return !!this._account;
+  },
+
+  async graphFetch(token, path, method = 'GET', body = null, contentType = 'application/json') {
+    const opts = {
+      method,
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': contentType }
+    };
+    if (body) opts.body = body;
+    const resp = await fetch(`https://graph.microsoft.com/v1.0${path}`, opts);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: { message: resp.statusText } }));
+      throw new Error(err.error?.message || `Graph API ${resp.status}`);
+    }
+    return method === 'PUT' ? resp.json() : resp.json().catch(() => ({}));
+  },
+
+  async uploadExcel(token, buffer, filename) {
+    // Crear carpeta /AlarmasReset en OneDrive raíz
+    try {
+      await this.graphFetch(token, '/me/drive/root/children', 'POST', JSON.stringify({
+        name: 'AlarmasReset', folder: {},
+        '@microsoft.graph.conflictBehavior': 'replace'
+      }));
+    } catch(e) { /* carpeta ya existe */ }
+
+    // Subir archivo (replace si existe)
+    const uint8 = new Uint8Array(buffer);
+    const blob = new Blob([uint8], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const resp = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/AlarmasReset/${filename}:/content`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        },
+        body: blob
+      }
+    );
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Upload error ${resp.status}`);
+    }
+    return resp.json();
+  }
+};
+
+// ── UI: Modal M365 ────────────────────────────────────
+function abrirModalM365() {
+  closeSidebar();
+  const clientIdEl = document.getElementById('m365-client-id');
+  if (clientIdEl) clientIdEl.value = localStorage.getItem('m365_client_id') || '';
+  const hint = document.getElementById('m365-redirect-hint');
+  if (hint) hint.textContent = window.location.origin + window.location.pathname;
+  actualizarUIm365();
+  cargarLogsExport();
+  document.getElementById('modal-m365').classList.add('open');
+}
+
+function cerrarModalM365() {
+  document.getElementById('modal-m365').classList.remove('open');
+}
+
+function actualizarUIm365() {
+  const isOn = M365.isLoggedIn();
+  const dot = document.getElementById('m365-dot');
+  const txt = document.getElementById('m365-conn-text');
+  const btnExport = document.getElementById('btn-m365-export');
+  const btnLogout = document.getElementById('btn-m365-logout');
+  const sidebarDot = document.getElementById('si-m365-dot');
+
+  if (dot) { dot.className = 'm365-dot' + (isOn ? ' on' : ''); }
+  if (txt) txt.textContent = isOn
+    ? `Conectado: ${M365._account?.username || M365._account?.name || 'cuenta Microsoft'}`
+    : 'Sin sesión iniciada';
+  if (btnExport) { btnExport.disabled = !isOn; btnExport.style.opacity = isOn ? '1' : '.5'; }
+  if (btnLogout) btnLogout.style.display = isOn ? '' : 'none';
+  if (sidebarDot) sidebarDot.style.color = isOn ? 'var(--green)' : 'var(--muted)';
+}
+
+async function iniciarSesionM365() {
+  const clientId = document.getElementById('m365-client-id')?.value?.trim();
+  if (!clientId) { toast('⚠️ Ingresa tu Client ID de Azure'); return; }
+  localStorage.setItem('m365_client_id', clientId);
+  M365._instance = null; // Forzar reinicio con nuevo client ID
+  toast('⏳ Abriendo ventana de Microsoft...');
+  try {
+    await M365.login();
+    actualizarUIm365();
+    toast('✅ Sesión iniciada con Microsoft');
+  } catch(e) {
+    if (e.name === 'BrowserAuthError' && e.errorCode === 'user_cancelled') {
+      toast('Inicio de sesión cancelado');
+    } else {
+      toast('⚠️ Error: ' + e.message);
+    }
+  }
+}
+
+function cerrarSesionM365() {
+  M365.logout();
+  actualizarUIm365();
+  toast('Sesión de Microsoft cerrada');
+}
+
+async function exportarM365() {
+  if (!M365.isLoggedIn()) { toast('⚠️ Inicia sesión con Microsoft primero'); return; }
+  if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
+
+  const btnExport = document.getElementById('btn-m365-export');
+  if (btnExport) { btnExport.disabled = true; btnExport.textContent = '⏳ Exportando...'; }
+
+  try {
+    toast('⏳ Generando Excel...');
+    await _ensureXLSX();
+
+    const buffer = _buildExcelBuffer();
+    const mes = new Date().toISOString().slice(0, 7);
+    const filename = `AlarmasReset-${mes}.xlsx`;
+
+    toast('⏳ Subiendo a OneDrive...');
+    const token = await M365.getToken();
+    const fileData = await M365.uploadExcel(token, buffer, filename);
+
+    // Registrar exportación
+    await _logExportM365(filename, fileData.webUrl || '');
+    cargarLogsExport();
+    actualizarUIm365();
+
+    const mesLabel = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    toast(`✅ Exportado a OneDrive: ${filename}`);
+
+    // Marcar para no volver a mostrar banner este mes
+    localStorage.setItem('m365_ultimo_export', mes);
+    cerrarBannerExport();
+
+  } catch(e) {
+    console.error('Error exportar M365:', e);
+    toast('⚠️ Error: ' + e.message);
+  } finally {
+    if (btnExport) { btnExport.disabled = false; btnExport.textContent = '📊 Exportar ahora a OneDrive'; }
+  }
+}
+
+function _buildExcelBuffer() {
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Órdenes
+  const h1 = [['ID','Cliente','Vehículo','F. Instalación','F. Pago','Estado','Total','A Cuenta','Saldo','Notas']];
+  ordenes.forEach(o => {
+    const t = o.total||0, a = o.a_cuenta_total||0;
+    const est = (o.estado||'PENDIENTE').toUpperCase();
+    h1.push([o.id||'', o.cliente||'', o.vehiculo||'', o.fecha_instalacion||'', o.fecha_pago||'',
+      ESTADO_LABELS[est]||est, t, a, t-a, o.recordatorios||'']);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(h1);
+  ws1['!cols'] = [{wch:20},{wch:24},{wch:24},{wch:15},{wch:15},{wch:14},{wch:13},{wch:13},{wch:13},{wch:34}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Órdenes');
+
+  // Hoja 2: Servicios detallados
+  const h2 = [['ID Orden','Cliente','Vehículo','Estado','Servicio','Costo','Inversión','Ganancia','Garantía']];
+  ordenes.forEach(o => {
+    const est = (o.estado||'PENDIENTE').toUpperCase();
+    (o.productos||[]).forEach(p => {
+      const c = parseFloat(p.costo)||0, inv = parseFloat(p.inversion)||0;
+      h2.push([o.id||'', o.cliente||'', o.vehiculo||'', ESTADO_LABELS[est]||est,
+        p.nombre||'', c, inv, c-inv, p.garantia||'Sin garantía']);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(h2);
+  ws2['!cols'] = [{wch:20},{wch:24},{wch:24},{wch:14},{wch:32},{wch:13},{wch:13},{wch:13},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
+
+  // Hoja 3: Resumen financiero
+  const {totalFac, totalGan, porCobrar} = _calcFinancialSummary(ordenes);
+  const mes = new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  const h3 = [
+    ['RESUMEN FINANCIERO MENSUAL — ALARMAS Y GPS RESET'],
+    ['Período:', mes],
+    ['Generado:', new Date().toLocaleString('es-MX')],
+    ['Exportación vía:', 'Microsoft 365 OneDrive'],
+    [],
+    ['Indicador','Valor'],
+    ['Total facturado', totalFac],
+    ['Ganancia estimada', totalGan],
+    ['Por cobrar', porCobrar],
+    [],
+    ['Total órdenes', ordenes.length],
+    ['Pendientes', ordenes.filter(o=>(o.estado||'')==='PENDIENTE').length],
+    ['En proceso', ordenes.filter(o=>(o.estado||'')==='EN_PROCESO').length],
+    ['Pagadas', ordenes.filter(o=>(o.estado||'')==='PAGADO').length],
+    ['Termo', ordenes.filter(o=>(o.estado||'')==='TERMO').length],
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(h3);
+  ws3['!cols'] = [{wch:30},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen');
+
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+
+async function _logExportM365(filename, url) {
+  const log = {
+    tipo: 'microsoft_365',
+    filename, url,
+    fecha: new Date().toISOString(),
+    cuenta: M365._account?.username || '',
+    ordenes_count: ordenes.length,
+    total_facturado: ordenes.reduce((s,o)=>s+(o.total||0),0)
+  };
+  const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
+  logs.unshift(log);
+  localStorage.setItem('alarmas_export_logs', JSON.stringify(logs.slice(0,30)));
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { collection, addDoc } = window._firebaseModules;
+      await addDoc(collection(window._firebaseDb, 'export_logs'), log);
+    } catch(e) { /* no crítico */ }
+  }
+}
+
+function cargarLogsExport() {
+  const cont = document.getElementById('m365-log-lista');
+  if (!cont) return;
+  const logs = JSON.parse(localStorage.getItem('alarmas_export_logs') || '[]');
+  if (!logs.length) { cont.innerHTML = '<span style="color:var(--muted)">Sin exportaciones registradas.</span>'; return; }
+  cont.innerHTML = logs.slice(0,8).map(l => {
+    const fecha = new Date(l.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
+    const icono = l.tipo === 'microsoft_365' ? '🔷' : '📊';
+    const safeUrl = (l.url && l.url.startsWith('https://')) ? l.url : null;
+    const link = safeUrl ? `<a href="${safeUrl}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Ver →</a>` : '';
+    return `<div class="export-log-row">
+      <span>${icono} ${esc(l.filename||l.tipo)}</span>
+      <span style="color:var(--muted)">${fecha} ${link}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Auto-exportación día 30 (sin intervención si ya hay sesión) ──
+async function intentarAutoExportM365() {
+  const hoy = new Date();
+  const mes = hoy.toISOString().slice(0,7);
+  const ultimoExport = localStorage.getItem('m365_ultimo_export');
+  const clientId = localStorage.getItem('m365_client_id');
+  const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate();
+  const diaExport = Math.min(30, ultimoDia);
+
+  // Si no es el día de exportación, ya se exportó, o no hay configuración → solo revisar banner
+  if (hoy.getDate() !== diaExport || ultimoExport === mes || !clientId) {
+    checkBannerExport(); return;
+  }
+
+  try {
+    const inst = await M365.getInstance();
+    const accounts = inst.getAllAccounts();
+
+    if (!accounts.length) {
+      // Sin sesión guardada → mostrar banner para que el usuario haga clic
+      checkBannerExport(); return;
+    }
+
+    M365._account = accounts[0];
+    actualizarUIm365();
+
+    // Intentar token silencioso — si la sesión sigue viva, funciona sin popup
+    const resp = await inst.acquireTokenSilent({ scopes: M365.SCOPES, account: accounts[0] });
+
+    // ¡Sesión activa! Exportar sin que el usuario haga nada
+    toast('📅 Día ' + diaExport + ' — Exportando respaldo mensual a OneDrive...');
+
+    await _ensureXLSX();
+
+    const buffer = _buildExcelBuffer();
+    const filename = `AlarmasReset-${mes}.xlsx`;
+    const fileData = await M365.uploadExcel(resp.accessToken, buffer, filename);
+
+    await _logExportM365(filename, fileData?.webUrl || '');
+    localStorage.setItem('m365_ultimo_export', mes);
+    cerrarBannerExport();
+    toast('✅ Respaldo mensual guardado en OneDrive: ' + filename);
+
+  } catch(e) {
+    // Sesión expirada o token inválido → mostrar banner para login manual (un clic)
+    console.log('Auto-export silencioso:', e.message);
+    checkBannerExport();
+  }
+}
+
+// ── Banner día 30 ─────────────────────────────────────
+function checkBannerExport() {
+  const hoy = new Date();
+  const mes = hoy.toISOString().slice(0,7);
+  const ultimoExport = localStorage.getItem('m365_ultimo_export');
+  const diasRestantes = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate() - hoy.getDate();
+  const banner = document.getElementById('export-banner');
+  if (!banner) return;
+  // Mostrar el banner el día 30, o el último día del mes si tiene menos de 30
+  const esDia30 = hoy.getDate() === 30 || (hoy.getDate() > 28 && diasRestantes === 0);
+  if (esDia30 && ultimoExport !== mes && localStorage.getItem('m365_client_id')) {
+    banner.classList.add('show');
+  }
+}
+
+function cerrarBannerExport() {
+  document.getElementById('export-banner')?.classList.remove('show');
+}
 
 // ═══════════════════════════════════════
 // CONFIRM MODAL
@@ -1554,14 +2172,22 @@ function _confirmCancel() {
 async function cambiarEstado(id, nuevoEstado) {
   const orden = ordenes.find(o => o.id === id);
   if (!orden || (orden.estado||'PENDIENTE').toUpperCase() === nuevoEstado) return;
+  const estadoAnterior = orden.estado;
   orden.estado = nuevoEstado;
+  if (nuevoEstado === 'PAGADO') _registrarIngresoOrden(orden);
   if (window._useFirebase && window._firebaseDb) {
     try {
       const { updateDoc, doc } = window._firebaseModules;
       await updateDoc(doc(window._firebaseDb, 'ordenes', id), { estado: nuevoEstado });
       toast('✅ Estado: ' + (ESTADO_LABELS[nuevoEstado] || nuevoEstado));
       return;
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      orden.estado = estadoAnterior;
+      renderAll();
+      toast('⚠️ No se pudo actualizar — sin conexión');
+      return;
+    }
   }
   await guardarLocal();
   renderAll();
@@ -1570,6 +2196,27 @@ async function cambiarEstado(id, nuevoEstado) {
     const body = document.getElementById('body-' + id);
     if (body) body.classList.add('open');
   }, 40);
+}
+
+function _registrarIngresoOrden(orden) {
+  try {
+    const mesKey = _getMesActual();
+    let current = JSON.parse(localStorage.getItem('fin_current')||'null');
+    if (!current || current.mes !== mesKey) {
+      current = { mes: mesKey, ganancia: 0, inversion: 0, movimientos: [] };
+    }
+    current.movimientos = current.movimientos || [];
+    const monto = orden.total || 0;
+    if (monto <= 0) return;
+    current.movimientos.unshift({
+      id: Date.now(), tipo: 'ganancia', monto,
+      desc: 'Orden pagada: ' + (orden.vehiculo||'') + ' — ' + (orden.cliente||''),
+      fecha: new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+    });
+    if (current.movimientos.length > 200) current.movimientos = current.movimientos.slice(0,200);
+    current.ganancia = (current.ganancia||0) + monto;
+    localStorage.setItem('fin_current', JSON.stringify(current));
+  } catch(e) { console.warn('_registrarIngresoOrden:', e); }
 }
 
 // ═══════════════════════════════════════
@@ -1628,6 +2275,17 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
 
+async function forzarActualizacion() {
+  const ok = await confirmarAccion('Actualizar app', 'Se limpiará el caché y se recargará la app. Tus datos no se borran.', '🔄', 'Actualizar');
+  if (!ok) return;
+  const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
+  } else {
+    limpiar();
+  }
+}
+
 function navTo(tab) {
   closeSidebar();
   const tabBtns = document.querySelectorAll('.tab-btn');
@@ -1662,18 +2320,14 @@ function updateSidebarStatus() {
 // ═══════════════════════════════════════
 // EXPORTAR EXCEL
 // ═══════════════════════════════════════
-function exportarExcel() {
+async function exportarExcel() {
   closeSidebar();
   if (!ordenes.length) { toast('⚠️ No hay órdenes para exportar'); return; }
-  if (typeof XLSX === 'undefined') {
-    toast('⏳ Cargando librería...');
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = _doExportExcel;
-    document.head.appendChild(s);
-  } else {
+  try {
+    if (typeof XLSX === 'undefined') toast('⏳ Cargando librería...');
+    await _ensureXLSX();
     _doExportExcel();
-  }
+  } catch(e) { toast('⚠️ Error al cargar Excel: ' + e.message); }
 }
 
 function _doExportExcel() {
@@ -1704,10 +2358,7 @@ function _doExportExcel() {
   XLSX.utils.book_append_sheet(wb, ws2, 'Servicios');
 
   // Hoja 3: Resumen financiero
-  const totalFac = ordenes.reduce((s,o)=>s+(o.total||0),0);
-  const totalGan = ordenes.reduce((s,o)=>s+(o.productos||[]).reduce((g,p)=>g+(parseFloat(p.costo)||0)-(parseFloat(p.inversion)||0),0),0);
-  const porCobrar = ordenes.filter(o=>(o.estado||'').toUpperCase()==='PENDIENTE')
-    .reduce((s,o)=>s+(o.total||0)-(o.a_cuenta_total||0),0);
+  const {totalFac, totalGan, porCobrar} = _calcFinancialSummary(ordenes);
   const h3 = [
     ['Resumen Financiero — Alarmas y GPS Reset'],
     ['Generado:', new Date().toLocaleDateString('es-MX',{dateStyle:'long'})],
@@ -1756,16 +2407,29 @@ function procesarRestaurarJSON(event) {
   if (!file) return;
   event.target.value = '';
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
       const nuevas = data.ordenes || (Array.isArray(data) ? data : null);
       if (!nuevas || !Array.isArray(nuevas)) { toast('⚠️ Formato de archivo inválido'); return; }
-      if (!confirm('¿Restaurar ' + nuevas.length + ' órdenes desde el respaldo?\nSe reemplazarán los datos locales actuales.')) return;
+      const ok = await confirmarAccion('Restaurar respaldo', '¿Restaurar ' + nuevas.length + ' órdenes? Se reemplazarán los datos actuales.', '📂', 'Restaurar');
+      if (!ok) return;
       ordenes = nuevas;
       guardarLocal();
       renderAll();
       toast('✅ ' + nuevas.length + ' órdenes restauradas');
+      // Si Firebase está activo, subir también para evitar que onSnapshot sobreescriba
+      if (window._useFirebase && window._firebaseDb) {
+        try {
+          const { collection, addDoc, updateDoc, doc } = window._firebaseModules;
+          for (const orden of nuevas) {
+            const d = {...orden}; const id = d.id; delete d.id;
+            if (id) await updateDoc(doc(window._firebaseDb,'ordenes',id), d).catch(() => addDoc(collection(window._firebaseDb,'ordenes'), d));
+            else await addDoc(collection(window._firebaseDb,'ordenes'), d);
+          }
+          toast('☁️ Respaldo sincronizado con Firebase');
+        } catch(err) { toast('⚠️ Local OK — Firebase no disponible'); }
+      }
     } catch(err) {
       toast('⚠️ Error al leer el archivo: ' + err.message);
     }
@@ -1776,6 +2440,122 @@ function procesarRestaurarJSON(event) {
 function mostrarInfoFirebase() {
   closeSidebar();
   toast(window._useFirebase ? '🔥 Firebase activo — alarmas-reset-e3484' : '💾 Modo local activo');
+}
+
+// ═══════════════════════════════════════
+// FASE 5 — HISTORIAL MENSUAL DE ÓRDENES
+// ═══════════════════════════════════════
+const ORDENES_HIST_KEY = 'ordenes_historial';
+const ORDENES_MES_KEY  = 'ordenes_ultimo_reset_mes';
+
+async function checkAndRotateMonthOrders() {
+  const mesActual = _getMesActual();
+  const ultimoMes = localStorage.getItem(ORDENES_MES_KEY);
+  if (ultimoMes === mesActual) return;
+  const archivables = ordenes.filter(o => {
+    const e = (o.estado||'').toUpperCase();
+    return e === 'PAGADO' || e === 'TERMO';
+  });
+  if (!archivables.length) {
+    localStorage.setItem(ORDENES_MES_KEY, mesActual);
+    return;
+  }
+  const mesLabel = ultimoMes
+    ? new Date(ultimoMes + '-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'})
+    : 'del mes anterior';
+  const ok = await confirmarAccion(
+    'Nuevo mes — archivar órdenes',
+    `Hay ${archivables.length} orden(es) PAGADA(S)/TERMO de ${mesLabel}. ¿Archivarlas para limpiar la lista activa?`,
+    '📦', 'Archivar'
+  );
+  if (ok) await archivarOrdenesDelMes(ultimoMes || mesActual, archivables);
+  localStorage.setItem(ORDENES_MES_KEY, mesActual);
+}
+
+async function archivarOrdenesDelMes(mes, archivables) {
+  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const idx = hist.findIndex(h=>h.mes===mes);
+  const entrada = {
+    mes,
+    ordenes: archivables,
+    archivadasEn: new Date().toISOString(),
+    total: archivables.reduce((s,o)=>s+(o.total||0),0)
+  };
+  if (idx >= 0) hist[idx] = entrada;
+  else hist.unshift(entrada);
+  localStorage.setItem(ORDENES_HIST_KEY, JSON.stringify(hist));
+
+  ordenes = ordenes.filter(o => {
+    const e = (o.estado||'').toUpperCase();
+    return e !== 'PAGADO' && e !== 'TERMO';
+  });
+  guardarLocal();
+  renderAll();
+
+  if (window._useFirebase && window._firebaseDb) {
+    try {
+      const { collection, addDoc, deleteDoc, doc } = window._firebaseModules;
+      await addDoc(collection(window._firebaseDb,'ordenes_historial'), entrada);
+      for (const o of archivables) {
+        if (o.id && !o.id.startsWith('local_')) {
+          await deleteDoc(doc(window._firebaseDb,'ordenes',o.id)).catch(()=>{});
+        }
+      }
+    } catch(e) { console.warn('archivar firebase:', e); }
+  }
+  toast('📦 ' + archivables.length + ' órdenes archivadas');
+}
+
+function renderHistorialOrdenes() {
+  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const sec = document.getElementById('historial-section');
+  const lista = document.getElementById('historial-lista');
+  if (!sec || !lista) return;
+  if (!hist.length) { sec.style.display='none'; return; }
+  sec.style.display='block';
+  lista.innerHTML = hist.slice(0,12).map(h=>{
+    const label = new Date(h.mes+'-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+    const pagadas = (h.ordenes||[]).filter(o=>(o.estado||'').toUpperCase()==='PAGADO').length;
+    const termos  = (h.ordenes||[]).filter(o=>(o.estado||'').toUpperCase()==='TERMO').length;
+    return `<div class="historial-mes-card" onclick="verHistorialMes('${h.mes}')">
+      <div class="historial-mes-info">
+        <div class="historial-mes-nombre">${label}</div>
+        <div class="historial-mes-stats">${(h.ordenes||[]).length} órdenes · ${pagadas} pagadas · ${termos} termo</div>
+      </div>
+      <div class="historial-mes-total">${fmt(h.total||0)}</div>
+    </div>`;
+  }).join('');
+}
+
+function verHistorialMes(mes) {
+  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const entrada = hist.find(h=>h.mes===mes);
+  if (!entrada) return;
+  const label = new Date(mes+'-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  document.getElementById('historial-modal-title').textContent = '📦 ' + label;
+  const ords = entrada.ordenes || [];
+  document.getElementById('historial-modal-body').innerHTML = ords.length
+    ? ords.map(o=>{
+        const est=(o.estado||'PENDIENTE').toUpperCase();
+        return `<div class="orden-card" style="margin-bottom:8px">
+          <div class="orden-header">
+            <div>
+              <div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
+              <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div>
+            </div>
+            <div style="text-align:right">
+              <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
+              <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--green);margin-top:4px">${fmt(o.total||0)}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty"><div class="empty-text">Sin órdenes archivadas</div></div>';
+  document.getElementById('modal-historial').classList.add('open');
+}
+
+function cerrarHistorialModal() {
+  document.getElementById('modal-historial').classList.remove('open');
 }
 
 // Globales para onclick en HTML dinámico (GitHub Pages / móvil)
@@ -1809,10 +2589,20 @@ window.respaldoJSON = respaldoJSON;
 window.restaurarJSON = restaurarJSON;
 window.procesarRestaurarJSON = procesarRestaurarJSON;
 window.mostrarInfoFirebase = mostrarInfoFirebase;
+window.abrirModalM365 = abrirModalM365;
+window.cerrarModalM365 = cerrarModalM365;
+window.iniciarSesionM365 = iniciarSesionM365;
+window.cerrarSesionM365 = cerrarSesionM365;
+window.exportarM365 = exportarM365;
+window.cerrarBannerExport = cerrarBannerExport;
+window.intentarAutoExportM365 = intentarAutoExportM365;
 window.cambiarEstado = cambiarEstado;
 window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;
 window.skipOnboarding = skipOnboarding;
+window.verHistorialMes = verHistorialMes;
+window.cerrarHistorialModal = cerrarHistorialModal;
+window.checkAndRotateMonthOrders = checkAndRotateMonthOrders;
 </script>
 </body>
 </html>

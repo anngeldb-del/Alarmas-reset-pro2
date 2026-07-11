@@ -1,26 +1,38 @@
 {
   "name": "Alarmas Reset — Órdenes",
   "short_name": "Alarmas Reset",
-  "description": "Alarmas Reset — Órdenes",
+  "description": "Gestión de órdenes, servicios y finanzas para Alarmas y GPS Reset",
   "start_url": "/Alarmas-reset-pro2/",
   "scope": "/Alarmas-reset-pro2/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0c0f",
-  "theme_color": "#ff6030",
+  "background_color": "#0a0a0f",
+  "theme_color": "#ff6b35",
   "lang": "es-MX",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -2,8 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <title>Alarmas Reset — Cotizaciones</title>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW error:', e)));
+  }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 
@@ -451,7 +459,46 @@ body::before{
 .mov-monto{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;flex-shrink:0;}
 .mov-monto.g{color:#25D366;}
 .mov-monto.i{color:var(--orange);}
-/* ── MODAL ── */
+/* ── OCULTAR IMPORTES ── */
+.btn-ocultar-imp{
+  display:flex;align-items:center;gap:10px;
+  width:100%;padding:11px 14px;margin-bottom:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;color:var(--muted);
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .2s;text-align:left;
+}
+.btn-ocultar-imp:hover{border-color:var(--border2);color:var(--text);}
+.btn-ocultar-imp.activo{border-color:var(--cyan);color:var(--cyan);background:var(--cyan2);}
+.btn-ocultar-imp .ocu-badge{
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1px;
+  margin-left:auto;padding:2px 8px;border-radius:20px;
+  background:var(--border);color:var(--muted);transition:all .2s;
+}
+.btn-ocultar-imp.activo .ocu-badge{background:rgba(0,229,200,.2);color:var(--cyan);}
+/* ── RESET MES ── */
+.btn-reset-mes-actual{
+  width:100%;padding:9px;margin-top:10px;
+  background:transparent;border:1px solid var(--border2);
+  border-radius:8px;color:var(--muted);
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .2s;
+}
+.btn-reset-mes-actual:hover{border-color:var(--orange);color:var(--orange);}
+.btn-rst-hist{
+  margin-top:10px;padding:6px 12px;display:block;width:100%;
+  background:transparent;border:1px solid var(--border2);
+  border-radius:6px;color:var(--muted);
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.5px;
+  cursor:pointer;transition:all .2s;text-align:center;
+}
+.btn-rst-hist:hover{border-color:var(--orange);color:var(--orange);}
+.reset-log-info{
+  font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);
+  margin-top:6px;padding:4px 8px;
+  background:rgba(255,96,48,.05);border:1px solid rgba(255,96,48,.1);
+  border-radius:4px;line-height:1.5;
+}
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.75);
   z-index:200;display:flex;align-items:flex-end;justify-content:center;
@@ -1134,6 +1181,13 @@ body::before{
   <div class="panel" id="panel-ajustes">
     <div style="padding:4px 0;">
 
+      <!-- Botón ocultar importes (Fase 4) -->
+      <button class="btn-ocultar-imp" id="btn-ocultar-importes" onclick="toggleOcultarImportes()">
+        <span id="ocu-ico">👁</span>
+        <span id="ocu-texto">Ocultar importes</span>
+        <span class="ocu-badge" id="ocu-badge">VISIBLE</span>
+      </button>
+
       <!-- Finanzas del mes actual -->
       <div class="client-card">
         <div class="section-label">Finanzas del mes</div>
@@ -1144,15 +1198,15 @@ body::before{
         <div class="finance-totals">
           <div class="finance-box">
             <div class="finance-box-label">Ganancias</div>
-            <div class="finance-box-amount green" id="fin-ganancia-total">$0.00</div>
+            <div class="finance-box-amount green fin-imp" id="fin-ganancia-total">$0.00</div>
           </div>
           <div class="finance-box">
             <div class="finance-box-label">Inversiones</div>
-            <div class="finance-box-amount red" id="fin-inversion-total">$0.00</div>
+            <div class="finance-box-amount red fin-imp" id="fin-inversion-total">$0.00</div>
           </div>
           <div class="finance-box full">
             <div class="finance-box-label">Balance neto del mes</div>
-            <div class="finance-box-amount gold" id="fin-balance-total">$0.00</div>
+            <div class="finance-box-amount gold fin-imp" id="fin-balance-total">$0.00</div>
           </div>
         </div>
 
@@ -1166,11 +1220,20 @@ body::before{
         </div>
 
         <div id="fin-mov-list" class="mov-list"></div>
+
+        <!-- Botón reiniciar mes actual (Fase 3) -->
+        <button class="btn-reset-mes-actual" onclick="pedirResetMesActual()">
+          🔄 Reiniciar contador del mes actual
+        </button>
       </div>
 
       <!-- Botón histórico -->
       <button class="btn-historico" onclick="showHistorico()">
         📊 Ver histórico de ganancias e inversiones
+      </button>
+      <!-- Botón reset flujo de dinero -->
+      <button class="btn-reset-flujo" onclick="resetFlujoDinero()" style="width:100%;margin-top:8px;padding:10px 0;border-radius:10px;border:1.5px solid rgba(255,80,80,.35);background:rgba(255,80,80,.07);color:#ff6060;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.4px;">
+        🔄 Resetear flujo de dinero del mes
       </button>
 
       <!-- Info cierre automático -->
@@ -1181,11 +1244,29 @@ body::before{
         </p>
       </div>
 
+      <!-- Actualizar app -->
+      <button onclick="forzarActualizacion()" style="width:100%;margin-top:8px;padding:10px 0;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.4px;">
+        🔄 Actualizar app &nbsp;<span style="opacity:.5">v2.1</span>
+      </button>
+
       <div style="height:80px"></div>
     </div>
   </div>
 
 </div><!-- /page -->
+
+<!-- MODAL CONFIRMACIÓN PERSONALIZADO -->
+<div class="modal-overlay hidden" id="modal-confirm" onclick="closeConfirmOverlay(event)">
+  <div class="modal-sheet" style="padding-bottom:28px">
+    <div class="modal-bar"></div>
+    <div class="modal-title" id="confirm-titulo" style="font-size:15px;margin-bottom:10px">¿Confirmar acción?</div>
+    <p id="confirm-msg" style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.65"></p>
+    <div style="display:flex;gap:8px">
+      <button class="btn-fin i" style="flex:1;padding:12px" id="confirm-ok-btn">Confirmar</button>
+      <button class="reset-btn" style="flex:1" onclick="closeConfirm()">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL HISTÓRICO DE FINANZAS -->
 <div class="modal-overlay hidden" id="modal-historico" onclick="closeHistoricoOverlay(event)">
@@ -1296,6 +1377,10 @@ async function addCustomItem(panel) {
 }
 
 async function deleteCustomItem(panel, id) {
+  // Eliminación optimista del DOM
+  const elToRemove = document.getElementById('ci-' + panel + '-' + id);
+  if (elToRemove) elToRemove.remove();
+  updateProgress(panel);
   if (_useFirebase && window._db) {
     try {
       const { doc, deleteDoc } = window._fs;
@@ -1318,8 +1403,10 @@ function renderCustomItems(panel) {
   const items = loadCustomItems(panel);
   if (countEl) countEl.textContent = items.length + ' personalizado' + (items.length !== 1 ? 's' : '');
   if (items.length === 0) { list.innerHTML = ''; return; }
+  // Preservar IDs de ítems actualmente seleccionados antes de re-renderizar
+  const selIds = new Set([...list.querySelectorAll('.custom-item.sel')].map(el => el.id));
   list.innerHTML = items.map(item => `
-    <div class="custom-item" id="ci-${panel}-${item.id}" data-label="${esc(item.label)}">
+    <div class="custom-item${selIds.has('ci-'+panel+'-'+item.id) ? ' sel' : ''}" id="ci-${panel}-${item.id}" data-label="${esc(item.label)}">
       <div class="chk" onclick="selCustom(this,'${panel}')"></div>
       <div class="item-text" onclick="selCustom(this.parentElement.querySelector('.chk'),'${panel}')">
         <div class="item-name">${esc(item.label)}</div>
@@ -1353,7 +1440,7 @@ function buildDynamicTabs() {
     const tab = document.createElement('div');
     tab.className = 'tab tab-dynamic';
     tab.id = 'tab-extra-'+svc.id;
-    tab.innerHTML = `<span class="tab-icon">${svc.icon}</span> ${svc.name}`;
+    tab.innerHTML = `<span class="tab-icon">${esc(svc.icon)}</span> ${esc(svc.name)}`;
     tab.onclick = () => showTab('extra-'+svc.id);
     tabsScroll.insertBefore(tab, addTab);
 
@@ -1385,8 +1472,8 @@ function buildDynamicTabs() {
       </div>
       <div class="sect">
         <div class="sect-head">
-          <div class="sect-ico">${svc.icon}</div>
-          <div class="sect-title">${svc.name}</div>
+          <div class="sect-ico">${esc(svc.icon)}</div>
+          <div class="sect-title">${esc(svc.name)}</div>
           <div class="sect-badge">${svc.options.length} OPC.</div>
         </div>
         <div class="items-list">
@@ -1425,6 +1512,11 @@ function buildDynamicTabs() {
     agregarPanel.parentNode.insertBefore(panel, agregarPanel);
     // render custom items for this dynamic panel
     renderCustomItems(tid);
+    // Bind Enter key for the custom-input of this dynamic panel
+    const dynInp = document.getElementById('custom-input-' + tid);
+    if (dynInp) dynInp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addCustomItem(tid); }
+    });
   });
 }
 
@@ -1468,6 +1560,13 @@ function updateProgress(panel) {
 
 // ── RESET ──
 function resetPanel(panel) {
+  // Solo deselecciona ítems; no toca los campos del cliente
+  document.querySelectorAll('#panel-'+panel+' .item.sel, #panel-'+panel+' .custom-item.sel')
+    .forEach(el => el.classList.remove('sel'));
+  updateProgress(panel);
+}
+function resetPanelCompleto(panel) {
+  // Limpia todo incluyendo datos del cliente (llamado explícitamente)
   document.querySelectorAll('#panel-'+panel+' .item.sel, #panel-'+panel+' .custom-item.sel')
     .forEach(el => el.classList.remove('sel'));
   document.querySelectorAll('#panel-'+panel+' input, #panel-'+panel+' textarea')
@@ -1537,7 +1636,7 @@ function enviarWA() {
   if(tel)      m += '• Teléfono: '+tel+'\n';
   if(vehiculo) m += '• Vehículo: '+vehiculo+'\n';
   const anio  = getField('p_anio') || getField(tab+'_anio');
-  const color = getField('p_color');
+  const color = (tab === 'pantallas') ? getField('p_color') : '';
   if(anio)  m += '• Año: '+anio+'\n';
   if(color) m += '• Color: '+color+'\n';
   m += '\n📋 *LO QUE ME INTERESA*\n';
@@ -1621,11 +1720,17 @@ async function saveService() {
   document.getElementById('new_service_icon').value='';
   pendingOptions=[];
   renderOptionsPreview();
-  showTab('extra-'+id);
+  // En modo Firebase el panel se crea cuando llega el onSnapshot; en local ya existe
+  if (document.getElementById('panel-extra-'+id)) showTab('extra-'+id);
+  else setTimeout(() => showTab('extra-'+id), 800);
 }
 
 async function deleteServiceFromTab(id) {
-  if(!confirm('¿Eliminar este servicio?')) return;
+  const svc = loadServices().find(s=>s.id===id);
+  const nombre = svc ? svc.name : 'este servicio';
+  openConfirm('🗑 Eliminar servicio', `¿Eliminar "${nombre}"? Esta acción no se puede deshacer.`, ()=>_doDeleteService(id));
+}
+async function _doDeleteService(id) {
   if (_useFirebase && window._db) {
     try {
       const { doc, deleteDoc } = window._fs;
@@ -1641,8 +1746,6 @@ async function deleteServiceFromTab(id) {
   }
   showTab('pantallas');
 }
-function deleteService(id) { deleteServiceFromTab(id); }
-
 function renderSavedList() {
   const list = document.getElementById('saved_services_list');
   const services = loadServices();
@@ -1654,7 +1757,7 @@ function renderSavedList() {
           <div class="saved-item-name">${esc(s.icon)} ${esc(s.name)}</div>
           <div class="saved-item-count">${s.options.length} opción(es)</div>
         </div>
-        <button class="del-btn" onclick="deleteService(${s.id})">🗑</button>
+        <button class="del-btn" onclick="deleteServiceFromTab(${s.id})">🗑</button>
       </div>`).join('');
 }
 
@@ -1680,26 +1783,49 @@ function formatMXN(n) {
 function loadFinCurrent() {
   try { return JSON.parse(localStorage.getItem('fin_current')||'null'); } catch(e){ return null; }
 }
-function saveFinCurrent(obj) { localStorage.setItem('fin_current', JSON.stringify(obj)); }
+function saveFinCurrent(obj) {
+  localStorage.setItem('fin_current', JSON.stringify(obj));
+  _syncFinToFirebase();
+}
 function loadFinHistorial() {
   try { return JSON.parse(localStorage.getItem('fin_historial')||'[]'); } catch(e){ return []; }
 }
-function saveFinHistorial(arr) { localStorage.setItem('fin_historial', JSON.stringify(arr)); }
+function saveFinHistorial(arr) {
+  localStorage.setItem('fin_historial', JSON.stringify(arr));
+  _syncFinToFirebase();
+}
+
+// Sube finanzas a Firebase con debounce para agrupar escrituras rápidas
+let _finSyncTimer = null;
+function _syncFinToFirebase() {
+  // usa la variable LOCAL _useFirebase (no window._useFirebase que es de index.html)
+  if (!_useFirebase || !window._db) return;
+  clearTimeout(_finSyncTimer);
+  _finSyncTimer = setTimeout(() => {
+    try {
+      const { doc, setDoc } = window._fs;
+      const payload = { current: loadFinCurrent(), historial: loadFinHistorial() };
+      setDoc(doc(window._db, 'finanzas', 'datos'), payload)
+        .catch(e => console.warn('Finanzas sync error:', e));
+    } catch(e) { console.warn('Finanzas sync error:', e); }
+  }, 500);
+}
 
 function checkAndRotateMonth() {
   const currentKey = getCurrentMonthKey();
   let current = loadFinCurrent();
-  if (!current) {
+  if (!current || typeof current.mes !== 'string' || !/^\d{4}-\d{2}$/.test(current.mes)) {
     current = {mes:currentKey,ganancia:0,inversion:0,movimientos:[]};
     saveFinCurrent(current);
   } else if (current.mes !== currentKey) {
-    // Mes anterior → archivar automáticamente
+    // Mes anterior → archivar automáticamente (conserva movimientos individuales)
     const hist = loadFinHistorial();
     if (!hist.some(h=>h.mes===current.mes)) {
       hist.unshift({
         mes: current.mes,
         ganancia: current.ganancia||0,
         inversion: current.inversion||0,
+        movimientos: (current.movimientos||[]).slice(0,200), // conserva historial de movimientos
         cerradoEn: new Date().toISOString()
       });
       saveFinHistorial(hist);
@@ -1726,12 +1852,15 @@ function registrarMovimiento(tipo) {
   if (!monto || monto <= 0) { montoEl.focus(); return; }
   const desc = descEl.value.trim() || (tipo==='ganancia'?'Ganancia':'Inversión');
 
-  let current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  // checkAndRotateMonth garantiza que estamos en el mes correcto aunque la app lleve días abierta
+  let current = checkAndRotateMonth();
   current.movimientos = current.movimientos || [];
   current.movimientos.unshift({
     id: Date.now(), tipo, monto, desc,
-    fecha: new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+    fecha: new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
   });
+  // Límite de 200 movimientos para no saturar localStorage
+  if (current.movimientos.length > 200) current.movimientos = current.movimientos.slice(0,200);
   if (tipo==='ganancia') current.ganancia = (current.ganancia||0)+monto;
   else current.inversion = (current.inversion||0)+monto;
   saveFinCurrent(current);
@@ -1754,11 +1883,11 @@ function renderFinanceDashboard() {
   const balEl  = document.getElementById('fin-balance-total');
   if (mesEl)  mesEl.textContent  = formatMes(current.mes).toUpperCase();
   if (diasEl) diasEl.textContent = getDiasLabel();
-  if (ganEl)  ganEl.textContent  = formatMXN(g);
-  if (invEl)  invEl.textContent  = formatMXN(i);
+  if (ganEl)  ganEl.textContent  = dispMonto(g);
+  if (invEl)  invEl.textContent  = dispMonto(i);
   if (balEl) {
-    balEl.textContent  = formatMXN(b);
-    balEl.className = 'finance-box-amount '+(b>=0?'gold':'red');
+    balEl.textContent  = dispMonto(b);
+    balEl.className = 'finance-box-amount fin-imp '+(b>=0?'gold':'red');
   }
 
   const movs = (current.movimientos||[]).slice(0,10);
@@ -1769,15 +1898,20 @@ function renderFinanceDashboard() {
     return;
   }
   listEl.innerHTML = '<div class="section-label" style="margin-bottom:6px">Movimientos recientes</div>'+
-    movs.map(m=>`
+    movs.map(m=>{
+      const isReset = m.tipo==='reset';
+      const dotClass = isReset ? 'i' : (m.tipo==='ganancia'?'g':'i');
+      const montoTxt = isReset ? '' : `<div class="mov-monto ${m.tipo==='ganancia'?'g':'i'}">${dispMonto(m.monto)}</div>`;
+      return `
       <div class="mov-item">
-        <div class="mov-dot ${m.tipo==='ganancia'?'g':'i'}"></div>
+        <div class="mov-dot ${dotClass}"></div>
         <div class="mov-info">
           <div class="mov-desc">${esc(m.desc)}</div>
           <div class="mov-fecha">${m.fecha||''}</div>
         </div>
-        <div class="mov-monto ${m.tipo==='ganancia'?'g':'i'}">${formatMXN(m.monto)}</div>
-      </div>`).join('');
+        ${montoTxt}
+      </div>`;
+    }).join('');
 }
 
 function showHistorico() {
@@ -1785,6 +1919,18 @@ function showHistorico() {
   document.getElementById('modal-historico').classList.remove('hidden');
   document.body.style.overflow='hidden';
 }
+
+function resetFlujoDinero() {
+  openConfirm('🔄 Resetear flujo del mes',
+    'Se borrarán ganancias, inversiones y movimientos del mes actual. El historial de meses anteriores NO se modifica.',
+    () => {
+      const currentKey = getCurrentMonthKey();
+      saveFinCurrent({mes: currentKey, ganancia: 0, inversion: 0, movimientos: []});
+      renderFinanceDashboard();
+    }
+  );
+}
+
 function closeHistorico() {
   document.getElementById('modal-historico').classList.add('hidden');
   document.body.style.overflow='';
@@ -1802,30 +1948,174 @@ function renderHistorico() {
   }
   el.innerHTML = hist.map(h=>{
     const g=h.ganancia||0, i=h.inversion||0, b=g-i;
+    const reinicios = h.reinicios || [];
+    const resetInfo = reinicios.length > 0
+      ? `<div class="reset-log-info">🔄 Reiniciado ${reinicios.length}x — último: ${new Date(reinicios[reinicios.length-1].fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</div>`
+      : '';
     return `
       <div class="hist-month">
         <div class="hist-month-title">${formatMes(h.mes)}</div>
         <div class="hist-month-grid">
           <div>
             <div class="hist-col-label">Ganancias</div>
-            <div class="hist-col-val green">${formatMXN(g)}</div>
+            <div class="hist-col-val green">${dispMonto(g)}</div>
           </div>
           <div>
             <div class="hist-col-label">Inversiones</div>
-            <div class="hist-col-val red">${formatMXN(i)}</div>
+            <div class="hist-col-val red">${dispMonto(i)}</div>
           </div>
           <div>
             <div class="hist-col-label">Balance</div>
-            <div class="hist-col-val ${b>=0?'gold':'red'}">${formatMXN(b)}</div>
+            <div class="hist-col-val ${b>=0?'gold':'red'}">${dispMonto(b)}</div>
           </div>
         </div>
+        ${resetInfo}
+        <button class="btn-rst-hist" onclick="pedirResetMesHistorial('${h.mes}')">🔄 Reiniciar efectivo de ${formatMes(h.mes)}</button>
       </div>`;
   }).join('');
 }
 
+// ══════════════════════════════════════════
+// FASE 3 — RESET DE EFECTIVO POR MES
+// ══════════════════════════════════════════
+
+// Modal de confirmación personalizado (reemplaza confirm() nativo)
+let _confirmCb = null;
+function openConfirm(titulo, msg, cb) {
+  document.getElementById('confirm-titulo').textContent = titulo;
+  document.getElementById('confirm-msg').textContent = msg;
+  _confirmCb = cb;
+  document.getElementById('confirm-ok-btn').onclick = () => { closeConfirm(); cb(); };
+  document.getElementById('modal-confirm').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeConfirm() {
+  document.getElementById('modal-confirm').classList.add('hidden');
+  document.body.style.overflow = '';
+  _confirmCb = null;
+}
+function closeConfirmOverlay(e) {
+  if (e.target === document.getElementById('modal-confirm')) closeConfirm();
+}
+
+// Reiniciar el mes actual en curso
+function pedirResetMesActual() {
+  const current = loadFinCurrent();
+  if (!current) return;
+  const g = formatMXN(current.ganancia||0);
+  const i = formatMXN(current.inversion||0);
+  openConfirm(
+    '🔄 Reiniciar mes actual',
+    `Se pondrán en cero las ganancias (${g}) e inversiones (${i}) del mes de ${formatMes(current.mes)}. Los movimientos anteriores quedan registrados en el historial. Esta acción no se puede deshacer.`,
+    ejecutarResetMesActual
+  );
+}
+function ejecutarResetMesActual() {
+  let current = loadFinCurrent() || {mes:getCurrentMonthKey(),ganancia:0,inversion:0,movimientos:[]};
+  current.movimientos = current.movimientos || [];
+  const fechaReset = new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  // Registrar el reinicio como movimiento especial
+  current.movimientos.unshift({
+    id: Date.now(), tipo: 'reset', monto: 0,
+    desc: `🔄 Reinicio manual — G:${formatMXN(current.ganancia||0)} / I:${formatMXN(current.inversion||0)}`,
+    fecha: fechaReset
+  });
+  current.ganancia = 0;
+  current.inversion = 0;
+  if (!current.reinicios) current.reinicios = [];
+  current.reinicios.push({ fecha: new Date().toISOString() });
+  saveFinCurrent(current);
+  renderFinanceDashboard();
+}
+
+// Reiniciar un mes del historial
+function pedirResetMesHistorial(mesKey) {
+  const hist = loadFinHistorial();
+  const h = hist.find(x=>x.mes===mesKey);
+  if (!h) return;
+  openConfirm(
+    `🔄 Reiniciar ${formatMes(mesKey)}`,
+    `Se pondrán en cero las ganancias (${formatMXN(h.ganancia||0)}) e inversiones (${formatMXN(h.inversion||0)}) de ${formatMes(mesKey)}. Los registros individuales de movimientos se conservan. Esta acción no se puede deshacer.`,
+    () => ejecutarResetMesHistorial(mesKey)
+  );
+}
+function ejecutarResetMesHistorial(mesKey) {
+  const hist = loadFinHistorial();
+  const idx = hist.findIndex(h=>h.mes===mesKey);
+  if (idx === -1) return;
+  if (!hist[idx].reinicios) hist[idx].reinicios = [];
+  hist[idx].reinicios.push({
+    fecha: new Date().toISOString(),
+    gananciaAntes: hist[idx].ganancia||0,
+    inversionAntes: hist[idx].inversion||0
+  });
+  hist[idx].ganancia = 0;
+  hist[idx].inversion = 0;
+  saveFinHistorial(hist);
+  renderHistorico();
+}
+
+// ══════════════════════════════════════════
+// FASE 4 — OCULTAR / MOSTRAR IMPORTES
+// ══════════════════════════════════════════
+let _importesOcultos = localStorage.getItem('fin_ocultar') === '1';
+const MASK = '••••••';
+
+function forzarActualizacion() {
+  openConfirm('Actualizar app', 'Se limpiará el caché y se recargará la app. Tus datos no se borran.', () => {
+    const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
+    } else {
+      limpiar();
+    }
+  });
+}
+
+function toggleOcultarImportes() {
+  _importesOcultos = !_importesOcultos;
+  localStorage.setItem('fin_ocultar', _importesOcultos ? '1' : '0');
+  actualizarBtnOcultar();
+  // Re-renderizar para aplicar la preferencia
+  renderFinanceDashboard();
+}
+
+function actualizarBtnOcultar() {
+  const btn  = document.getElementById('btn-ocultar-importes');
+  const ico  = document.getElementById('ocu-ico');
+  const txt  = document.getElementById('ocu-texto');
+  const bdg  = document.getElementById('ocu-badge');
+  if (!btn) return;
+  if (_importesOcultos) {
+    btn.classList.add('activo');
+    if (ico) ico.textContent = '🙈';
+    if (txt) txt.textContent = 'Mostrar importes';
+    if (bdg) bdg.textContent = 'OCULTO';
+  } else {
+    btn.classList.remove('activo');
+    if (ico) ico.textContent = '👁';
+    if (txt) txt.textContent = 'Ocultar importes';
+    if (bdg) bdg.textContent = 'VISIBLE';
+  }
+}
+
+// Devuelve el texto a mostrar según preferencia ocultar
+function dispMonto(val) { return _importesOcultos ? MASK : formatMXN(val); }
+
 function initFinances() {
   checkAndRotateMonth();
+  actualizarBtnOcultar();
   renderFinanceDashboard();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkAndRotateMonth();
+      renderFinanceDashboard();
+    }
+  });
+  // Actualiza en tiempo real si index.html registra un ingreso desde otra pestaña
+  window.addEventListener('storage', e => {
+    if (e.key === 'fin_current') renderFinanceDashboard();
+  });
 }
 
 // ── INIT ──
@@ -1878,6 +2168,43 @@ function initFirebase() {
     }
   );
 
+  // Listener — finanzas (sync bidireccional con merge inteligente)
+  onSnapshot(doc(db, 'finanzas', 'datos'), snap => {
+    if (!snap.exists()) {
+      _syncFinToFirebase(); // primera vez: subir lo que hay local
+      return;
+    }
+    const data = snap.data();
+    const localCurrent = loadFinCurrent();
+    const localHist = loadFinHistorial();
+
+    // Mes actual: tomar el más reciente; si es el mismo mes, el que tiene más movimientos
+    if (data.current && data.current.mes) {
+      const fbMes = data.current.mes;
+      const localMes = localCurrent ? localCurrent.mes : '';
+      const mismoMes = fbMes === localMes;
+      const fbMasMovs = (data.current.movimientos||[]).length >= (localCurrent ? (localCurrent.movimientos||[]).length : 0);
+      if (!localMes || fbMes > localMes || (mismoMes && fbMasMovs)) {
+        localStorage.setItem('fin_current', JSON.stringify(data.current));
+      } else if (mismoMes && !fbMasMovs) {
+        // Local tiene más datos del mismo mes → subir a Firebase
+        _syncFinToFirebase();
+      }
+    }
+
+    // Historial: merge por mes (union — no se pierden meses de ningún dispositivo)
+    if (Array.isArray(data.historial) && data.historial.length > 0) {
+      const merged = [...localHist];
+      data.historial.forEach(fbEntry => {
+        if (fbEntry.mes && !merged.some(h => h.mes === fbEntry.mes)) merged.push(fbEntry);
+      });
+      merged.sort((a, b) => b.mes.localeCompare(a.mes));
+      localStorage.setItem('fin_historial', JSON.stringify(merged));
+    }
+
+    if (initialRenderDone) renderFinanceDashboard();
+  }, err => console.warn('Firestore finanzas error:', err));
+
   // Listener — ítems personalizados
   onSnapshot(
     query(collection(db, 'checklist_custom_items'), orderBy('createdAt', 'asc')),
@@ -1889,7 +2216,12 @@ function initFirebase() {
         fresh[data.panel].push({ id: data.id, label: data.label });
       });
       _customCache = fresh;
+      // Persistir en localStorage tanto tabs estáticos como paneles dinámicos
       STATIC_TABS.forEach(t => saveCustomItemsLocal(t, _customCache[t] || []));
+      _servicesCache.forEach(svc => {
+        const tid = 'extra-' + svc.id;
+        saveCustomItemsLocal(tid, _customCache[tid] || []);
+      });
       customReady = true;
       if (initialRenderDone) {
         STATIC_TABS.forEach(t => { renderCustomItems(t); updateProgress(t); });
@@ -1924,6 +2256,12 @@ if (window._fbReady !== undefined && !fbInitDone) {
   fbInitDone = true;
   initFirebase();
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeConfirm();
+  closeHistorico();
+});
 </script>
 </body>
 </html>
