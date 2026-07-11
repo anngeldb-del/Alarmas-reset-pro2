@@ -413,7 +413,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <button class="sidebar-top-close" onclick="closeSidebar()">☰</button>
     <div>
       <div class="sidebar-brand">🔐 Alarmas <span>Reset</span></div>
-      <div class="sidebar-version">Control de Órdenes v2.0</div>
+      <div class="sidebar-version">Control de Órdenes v3.0</div>
     </div>
   </div>
 
@@ -468,7 +468,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
   <button class="sidebar-item" onclick="forzarActualizacion()" style="color:#ff6b35;border-top:1px solid var(--border);margin-top:4px">
     <span class="si-icon">🔄</span><span class="si-label">Actualizar app</span>
-    <span style="font-size:10px;color:var(--muted)">v2.1</span>
+    <span style="font-size:10px;color:var(--muted)">v3.0</span>
   </button>
 
   <div class="sidebar-footer">
@@ -3159,16 +3159,16 @@ function closeSidebar() {
 
 async function forzarActualizacion() {
   closeSidebar();
-  await new Promise(r => setTimeout(r, 200)); // espera que cierre el sidebar
-  const ok = await confirmarAccion('Actualizar app', 'Se limpiará el caché y se recargará la app. Tus datos no se borran.', '🔄', 'Actualizar');
-  if (!ok) return;
-  toast('⏳ Limpiando caché...');
-  const limpiar = () => caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true));
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).then(limpiar);
-  } else {
-    limpiar();
-  }
+  toast('⏳ Actualizando...');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } catch(e) { /* continuar igual */ }
+  location.reload(true);
 }
 
 function navTo(tab) {
