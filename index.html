@@ -12,7 +12,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
   // ══════════════════════════════════════════════════
   // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
@@ -41,7 +41,14 @@
   if (fbConfigured) {
     try {
       const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
+      // Persistencia offline nativa de Firestore: además de la cola propia que
+      // ya reintenta las escrituras fallidas, esto hace que las LECTURAS
+      // también funcionen sin internet (antes, si no había red al abrir la
+      // app, la lista de órdenes/clientes/citas se quedaba vacía indefinidamente
+      // porque el listener de Firestore nunca recibía su primer resultado)
+      const db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      });
       window._firebaseDb = db;
       window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query };
       window._useFirebase = true;
