@@ -2477,12 +2477,6 @@ function _runInitAppData() {
     initAppData();
   }
 }
-function _detenerListenersFirestore() {
-  if (_unsubOrdenes) { _unsubOrdenes(); _unsubOrdenes = null; }
-  if (_unsubClientes) { _unsubClientes(); _unsubClientes = null; }
-  if (_unsubCitas) { _unsubCitas(); _unsubCitas = null; }
-}
-
 // ═══════════════════════════════════════
 // NOTIFICACIONES PUSH (FCM)
 // ═══════════════════════════════════════

@@ -24,12 +24,13 @@
  *    cd functions && npm install
  *    firebase deploy --only functions
  *
- * 5. Las órdenes viven en usuarios/{uid}/ordenes (login por Google en la app).
- *    Este archivo las lee con collectionGroup('ordenes'), que requiere un
- *    índice de grupo de colecciones para el orderBy('fecha_creacion'). Si el
- *    primer despliegue/ejecución falla con "requires an index", Firestore
- *    imprime en el log un link para crearlo con un clic (Console → Firestore
- *    → Indexes → Collection group).
+ * 5. La app no pide login: todos los dispositivos comparten la misma ruta
+ *    usuarios/compartido/ordenes (ver README). Este archivo lee las órdenes
+ *    con collectionGroup('ordenes'), que requiere un índice de grupo de
+ *    colecciones para el orderBy('fecha_creacion'). Si el primer despliegue/
+ *    ejecución falla con "requires an index", Firestore imprime en el log
+ *    un link para crearlo con un clic (Console → Firestore → Indexes →
+ *    Collection group).
  */
 
 const { onSchedule } = require('firebase-functions/v2/scheduler');
@@ -95,8 +96,8 @@ exports.exportMensualM365 = onSchedule({
   try {
     // 1. Obtener todas las órdenes de Firestore
     console.log('Leyendo órdenes de Firestore...');
-    // Las órdenes viven en usuarios/{uid}/ordenes desde que se agregó login;
-    // collectionGroup las encuentra sin importar de qué usuario sean.
+    // Las órdenes viven en usuarios/compartido/ordenes; collectionGroup las
+    // encuentra sin depender de la ruta exacta.
     const snapshot = await db.collectionGroup('ordenes')
       .orderBy('fecha_creacion', 'desc')
       .get();
@@ -456,7 +457,9 @@ exports.notificarPendientes = onSchedule({
   const db = getFirestore();
   const hoy = new Date();
 
-  // Agrupar las órdenes de todos los negocios por uid dueño (usuarios/{uid}/ordenes/...)
+  // Agrupar las órdenes por el id de documento padre (usuarios/{id}/ordenes/...) —
+  // hoy solo existe "compartido", pero esto sigue funcionando si algún día
+  // vuelve a haber más de una ruta.
   const ordenesSnap = await db.collectionGroup('ordenes').get();
   const porUsuario = {};
   ordenesSnap.forEach(doc => {
