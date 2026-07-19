@@ -507,6 +507,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- COTIZACIONES -->
 <div class="view" id="tab-cotizaciones">
   <div id="cot-form-wrapper"></div>
+  <div id="cot-lista-wrapper"></div>
 </div>
 
 <!-- CLIENTES (CRM) -->
@@ -674,24 +675,31 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 let ordenes = [];
 let clientes = [];
 let citas = [];
+let cotizaciones = [];
 let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
 let editandoClienteId = null;
 let editandoCitaId = null;
-let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
-let cotFolioRegistrado = false;
+// Folio de cotización: se calcula del máximo folio del año ya guardado en
+// Firestore (compartido entre dispositivos) más este contador de sesión,
+// que evita repetir folio si generas varias cotizaciones seguidas antes de
+// que la anterior alcance a reflejarse en `cotizaciones`.
+let _ultimoCotFolioEmitido = 0;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 let fsListenerStarted = false;
 let clientesListenerStarted = false;
 let citasListenerStarted = false;
+let cotizacionesListenerStarted = false;
 let _unsubOrdenes = null;
 let _unsubClientes = null;
 let _unsubCitas = null;
+let _unsubCotizaciones = null;
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 const AGENDA_ESTADO_LABELS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
+const COT_ESTADO_LABELS = { PENDIENTE: 'Pendiente', ACEPTADA: 'Aceptada', RECHAZADA: 'Rechazada' };
 
 // ═══════════════════════════════════════
 // RUTAS FIRESTORE — datos privados por usuario (usuarios/{uid}/...)
@@ -723,6 +731,14 @@ function colCitas() {
 function docCita(id) {
   const { doc } = window._firebaseModules;
   return doc(window._firebaseDb, 'usuarios', window._uid, 'citas', id);
+}
+function colCotizaciones() {
+  const { collection } = window._firebaseModules;
+  return collection(window._firebaseDb, 'usuarios', window._uid, 'cotizaciones');
+}
+function docCotizacion(id) {
+  const { doc } = window._firebaseModules;
+  return doc(window._firebaseDb, 'usuarios', window._uid, 'cotizaciones', id);
 }
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
@@ -1424,6 +1440,108 @@ function linkGoogleCalendar(cita) {
 }
 
 // ═══════════════════════════════════════
+// COTIZACIONES — datos (usuarios/{uid}/cotizaciones)
+// ═══════════════════════════════════════
+async function cargarCotizacionesLocal() {
+  try {
+    const data = localStorage.getItem('alarmas_cotizaciones');
+    cotizaciones = data ? JSON.parse(data) : [];
+  } catch(e) { cotizaciones = []; }
+  renderCotizaciones();
+}
+
+function guardarCotizacionesLocal() {
+  try { localStorage.setItem('alarmas_cotizaciones', JSON.stringify(cotizaciones)); } catch(e) {}
+}
+
+async function cargarCotizaciones() {
+  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
+    try {
+      const { onSnapshot, orderBy, query } = window._firebaseModules;
+      const q = query(colCotizaciones(), orderBy('fecha_creacion','desc'));
+      if (!cotizacionesListenerStarted) {
+        cotizacionesListenerStarted = true;
+        _unsubCotizaciones = onSnapshot(q, snap => {
+          cotizaciones = snap.docs.map(d=>({id:d.id,...d.data()}));
+          renderCotizaciones();
+        }, err => {
+          console.error(err);
+          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
+          cotizacionesListenerStarted = false;
+          cargarCotizacionesLocal();
+        });
+      }
+      return;
+    } catch(e) { console.error(e); }
+  }
+  cargarCotizacionesLocal();
+}
+
+async function guardarCotizacion(cot) {
+  cot.fecha_creacion = Date.now();
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { addDoc } = window._firebaseModules;
+      await addDoc(colCotizaciones(), cot);
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Firebase no disponible — guardando local');
+      window._useFirebase = false;
+      updateFirebaseBadge();
+    }
+  }
+  cot.id = 'local_cot_' + Date.now();
+  cotizaciones.unshift(cot);
+  guardarCotizacionesLocal();
+  renderCotizaciones();
+}
+
+async function cambiarEstadoCotizacion(id, estado) {
+  const cot = cotizaciones.find(c=>c.id===id);
+  if (!cot) return;
+  const estadoAnterior = cot.estado;
+  cot.estado = estado;
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { updateDoc } = window._firebaseModules;
+      await updateDoc(docCotizacion(id), { estado });
+      renderCotizaciones();
+      return;
+    } catch(e) {
+      console.error(e);
+      cot.estado = estadoAnterior;
+      renderCotizaciones();
+      toast('⚠️ Error al actualizar: ' + (e.message || e));
+      return;
+    }
+  }
+  guardarCotizacionesLocal();
+  renderCotizaciones();
+}
+
+async function eliminarCotizacion(id) {
+  const ok = await confirmarAccion('Eliminar cotización', '¿Eliminar esta cotización?', '🗑️', 'Eliminar');
+  if (!ok) return;
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { deleteDoc } = window._firebaseModules;
+      await deleteDoc(docCotizacion(id));
+      toast('Cotización eliminada');
+      return;
+    } catch(e) {
+      console.error(e);
+      toast('⚠️ Error al eliminar: ' + (e.message || e));
+      return;
+    }
+  }
+  cotizaciones = cotizaciones.filter(c => c.id !== id);
+  guardarCotizacionesLocal();
+  renderCotizaciones();
+  toast('Cotización eliminada');
+}
+
+// ═══════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════
 function showTab(id, btn) {
@@ -1442,6 +1560,7 @@ function showTab(id, btn) {
   if (id==='cotizaciones') {
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
+    renderCotizaciones();
   }
   if (id==='clientes') renderClientes();
   if (id==='agenda') renderAgenda();
@@ -2196,9 +2315,19 @@ function cerrarModal() {
 // ═══════════════════════════════════════
 // COTIZACIONES
 // ═══════════════════════════════════════
+// Folio del año calculado a partir de las cotizaciones ya guardadas
+// (compartidas por Firestore entre dispositivos) más el último emitido en
+// esta sesión, para que nunca se repita aunque se generen varias seguidas.
+function nextCotFolioNum() {
+  const prefix = 'COT-' + new Date().getFullYear() + '-';
+  const nums = cotizaciones
+    .filter(c => (c.folio||'').startsWith(prefix))
+    .map(c => parseInt((c.folio||'').slice(prefix.length), 10) || 0);
+  const maxGuardado = nums.length ? Math.max(...nums) : 0;
+  return Math.max(maxGuardado, _ultimoCotFolioEmitido) + 1;
+}
 function buildCotFormHTML() {
-  cotFolioRegistrado = false;
-  const folio='COT-'+new Date().getFullYear()+'-'+String(cotFolioNum).padStart(3,'0');
+  const folio='COT-'+new Date().getFullYear()+'-'+String(nextCotFolioNum()).padStart(3,'0');
   const hoy=new Date().toISOString().split('T')[0];
   const vigencia=new Date(Date.now()+15*24*60*60*1000).toISOString().split('T')[0];
   return `
@@ -2280,7 +2409,7 @@ function buildCotFormHTML() {
   <div class="form-group" style="margin-bottom:20px"><label class="form-label">Notas adicionales</label>
     <input class="form-input" id="c-notas" placeholder="Observaciones o acuerdos especiales"></div>
   <div style="display:flex;gap:10px;padding-top:4px;padding-bottom:40px">
-    <button class="btn btn-primary" style="flex:1" onclick="verCotizacion()">🧾 Ver cotización</button>
+    <button class="btn btn-primary" style="flex:1" onclick="guardarYVerCotizacion()">💾 Guardar y ver cotización</button>
   </div>`;
 }
 
@@ -2381,58 +2510,166 @@ function leerPartidas() {
   })).filter(p=>p.nombre && (p.precio >= 0));
 }
 
-function verCotizacion() {
-  const cliente=document.getElementById('c-cliente')?.value?.trim();
-  if(!cliente){toast('⚠️ El nombre del cliente es obligatorio');return;}
-  const nums=recalcCot();
-  const partidas=leerPartidas();
-  const folio=document.getElementById('c-folio')?.value||'';
-  const fecha=document.getElementById('c-fecha')?.value||'';
-  const vigencia=document.getElementById('c-vigencia')?.value||'';
-  if (!cotFolioRegistrado) {
-    cotFolioRegistrado = true;
-    cotFolioNum++; localStorage.setItem('cot_folio', cotFolioNum);
-  }
-
-  const bodyHTML =
-    headerEmpresa('COTIZACIÓN', folio, fecha)
+// Construye el HTML imprimible de una cotización ya guardada (objeto plano
+// con los mismos campos que guardarYVerCotizacion persiste), para poder
+// reabrirla desde la lista sin depender de que el formulario siga montado.
+function renderCotizacionHTML(c) {
+  const partidas = c.partidas || [];
+  return headerEmpresa('COTIZACIÓN', c.folio, c.fecha)
     + '<div class="info-grid">'
-    +   '<div><div class="info-label">Cliente / Empresa</div><div class="info-val">'+esc(document.getElementById('c-cliente')?.value||'')+'</div></div>'
-    +   '<div><div class="info-label">No. Cotización</div><div class="info-val">'+esc(folio)+'</div></div>'
-    +   '<div><div class="info-label">Atención a</div><div class="info-val">'+esc(document.getElementById('c-atencion')?.value||'')+'</div></div>'
-    +   '<div><div class="info-label">Fecha</div><div class="info-val">'+esc(fecha)+'</div></div>'
-    +   '<div><div class="info-label">Dirección</div><div class="info-val">'+esc(document.getElementById('c-direccion')?.value||'')+'</div></div>'
-    +   '<div><div class="info-label">Válida hasta</div><div class="info-val">'+esc(vigencia)+'</div></div>'
+    +   '<div><div class="info-label">Cliente / Empresa</div><div class="info-val">'+esc(c.cliente||'')+'</div></div>'
+    +   '<div><div class="info-label">No. Cotización</div><div class="info-val">'+esc(c.folio||'')+'</div></div>'
+    +   '<div><div class="info-label">Atención a</div><div class="info-val">'+esc(c.atencion||'')+'</div></div>'
+    +   '<div><div class="info-label">Fecha</div><div class="info-val">'+esc(c.fecha||'')+'</div></div>'
+    +   '<div><div class="info-label">Dirección</div><div class="info-val">'+esc(c.direccion||'')+'</div></div>'
+    +   '<div><div class="info-label">Válida hasta</div><div class="info-val">'+esc(c.vigencia||'')+'</div></div>'
     + '</div>'
-    + (document.getElementById('c-descripcion')?.value?.trim()?'<div class="desc-box"><div class="desc-label">Descripción del proyecto</div>'+esc(document.getElementById('c-descripcion').value)+'</div>':'')
+    + (c.descripcion?'<div class="desc-box"><div class="desc-label">Descripción del proyecto</div>'+esc(c.descripcion)+'</div>':'')
     + '<table><thead><tr><th style="width:24px">#</th><th>Descripción</th><th>Marca/Modelo</th><th style="width:40px;text-align:center">Cant.</th><th style="width:80px;text-align:right">P. Unit.</th><th style="width:50px;text-align:center">Dscto.</th><th style="width:90px;text-align:right">Subtotal</th></tr></thead><tbody>'
     + partidas.map((p,i)=>'<tr><td style="color:#999">'+(i+1)+'</td><td>'+esc(p.nombre)+'</td><td style="color:#666">'+esc(p.marca)+'</td><td style="text-align:center">'+p.cant+'</td><td class="num">'+fmt(p.precio)+'</td><td style="text-align:center">'+(p.descto>0?p.descto+'%':'—')+'</td><td class="num">'+fmt(p.subtotal)+'</td></tr>').join('')
     + '</tbody></table>'
     + '<div style="display:flex;justify-content:flex-end"><div class="totales">'
-    +   '<div class="total-row"><span>Subtotal</span><span>'+fmt(nums.subtotal)+'</span></div>'
-    +   (nums.descMonto>0?'<div class="total-row"><span>Descuento adicional</span><span>- '+fmt(nums.descMonto)+'</span></div>':'')
-    +   (nums.ivaActivo&&nums.ivaRate>0?'<div class="total-row"><span>IVA ('+Math.round(nums.ivaRate*100)+'%)</span><span>'+fmt(nums.iva)+'</span></div>':'')
-    +   (!nums.ivaActivo?'<div class="total-row" style="color:#888"><span>IVA</span><span>No aplica / Sin IVA</span></div>':'')
-    +   (nums.envio>0?'<div class="total-row"><span>Envío / Otros</span><span>'+fmt(nums.envio)+'</span></div>':'')
-    +   '<div class="total-row main"><span>TOTAL A PAGAR</span><span>'+fmt(nums.total)+'</span></div>'
+    +   '<div class="total-row"><span>Subtotal</span><span>'+fmt(c.subtotal)+'</span></div>'
+    +   (c.descuento_monto>0?'<div class="total-row"><span>Descuento adicional</span><span>- '+fmt(c.descuento_monto)+'</span></div>':'')
+    +   (c.iva_activo&&c.iva_rate>0?'<div class="total-row"><span>IVA ('+Math.round(c.iva_rate*100)+'%)</span><span>'+fmt(c.iva_monto)+'</span></div>':'')
+    +   (!c.iva_activo?'<div class="total-row" style="color:#888"><span>IVA</span><span>No aplica / Sin IVA</span></div>':'')
+    +   (c.envio_total>0?'<div class="total-row"><span>Envío / Otros</span><span>'+fmt(c.envio_total)+'</span></div>':'')
+    +   '<div class="total-row main"><span>TOTAL A PAGAR</span><span>'+fmt(c.total)+'</span></div>'
     +   '<div style="font-size:10px;color:#999;margin-top:4px;text-align:right">Moneda: MXN</div>'
     + '</div></div>'
     + '<div class="condiciones"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-bottom:6px">Condiciones comerciales</div>'
     + '<table>'
-    +   '<tr><td>Forma de pago</td><td>'+esc(document.getElementById('c-pago')?.value||'')+'</td></tr>'
-    +   '<tr><td>Tiempo de entrega</td><td>'+esc(document.getElementById('c-entrega')?.value||'')+'</td></tr>'
-    +   '<tr><td>Garantía</td><td>'+esc(document.getElementById('c-garantia')?.value||'')+'</td></tr>'
-    +   '<tr><td>Instalación</td><td>'+esc(document.getElementById('c-instalacion')?.value||'')+'</td></tr>'
-    +   '<tr><td>Transporte</td><td>'+esc(document.getElementById('c-transporte')?.value||'')+'</td></tr>'
-    +   (document.getElementById('c-notas')?.value?.trim()?'<tr><td>Notas</td><td>'+esc(document.getElementById('c-notas').value)+'</td></tr>':'')
+    +   '<tr><td>Forma de pago</td><td>'+esc(c.pago||'')+'</td></tr>'
+    +   '<tr><td>Tiempo de entrega</td><td>'+esc(c.entrega||'')+'</td></tr>'
+    +   '<tr><td>Garantía</td><td>'+esc(c.garantia||'')+'</td></tr>'
+    +   '<tr><td>Instalación</td><td>'+esc(c.instalacion||'')+'</td></tr>'
+    +   '<tr><td>Transporte</td><td>'+esc(c.transporte||'')+'</td></tr>'
+    +   (c.notas?'<tr><td>Notas</td><td>'+esc(c.notas)+'</td></tr>':'')
     + '</table></div>'
     + '<div class="firmas">'
     +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">'+EMPRESA.contacto+'<br>'+EMPRESA.nombre+' — '+EMPRESA.subtitulo+'</div></div>'
-    +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">Nombre y firma del cliente<br>'+esc(cliente)+'</div></div>'
+    +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">Nombre y firma del cliente<br>'+esc(c.cliente||'')+'</div></div>'
     + '</div>'
     + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+'</div>';
+}
 
-  abrirDoc('Cotización '+folio, bodyHTML);
+let _guardandoCotizacion = false;
+async function guardarYVerCotizacion() {
+  if (_guardandoCotizacion) return;
+  const cliente=document.getElementById('c-cliente')?.value?.trim();
+  if(!cliente){toast('⚠️ El nombre del cliente es obligatorio');return;}
+  const partidas=leerPartidas();
+  if(!partidas.length){toast('⚠️ Agrega al menos una partida');return;}
+  const nums=recalcCot();
+  const folio=document.getElementById('c-folio')?.value||'';
+  _guardandoCotizacion = true;
+  try {
+    const cot = {
+      folio, cliente,
+      atencion: document.getElementById('c-atencion')?.value?.trim()||'',
+      direccion: document.getElementById('c-direccion')?.value?.trim()||'',
+      fecha: document.getElementById('c-fecha')?.value||'',
+      vigencia: document.getElementById('c-vigencia')?.value||'',
+      descripcion: document.getElementById('c-descripcion')?.value?.trim()||'',
+      partidas,
+      subtotal: nums.subtotal,
+      descuento_monto: nums.descMonto,
+      iva_activo: nums.ivaActivo,
+      iva_rate: nums.ivaRate,
+      iva_monto: nums.iva,
+      envio_total: nums.envio,
+      total: nums.total,
+      pago: document.getElementById('c-pago')?.value?.trim()||'',
+      entrega: document.getElementById('c-entrega')?.value?.trim()||'',
+      garantia: document.getElementById('c-garantia')?.value?.trim()||'',
+      instalacion: document.getElementById('c-instalacion')?.value||'',
+      transporte: document.getElementById('c-transporte')?.value?.trim()||'',
+      notas: document.getElementById('c-notas')?.value?.trim()||'',
+      estado: 'PENDIENTE'
+    };
+    const num = parseInt(String(folio).split('-').pop(), 10);
+    if (num) _ultimoCotFolioEmitido = Math.max(_ultimoCotFolioEmitido, num);
+    await guardarCotizacion(cot);
+    abrirDoc('Cotización '+folio, renderCotizacionHTML(cot));
+    toast('✅ Cotización guardada');
+    document.getElementById('cot-form-wrapper').innerHTML = buildCotFormHTML();
+    setTimeout(recalcCot, 0);
+  } finally {
+    _guardandoCotizacion = false;
+  }
+}
+
+// ═══════════════════════════════════════
+// COTIZACIONES — lista, estado y conversión a orden
+// ═══════════════════════════════════════
+function renderCotizaciones() {
+  const cont = document.getElementById('cot-lista-wrapper');
+  if (!cont) return;
+  if (!cotizaciones.length) { cont.innerHTML = ''; return; }
+  const ordenadas = [...cotizaciones].sort((a,b) => (b.folio||'').localeCompare(a.folio||''));
+  cont.innerHTML = '<div class="form-section">Cotizaciones guardadas</div>' + ordenadas.map(cotizacionCard).join('');
+}
+
+function cotizacionCard(c) {
+  const est = c.estado || 'PENDIENTE';
+  const estColorClass = { PENDIENTE:'pendiente', ACEPTADA:'pagado', RECHAZADA:'termo' }[est] || 'pendiente';
+  return `<div class="orden-card">
+    <div class="orden-header">
+      <div><div class="orden-title">🧾 ${esc(c.folio||'')} · ${esc(c.cliente||'')}</div>
+      <div class="orden-sub">${esc(c.fecha||'')} · ${fmt(c.total||0)}</div></div>
+      <span class="estado-badge ${estColorClass}">${COT_ESTADO_LABELS[est]||est}</span>
+    </div>
+    <div class="orden-body open">
+      <div class="orden-actions">
+        <button class="btn btn-ghost btn-sm" onclick="verCotizacionGuardada('${c.id}')">👁️ Ver</button>
+        ${est!=='ACEPTADA'?`<button class="btn btn-green btn-sm" onclick="convertirCotizacionAOrden('${c.id}')">✅ Aceptar → Orden</button>`:''}
+        ${est!=='RECHAZADA'?`<button class="btn btn-ghost btn-sm" onclick="cambiarEstadoCotizacion('${c.id}','RECHAZADA')">✕ Rechazar</button>`:''}
+        <button class="btn btn-danger btn-sm" onclick="eliminarCotizacion('${c.id}')">🗑️ Borrar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function verCotizacionGuardada(id) {
+  const c = cotizaciones.find(x=>x.id===id);
+  if (!c) return;
+  abrirDoc('Cotización '+(c.folio||''), renderCotizacionHTML(c));
+}
+
+// Precarga el formulario de Nueva Orden con los datos de la cotización
+// aceptada, para no tener que volver a escribir cliente ni partidas.
+function convertirCotizacionAOrden(id) {
+  const c = cotizaciones.find(x=>x.id===id);
+  if (!c) return;
+  const garTexto = (c.garantia||'').toLowerCase();
+  const garantiaProducto = /a[ñn]o|12\s*mes/.test(garTexto) ? 'GARANTIA 1 AÑO'
+    : /6\s*mes/.test(garTexto) ? 'GARANTIA 6 MESES' : '';
+  const productos = (c.partidas||[]).map(p => ({
+    nombre: p.nombre + (p.marca ? ' — ' + p.marca : ''),
+    costo: p.subtotal || 0,
+    inversion: 0,
+    garantia: garantiaProducto
+  }));
+  if (c.envio_total > 0) {
+    productos.push({ nombre: 'Envío / Otros cargos', costo: c.envio_total, inversion: 0, garantia: '' });
+  }
+  const prefill = {
+    cliente: c.cliente || '',
+    vehiculo: '',
+    telefono: '',
+    fecha_instalacion: '',
+    fecha_pago: '',
+    total: c.total || 0,
+    a_cuenta_total: 0,
+    estado: 'PENDIENTE',
+    recordatorios: 'Desde cotización ' + (c.folio||'') + (c.notas ? ' — ' + c.notas : ''),
+    productos: productos.length ? productos : undefined
+  };
+  editandoId = null;
+  document.getElementById('modal-title').textContent = 'Nueva Orden (desde ' + (c.folio||'cotización') + ')';
+  mountOrdenForm(prefill, 'modal');
+  cambiarEstadoCotizacion(id, 'ACEPTADA');
+  toast('📋 Revisa el vehículo y los precios, y guarda la orden');
 }
 
 // ═══════════════════════════════════════
@@ -2448,6 +2685,7 @@ function initAppData() {
   cargarOrdenes();
   cargarClientes();
   cargarCitas();
+  cargarCotizaciones();
   setTimeout(checkAndRotateMonthOrders, 1200);
   setTimeout(initOnboarding, 800);
   // Capturar resultado de loginRedirect de MSAL (iOS Safari)
@@ -3376,7 +3614,11 @@ window.irAOrden = irAOrden;
 window.setIvaCot = setIvaCot;
 window.agregarPartida = agregarPartida;
 window.quitarPartida = quitarPartida;
-window.verCotizacion = verCotizacion;
+window.guardarYVerCotizacion = guardarYVerCotizacion;
+window.verCotizacionGuardada = verCotizacionGuardada;
+window.convertirCotizacionAOrden = convertirCotizacionAOrden;
+window.cambiarEstadoCotizacion = cambiarEstadoCotizacion;
+window.eliminarCotizacion = eliminarCotizacion;
 window.docImprimir = docImprimir;
 window.docCompartir = docCompartir;
 window.cerrarDoc = cerrarDoc;
