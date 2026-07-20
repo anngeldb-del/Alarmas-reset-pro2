@@ -1,5 +1,5 @@
-const CACHE = 'app-v12';
-const STATIC = ['./', './index.html', './checklist.html', './manifest.json'];
+const CACHE = 'app-v13';
+const STATIC = ['./', './index.html', './checklist.html', './manifest.json', './assets/logo-reset-compact.png', './assets/logo-reset-full.png'];
 
 // ── Firebase Cloud Messaging (notificaciones push) ──
 // Mismo firebaseConfig público que index.html/checklist.html.

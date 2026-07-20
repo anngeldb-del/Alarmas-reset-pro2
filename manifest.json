@@ -1,13 +1,13 @@
 {
-  "name": "Alarmas Reset — Órdenes",
-  "short_name": "Alarmas Reset",
-  "description": "Alarmas Reset — Órdenes",
+  "name": "RESET Alarmas y GPS — Órdenes",
+  "short_name": "RESET Alarmas",
+  "description": "RESET Alarmas y GPS — Control de Órdenes",
   "start_url": "/Alarmas-reset-pro2/",
   "scope": "/Alarmas-reset-pro2/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0c0f",
-  "theme_color": "#ff6030",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
   "lang": "es-MX",
   "icons": [
     {
