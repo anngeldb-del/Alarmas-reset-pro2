@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "ordenes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "fecha_creacion", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

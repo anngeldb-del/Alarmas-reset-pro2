@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Catálogo de servicios y finanzas — Alarmas y GPS Reset">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <title>Alarmas Reset — Cotizaciones</title>
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW error:', e)));
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=12').catch(e => console.warn('SW error:', e)));
   }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,15 +24,7 @@
     query, orderBy, serverTimestamp,
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
-    authDomain: "alarmas-reset-e3484.firebaseapp.com",
-    projectId: "alarmas-reset-e3484",
-    storageBucket: "alarmas-reset-e3484.firebasestorage.app",
-    messagingSenderId: "1096561116547",
-    appId: "1:1096561116547:web:b13df05c092785723aa2b6"
-  };
+  import { firebaseConfig } from "./firebase-config.js";
 
   // Sin login: todos los dispositivos comparten la misma ruta de datos
   // (usuarios/compartido/...), igual que index.html — ver README.
@@ -1163,7 +1156,7 @@ body::before{
           <label>Agrega opciones (una a la vez)</label>
           <div style="display:flex;gap:8px">
             <input id="new_option_input" placeholder="Ej. Amplificador Rockford 4 canales" style="flex:1">
-            <button class="add-btn" style="width:auto;padding:9px 14px;margin:0" onclick="addOption()">+</button>
+            <button class="add-btn" style="width:auto;padding:9px 14px;margin:0" onclick="addOption()" aria-label="Agregar opción">+</button>
           </div>
         </div>
         <div class="add-items-preview" id="options_preview">
@@ -1283,7 +1276,7 @@ body::before{
     <div class="modal-bar"></div>
     <div class="modal-title">
       <span>📊 Histórico Mensual</span>
-      <button class="modal-close" onclick="closeHistorico()">✕</button>
+      <button class="modal-close" onclick="closeHistorico()" aria-label="Cerrar">✕</button>
     </div>
     <div id="hist-list"></div>
   </div>
@@ -1423,7 +1416,7 @@ function renderCustomItems(panel) {
         <div class="item-name">${esc(item.label)}</div>
       </div>
       <span class="custom-badge">CUSTOM</span>
-      <button class="btn-del-item" onclick="deleteCustomItem('${panel}',${item.id})" title="Eliminar ítem">✕</button>
+      <button class="btn-del-item" onclick="deleteCustomItem('${panel}',${item.id})" title="Eliminar ítem" aria-label="Eliminar ítem">✕</button>
     </div>`).join('');
 }
 
@@ -1436,7 +1429,7 @@ function selCustom(chkEl, panel) {
 
 function esc(s) {
   if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── BUILD DYNAMIC TABS & PANELS ──
@@ -1688,7 +1681,7 @@ function renderOptionsPreview() {
   const wrap = document.getElementById('options_preview');
   if(pendingOptions.length===0){ wrap.innerHTML='<p>Las opciones aparecerán aquí</p>'; return; }
   wrap.innerHTML = pendingOptions.map((o,i)=>
-    `<span class="preview-tag">${esc(o)}<button onclick="removeOption(${i})">×</button></span>`
+    `<span class="preview-tag">${esc(o)}<button onclick="removeOption(${i})" aria-label="Quitar opción">×</button></span>`
   ).join('');
 }
 
