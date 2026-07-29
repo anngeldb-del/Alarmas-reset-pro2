@@ -5,8 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>RESET Alarmas y GPS — Control de Órdenes</title>
 <script>
+  // ── PWA: Service Worker + Install Prompt + Update Detection ──
+  let _deferredInstallPrompt = null;
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=13').catch(e => console.warn('SW error:', e)));
+    window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('sw.js?v=14');
+
+        // Detect SW update available
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version ready — show update banner
+              const banner = document.getElementById('update-banner');
+              if (banner) banner.classList.add('show');
+            }
+          });
+        });
+
+        // Reload when SW takes control (after user clicks "Actualizar")
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (window._swUpdating) location.reload();
+        });
+      } catch(e) {
+        console.warn('SW error:', e);
+      }
+    });
+  }
+
+  // Install prompt: capture beforeinstallprompt
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    const btn = document.getElementById('btn-instalar-pwa');
+    if (btn) btn.style.display = 'flex';
+  });
+
+  window.addEventListener('appinstalled', () => {
+    _deferredInstallPrompt = null;
+    const btn = document.getElementById('btn-instalar-pwa');
+    if (btn) btn.style.display = 'none';
+  });
+
+  async function instalarPWA() {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    const { outcome } = await _deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') _deferredInstallPrompt = null;
+  }
+
+  async function aplicarActualizacion() {
+    const banner = document.getElementById('update-banner');
+    if (banner) banner.classList.remove('show');
+    window._swUpdating = true;
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        location.reload();
+      }
+    } else {
+      location.reload();
+    }
   }
 </script>
 
@@ -84,10 +148,20 @@
 </script>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#ff6b35">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="RESET Alarmas">
+<meta name="description" content="Control de órdenes de servicio para Alarmas y GPS Reset">
+<meta name="application-name" content="RESET Alarmas">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://www.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
@@ -341,6 +415,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .historial-mes-total{font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--green);white-space:nowrap}
 .offline-banner{display:none;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);border-radius:var(--radius);padding:10px 14px;margin:0 20px 12px;font-size:12px;color:var(--accent);font-weight:600;text-align:center}
 .offline-banner.show{display:block}
+.update-banner{display:none;align-items:center;gap:10px;background:rgba(6,214,160,.1);border:1px solid rgba(6,214,160,.3);border-radius:var(--radius);padding:10px 14px;margin:0 20px 12px;font-size:13px;color:var(--green);font-weight:600}
+.update-banner.show{display:flex}
 
 /* PRINT */
 @media print{
@@ -434,6 +510,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <span id="si-fb-dot" style="font-size:10px;color:var(--muted)">●</span>
   </button>
 
+  <button id="btn-instalar-pwa" class="sidebar-item" onclick="instalarPWA()" style="display:none;color:var(--green);border-top:1px solid var(--border);margin-top:4px">
+    <span class="si-icon">📲</span><span class="si-label">Instalar app</span>
+    <span style="font-size:10px;color:var(--green)">PWA</span>
+  </button>
+
   <button class="sidebar-item" onclick="forzarActualizacion()" style="color:#ff6b35;border-top:1px solid var(--border);margin-top:4px">
     <span class="si-icon">🔄</span><span class="si-label">Actualizar app</span>
     <span style="font-size:10px;color:var(--muted)">v3.0</span>
@@ -471,6 +552,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </nav>
 
 <div class="offline-banner" id="offline-banner">📴 Sin conexión — los cambios se guardarán local y sincronizarán al reconectar</div>
+
+<!-- BANNER ACTUALIZACIÓN DISPONIBLE -->
+<div class="update-banner" id="update-banner">
+  <span>🚀 Nueva versión disponible</span>
+  <button class="btn btn-sm" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer" onclick="aplicarActualizacion()">Actualizar</button>
+  <button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1" onclick="document.getElementById('update-banner').classList.remove('show')">✕</button>
+</div>
 
 <!-- BANNER DÍA 30 -->
 <div class="export-banner" id="export-banner">
@@ -838,7 +926,7 @@ const IDB = {
 // HELPERS
 // ═══════════════════════════════════════
 function fmt(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}); }
-function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;').replace(/\//g,'&#x2F;'); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function renderAll(){
   renderDashboard(); renderOrdenes(); updateSidebarStatus();
