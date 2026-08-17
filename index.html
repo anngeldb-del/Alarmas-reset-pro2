@@ -81,6 +81,12 @@
      expuestas como funciones globales (window.colOrdenes, etc.) para que el
      resto del código las siga usando sin cambios. -->
 <script type="module" src="js/firestore-paths.js"></script>
+<!-- MÓDULO data-ordenes.js: carga/guardado/eliminación de órdenes.
+     Depende de window.ordenes, window.IDB, window.renderAll, etc. — ver
+     comentarios dentro del archivo. Debe cargar DESPUÉS de firebase-init.js
+     y firestore-paths.js, aunque en la práctica no importa el orden exacto
+     porque solo se usan dentro de funciones, no al cargar el módulo. -->
+<script type="module" src="js/data-ordenes.js"></script>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b35">
@@ -711,14 +717,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 // ═══════════════════════════════════════
 // ESTADO
 // ═══════════════════════════════════════
-let ordenes = [];
+// Cambiado de 'let' a 'var': un 'var' a nivel superior de un script clásico
+// se vuelve propiedad de window automáticamente, lo que permite que los
+// módulos externos (data/ordenes.js, etc.) lean y muten estos mismos
+// arrays sin tener que cambiar ninguna de las referencias existentes en
+// este archivo (siguen siendo la misma variable/binding).
+var ordenes = [];
 // Tope de seguridad para el listener de Firestore (ver cargarOrdenes()).
 // No afecta el uso normal: solo entra en juego si algún día hay más de
 // este número de órdenes activas simultáneas, algo muy improbable para
 // este negocio si el archivado mensual funciona correctamente.
 const ORDENES_LIMIT_SEGURIDAD = 1500;
-let clientes = [];
-let citas = [];
+window.ORDENES_LIMIT_SEGURIDAD = ORDENES_LIMIT_SEGURIDAD;
+var clientes = [];
+var citas = [];
 let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
@@ -728,10 +740,10 @@ let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
-let fsListenerStarted = false;
+// fsListenerStarted / _unsubOrdenes se movieron a data/ordenes.js — solo se
+// usaban dentro de cargarOrdenes(), que ahora vive ahí.
 let clientesListenerStarted = false;
 let citasListenerStarted = false;
-let _unsubOrdenes = null;
 let _unsubClientes = null;
 let _unsubCitas = null;
 let _autoExportChecked = false;
@@ -836,6 +848,10 @@ const IDB = {
     });
   }
 };
+// IDB es 'const' — no se auto-expone en window como sí pasa con 'var' o
+// declaraciones 'function'. Se expone explícitamente para que
+// data/ordenes.js (módulo aparte) pueda usarlo.
+window.IDB = IDB;
 
 // ═══════════════════════════════════════
 // HELPERS
@@ -1021,59 +1037,11 @@ function headerEmpresa(tipoDoc, folio, fecha) {
 // ═══════════════════════════════════════
 // FIREBASE / LOCALSTORAGE
 // ═══════════════════════════════════════
-async function cargarOrdenesLocal() {
-  await IDB.init();
-  try {
-    if (IDB.db) {
-      const data = await IDB.getAll();
-      if (data && data.length > 0) {
-        ordenes = data.sort((a,b)=>(b.fecha_creacion||0)-(a.fecha_creacion||0));
-        renderAll(); return;
-      }
-      const ls = localStorage.getItem('alarmas_ordenes');
-      if (ls) {
-        try { ordenes = JSON.parse(ls); await IDB.putAll(ordenes); } catch(e) { ordenes = []; }
-        renderAll(); return;
-      }
-    }
-    const data = localStorage.getItem('alarmas_ordenes');
-    ordenes = data ? JSON.parse(data) : [];
-  } catch(e) {
-    ordenes = [];
-    console.error(e);
-  }
-  renderAll();
-}
-
-async function cargarOrdenes() {
-  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
-    try {
-      const { onSnapshot, orderBy, query, limit } = window._firebaseModules;
-      // Tope de seguridad: con el archivado mensual ya reparado, la colección
-      // activa debería quedarse chica siempre. Este limit() es solo una red
-      // de protección para que el listener nunca vuelva a leer una colección
-      // sin control si el archivado falla por cualquier otra razón futura.
-      const q = query(colOrdenes(), orderBy('fecha_creacion','desc'), limit(ORDENES_LIMIT_SEGURIDAD));
-      if (!fsListenerStarted) {
-        fsListenerStarted = true;
-        _unsubOrdenes = onSnapshot(q, snap => {
-          ordenes = snap.docs.map(d=>({id:d.id,...d.data()}));
-          renderAll();
-        }, err => {
-          console.error(err);
-          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
-          toast('⚠️ Firestore no disponible — modo local');
-          window._useFirebase = false;
-          fsListenerStarted = false;
-          updateFirebaseBadge();
-          cargarOrdenesLocal();
-        });
-      }
-      return;
-    } catch(e) { console.error(e); }
-  }
-  cargarOrdenesLocal();
-}
+// ═══════════════════════════════════════
+// cargarOrdenesLocal(), cargarOrdenes(), guardarOrden(), eliminarOrden()
+// ahora viven en js/data-ordenes.js (ver <script> junto a los demás
+// módulos). Siguen expuestas en window, mismo comportamiento de siempre.
+// ═══════════════════════════════════════
 
 function updateFirebaseBadge() {
   const badge = document.getElementById('fb-badge');
@@ -1097,62 +1065,6 @@ async function guardarLocal() {
   } catch(e) {
     try { localStorage.setItem('alarmas_ordenes', JSON.stringify(ordenes)); } catch(e2) {}
   }
-}
-
-async function guardarOrden(orden) {
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { addDoc, updateDoc } = window._firebaseModules;
-      if (orden.id) {
-        const id = orden.id;
-        const data = {...orden};
-        delete data.id;
-        await updateDoc(docOrden(id), data);
-      } else {
-        orden.fecha_creacion = Date.now();
-        await addDoc(colOrdenes(), orden);
-      }
-      return;
-    } catch(e) {
-      console.error(e);
-      toast('⚠️ Firebase no disponible — guardando local');
-      window._useFirebase = false;
-      updateFirebaseBadge();
-      _addToOfflineQueue({ tipo: 'guardar', orden: {...orden} });
-    }
-  }
-  if (orden.id) {
-    const idx = ordenes.findIndex(o=>o.id===orden.id);
-    if (idx >= 0) ordenes[idx] = orden;
-    else ordenes.unshift(orden);
-  } else {
-    orden.id = 'local_'+Date.now();
-    orden.fecha_creacion = Date.now();
-    ordenes.unshift(orden);
-  }
-  guardarLocal();
-  renderAll();
-}
-
-async function eliminarOrden(id) {
-  const ok = await confirmarAccion('Eliminar orden', '¿Eliminar esta orden? Esta acción no se puede deshacer.', '🗑️', 'Eliminar');
-  if (!ok) return;
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { deleteDoc } = window._firebaseModules;
-      await deleteDoc(docOrden(id));
-      toast('Orden eliminada');
-      return;
-    } catch(e) {
-      console.error(e);
-      toast('⚠️ Error al eliminar: ' + (e.message || e));
-      return;
-    }
-  }
-  ordenes = ordenes.filter(o => o.id !== id);
-  guardarLocal();
-  renderAll();
-  toast('Orden eliminada');
 }
 
 // ═══════════════════════════════════════
