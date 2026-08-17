@@ -75,4 +75,14 @@ if (fbConfigured) {
     window._useFirebase = false;
   }
 }
-window.dispatchEvent(new Event('firebaseReady'));
+// FIX (ago-2026): antes esto se disparaba de forma SÍNCRONA, justo al
+// terminar de ejecutarse este módulo. Como firebase-init.js es el primer
+// módulo del documento, el evento 'firebaseReady' llegaba a initAppData()
+// -> cargarOrdenes() ANTES de que data-ordenes.js (que viene después en la
+// lista de módulos) hubiera terminado de ejecutarse y definir esa función
+// en window — causando "ReferenceError: cargarOrdenes is not defined" y
+// dejando la app sin datos. setTimeout(...,0) difiere el disparo a la
+// siguiente vuelta del bucle de eventos, momento en el que TODOS los
+// módulos (incluido data-ordenes.js, data-clientes.js, data-citas.js) ya
+// terminaron de ejecutarse, sin excepción.
+setTimeout(() => window.dispatchEvent(new Event('firebaseReady')), 0);
