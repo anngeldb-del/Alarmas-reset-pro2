@@ -87,6 +87,10 @@
      y firestore-paths.js, aunque en la práctica no importa el orden exacto
      porque solo se usan dentro de funciones, no al cargar el módulo. -->
 <script type="module" src="js/data-ordenes.js"></script>
+<!-- MÓDULO data-clientes.js: carga/guardado/eliminación de clientes. -->
+<script type="module" src="js/data-clientes.js"></script>
+<!-- MÓDULO data-citas.js: carga/guardado/eliminación de citas. -->
+<script type="module" src="js/data-citas.js"></script>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b35">
@@ -740,12 +744,9 @@ let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
-// fsListenerStarted / _unsubOrdenes se movieron a data/ordenes.js — solo se
-// usaban dentro de cargarOrdenes(), que ahora vive ahí.
-let clientesListenerStarted = false;
-let citasListenerStarted = false;
-let _unsubClientes = null;
-let _unsubCitas = null;
+// fsListenerStarted / _unsubOrdenes se movieron a js/data-ordenes.js.
+// clientesListenerStarted / _unsubClientes se movieron a js/data-clientes.js.
+// citasListenerStarted / _unsubCitas se movieron a js/data-citas.js.
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
 const AGENDA_ESTADO_LABELS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
@@ -1070,99 +1071,12 @@ async function guardarLocal() {
 // ═══════════════════════════════════════
 // CRM — CLIENTES (usuarios/{uid}/clientes)
 // ═══════════════════════════════════════
-async function cargarClientesLocal() {
-  try {
-    const data = localStorage.getItem('alarmas_clientes');
-    clientes = data ? JSON.parse(data) : [];
-  } catch(e) { clientes = []; }
-  renderClientes();
-}
-
-function guardarClientesLocal() {
-  try { localStorage.setItem('alarmas_clientes', JSON.stringify(clientes)); } catch(e) {}
-}
-
-async function cargarClientes() {
-  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
-    try {
-      const { onSnapshot, orderBy, query } = window._firebaseModules;
-      const q = query(colClientes(), orderBy('nombre_lower','asc'));
-      if (!clientesListenerStarted) {
-        clientesListenerStarted = true;
-        _unsubClientes = onSnapshot(q, snap => {
-          clientes = snap.docs.map(d=>({id:d.id,...d.data()}));
-          renderClientes();
-        }, err => {
-          console.error(err);
-          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
-          clientesListenerStarted = false;
-          cargarClientesLocal();
-        });
-      }
-      return;
-    } catch(e) { console.error(e); }
-  }
-  cargarClientesLocal();
-}
-
-async function guardarCliente(cliente) {
-  const data = {...cliente};
-  data.nombre_lower = (data.nombre||'').trim().toLowerCase();
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { addDoc, updateDoc } = window._firebaseModules;
-      if (data.id) {
-        const id = data.id; delete data.id;
-        await updateDoc(docCliente(id), data);
-        return id;
-      } else {
-        const ref = await addDoc(colClientes(), data);
-        return ref.id;
-      }
-    } catch(e) {
-      console.error(e);
-      toast('⚠️ No se pudo guardar el cliente en Firebase');
-      return null;
-    }
-  }
-  if (data.id) {
-    const idx = clientes.findIndex(c=>c.id===data.id);
-    if (idx>=0) clientes[idx] = data;
-  } else {
-    data.id = 'local_cli_'+Date.now();
-    clientes.unshift(data);
-  }
-  guardarClientesLocal();
-  renderClientes();
-  return data.id;
-}
-
-async function eliminarCliente(id) {
-  const ok = await confirmarAccion('Eliminar cliente', '¿Eliminar este cliente? Sus órdenes no se borran, mantienen su historial.', '🗑️', 'Eliminar');
-  if (!ok) return;
-  const okBorrado = await _borrarClienteSilencioso(id);
-  if (okBorrado) toast('Cliente eliminado');
-  cerrarModalCliente();
-}
-
-// Borra un cliente sin pedir confirmación (para uso interno, p.ej. fusión de duplicados)
-async function _borrarClienteSilencioso(id) {
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { deleteDoc } = window._firebaseModules;
-      await deleteDoc(docCliente(id));
-      return true;
-    } catch(e) {
-      console.error(e);
-      toast('⚠️ Error al eliminar: ' + (e.message || e));
-      return false;
-    }
-  }
-  clientes = clientes.filter(c => c.id !== id);
-  guardarClientesLocal();
-  renderClientes();
-  return true;
-}
+// ═══════════════════════════════════════
+// cargarClientesLocal(), guardarClientesLocal(), cargarClientes(),
+// guardarCliente(), eliminarCliente(), _borrarClienteSilencioso() ahora
+// viven en js/data-clientes.js. Siguen expuestas en window, mismo
+// comportamiento de siempre.
+// ═══════════════════════════════════════
 
 // Detecta clientes con el mismo nombre (creados por el bug de duplicados) y los
 // fusiona en un solo registro, reasignando sus órdenes al cliente que quede.
@@ -1236,94 +1150,11 @@ async function resolverClienteId(nombre, telefono) {
 // ═══════════════════════════════════════
 // AGENDA — CITAS (usuarios/{uid}/citas)
 // ═══════════════════════════════════════
-async function cargarCitasLocal() {
-  try {
-    const data = localStorage.getItem('alarmas_citas');
-    citas = data ? JSON.parse(data) : [];
-  } catch(e) { citas = []; }
-  renderAgenda();
-}
-
-function guardarCitasLocal() {
-  try { localStorage.setItem('alarmas_citas', JSON.stringify(citas)); } catch(e) {}
-}
-
-async function cargarCitas() {
-  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
-    try {
-      const { onSnapshot, orderBy, query } = window._firebaseModules;
-      const q = query(colCitas(), orderBy('fecha','asc'));
-      if (!citasListenerStarted) {
-        citasListenerStarted = true;
-        _unsubCitas = onSnapshot(q, snap => {
-          citas = snap.docs.map(d=>({id:d.id,...d.data()}));
-          renderAgenda();
-        }, err => {
-          console.error(err);
-          if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar
-          citasListenerStarted = false;
-          cargarCitasLocal();
-        });
-      }
-      return;
-    } catch(e) { console.error(e); }
-  }
-  cargarCitasLocal();
-}
-
-async function guardarCita(cita) {
-  const data = {...cita};
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { addDoc, updateDoc } = window._firebaseModules;
-      if (data.id) {
-        const id = data.id; delete data.id;
-        await updateDoc(docCita(id), data);
-        return id;
-      } else {
-        const ref = await addDoc(colCitas(), data);
-        return ref.id;
-      }
-    } catch(e) {
-      console.error(e);
-      toast('⚠️ No se pudo guardar la cita en Firebase');
-      return null;
-    }
-  }
-  if (data.id) {
-    const idx = citas.findIndex(c=>c.id===data.id);
-    if (idx>=0) citas[idx] = data;
-  } else {
-    data.id = 'local_cita_'+Date.now();
-    citas.push(data);
-  }
-  guardarCitasLocal();
-  renderAgenda();
-  return data.id;
-}
-
-async function eliminarCita(id) {
-  const ok = await confirmarAccion('Eliminar cita', '¿Eliminar esta cita?', '🗑️', 'Eliminar');
-  if (!ok) return;
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { deleteDoc } = window._firebaseModules;
-      await deleteDoc(docCita(id));
-      toast('Cita eliminada');
-      cerrarModalCita();
-      return;
-    } catch(e) {
-      console.error(e);
-      toast('⚠️ Error al eliminar: ' + (e.message || e));
-      return;
-    }
-  }
-  citas = citas.filter(c => c.id !== id);
-  guardarCitasLocal();
-  renderAgenda();
-  toast('Cita eliminada');
-  cerrarModalCita();
-}
+// ═══════════════════════════════════════
+// cargarCitasLocal(), guardarCitasLocal(), cargarCitas(), guardarCita(),
+// eliminarCita() ahora viven en js/data-citas.js. Siguen expuestas en
+// window, mismo comportamiento de siempre.
+// ═══════════════════════════════════════
 
 async function cambiarEstadoCita(id, estado) {
   const cita = citas.find(c=>c.id===id);
