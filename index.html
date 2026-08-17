@@ -77,6 +77,10 @@
 <!-- MÓDULO firebase-init.js: mismo comportamiento que antes, ahora en archivo
      aparte (js/firebase-init.js) para facilitar mantenimiento. -->
 <script type="module" src="js/firebase-init.js"></script>
+<!-- MÓDULO firestore-paths.js: rutas de colecciones/documentos de Firestore,
+     expuestas como funciones globales (window.colOrdenes, etc.) para que el
+     resto del código las siga usando sin cambios. -->
+<script type="module" src="js/firestore-paths.js"></script>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b35">
@@ -735,45 +739,11 @@ const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo'
 const AGENDA_ESTADO_LABELS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
 
 // ═══════════════════════════════════════
-// RUTAS FIRESTORE — datos privados por usuario (usuarios/{uid}/...)
+// RUTAS FIRESTORE — ahora en js/firestore-paths.js (ver <script> arriba).
+// colOrdenes(), docOrden(), colClientes(), docCliente(), colCitas(),
+// docCita(), colExportLogs(), colArchivados() siguen disponibles igual,
+// como funciones globales expuestas por ese módulo.
 // ═══════════════════════════════════════
-function colOrdenes() {
-  const { collection } = window._firebaseModules;
-  return collection(window._firebaseDb, 'usuarios', window._uid, 'ordenes');
-}
-function docOrden(id) {
-  const { doc } = window._firebaseModules;
-  return doc(window._firebaseDb, 'usuarios', window._uid, 'ordenes', id);
-}
-function colExportLogs() {
-  const { collection } = window._firebaseModules;
-  return collection(window._firebaseDb, 'usuarios', window._uid, 'export_logs');
-}
-function colClientes() {
-  const { collection } = window._firebaseModules;
-  return collection(window._firebaseDb, 'usuarios', window._uid, 'clientes');
-}
-function docCliente(id) {
-  const { doc } = window._firebaseModules;
-  return doc(window._firebaseDb, 'usuarios', window._uid, 'clientes', id);
-}
-function colCitas() {
-  const { collection } = window._firebaseModules;
-  return collection(window._firebaseDb, 'usuarios', window._uid, 'citas');
-}
-function docCita(id) {
-  const { doc } = window._firebaseModules;
-  return doc(window._firebaseDb, 'usuarios', window._uid, 'citas', id);
-}
-// FIX (ago-2026): esta función no existía — archivarOrdenesDelMes() la
-// referenciaba sin declarar, lo que lanzaba ReferenceError en silencio
-// (atrapado por el catch) y por eso las órdenes archivadas NUNCA se
-// borraban de Firestore: se acumulaban para siempre en 'ordenes',
-// haciendo crecer el listener sin límite mes tras mes.
-function colArchivados() {
-  const { collection } = window._firebaseModules;
-  return collection(window._firebaseDb, 'usuarios', window._uid, 'ordenes_archivadas');
-}
 
 // Datos de la empresa — SE MUESTRAN EN BOLETA Y COTIZACIÓN
 const EMPRESA = {
