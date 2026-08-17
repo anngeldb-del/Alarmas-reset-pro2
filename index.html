@@ -5,6 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>RESET Alarmas y GPS — Control de Órdenes</title>
 <script>
+  // ═══════════════════════════════════════
+  // 🩺 DIAGNÓSTICO TEMPORAL (ago-2026) — quitar una vez resuelto el bug
+  // de "app sin datos". Muestra cualquier error de JS en pantalla, sin
+  // necesidad de herramientas de desarrollador.
+  // ═══════════════════════════════════════
+  window.addEventListener('error', function(e) {
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#c00;color:#fff;padding:14px;font-family:monospace;font-size:13px;white-space:pre-wrap;max-height:60vh;overflow:auto;';
+    box.textContent = '🩺 ERROR JS:\n' + (e.message || '') + '\nArchivo: ' + (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?') + (e.error && e.error.stack ? '\n\n' + e.error.stack : '');
+    document.body.appendChild(box);
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#a00;color:#fff;padding:14px;font-family:monospace;font-size:13px;white-space:pre-wrap;max-height:60vh;overflow:auto;';
+    box.textContent = '🩺 PROMESA RECHAZADA:\n' + (e.reason && e.reason.message ? e.reason.message : e.reason) + (e.reason && e.reason.stack ? '\n\n' + e.reason.stack : '');
+    document.body.appendChild(box);
+  });
+</script>
+<script>
   // ── PWA: Service Worker + Install Prompt + Update Detection ──
   let _deferredInstallPrompt = null;
 
