@@ -1,0 +1,78 @@
+// ═══════════════════════════════════════
+// MÓDULO: firebase-init.js
+// Extraído 1:1 de index.html (ago-2026) — misma lógica, mismo comportamiento.
+// Expone en window(): _useFirebase, _uid, _firebaseDb, _firebaseModules,
+// _activarNotificaciones — exactamente igual que antes, para que el resto
+// del código (aún en index.html) siga funcionando sin cambios.
+// ═══════════════════════════════════════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+
+// ══════════════════════════════════════════════════
+// 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
+// ══════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyAOUGIWvrPtdKf9pnoYlh3NIHHiBO_R7mE",
+  authDomain: "alarmas-reset-e3484.firebaseapp.com",
+  projectId: "alarmas-reset-e3484",
+  storageBucket: "alarmas-reset-e3484.firebasestorage.app",
+  messagingSenderId: "1096561116547",
+  appId: "1:1096561116547:web:b13df05c092785723aa2b6",
+  measurementId: "G-TJD208HVFB"
+};
+// 🔔 NOTIFICACIONES PUSH — genera esta clave en:
+// Firebase Console → Configuración del proyecto → Cloud Messaging →
+// "Certificados push web" → Generar par de claves. Pega aquí la clave pública.
+const VAPID_KEY = 'PEGA_AQUI_TU_VAPID_KEY';
+const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
+  && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
+window._useFirebase = false;
+// Sin login: todos los dispositivos comparten la misma ruta de datos,
+// protegida solo por reglas de Firestore abiertas (ver README). No se usa
+// Firebase Auth en absoluto — un residuo de sesión de Google guardado en el
+// navegador de una versión anterior ya no puede desviar los datos a otra ruta.
+window._uid = 'compartido';
+if (fbConfigured) {
+  try {
+    const app = initializeApp(firebaseConfig);
+    // Persistencia offline nativa de Firestore: además de la cola propia que
+    // ya reintenta las escrituras fallidas, esto hace que las LECTURAS
+    // también funcionen sin internet (antes, si no había red al abrir la
+    // app, la lista de órdenes/clientes/citas se quedaba vacía indefinidamente
+    // porque el listener de Firestore nunca recibía su primer resultado)
+    const db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+    window._firebaseDb = db;
+    window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit };
+    window._useFirebase = true;
+
+    // 🔔 Notificaciones push (FCM) — requiere VAPID_KEY configurada arriba.
+    window._activarNotificaciones = async () => {
+      if (!(await isSupported().catch(()=>false))) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Este navegador no soporta notificaciones push.' } })); return; }
+      if (String(VAPID_KEY).includes('PEGA_AQUI')) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Falta configurar la VAPID key (ver comentario en el código).' } })); return; }
+      if (!window._uid) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Inicia sesión primero.' } })); return; }
+      try {
+        const permiso = await Notification.requestPermission();
+        if (permiso !== 'granted') { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Permiso de notificaciones denegado.' } })); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const messaging = getMessaging(app);
+        const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+        if (!token) { window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'No se pudo obtener el token de notificaciones.' } })); return; }
+        await setDoc(doc(db, 'usuarios', window._uid, 'fcm_tokens', token), { token, ua: navigator.userAgent, fecha: Date.now() });
+        onMessage(messaging, payload => {
+          window.dispatchEvent(new CustomEvent('pushForeground', { detail: payload }));
+        });
+        window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:true, msg:'✅ Notificaciones activadas' } }));
+      } catch(e) {
+        console.error(e);
+        window.dispatchEvent(new CustomEvent('pushResult', { detail: { ok:false, msg:'Error: ' + e.message } }));
+      }
+    };
+  } catch(e) {
+    console.warn('Firebase no inicializado:', e);
+    window._useFirebase = false;
+  }
+}
+window.dispatchEvent(new Event('firebaseReady'));
