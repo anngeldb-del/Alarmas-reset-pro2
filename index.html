@@ -108,8 +108,6 @@
 <script type="module" src="js/data-ordenes.js"></script>
 <!-- MÓDULO data-clientes.js: carga/guardado/eliminación de clientes. -->
 <script type="module" src="js/data-clientes.js"></script>
-<!-- MÓDULO data-citas.js: carga/guardado/eliminación de citas. -->
-<script type="module" src="js/data-citas.js"></script>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b35">
@@ -153,11 +151,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .firebase-badge.on{background:rgba(6,214,160,.15);color:var(--green);border:1px solid rgba(6,214,160,.3)}
 .firebase-badge.off{background:rgba(122,122,149,.12);color:var(--muted);border:1px solid var(--border)}
 
-/* TABS */
-.nav-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:68px;z-index:99}
-.nav-tabs::-webkit-scrollbar{display:none}
-.tab-btn{flex:1;min-width:70px;padding:14px 10px;background:none;border:none;color:var(--muted);font-family:var(--font-display);font-weight:600;font-size:11px;letter-spacing:.5px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;text-transform:uppercase}
-.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+/* TABS eliminadas (ago-2026) — navegación ahora solo por sidebar */
 
 /* VIEWS */
 .view{display:none;padding:20px}
@@ -398,13 +392,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   .app-header{height:60px;padding:0 8px;gap:6px}
   .brand-logo{height:26px}
   .firebase-badge{font-size:10px;padding:3px 7px}
-  .nav-tabs{top:60px}
 }
 
 @media(min-width:768px){
   .app-header{height:76px}
   .brand-logo{height:40px}
-  .nav-tabs{top:76px}
 }
 </style>
 </head>
@@ -443,10 +435,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   </button>
   <button class="sidebar-item" id="si-clientes" onclick="navTo('clientes')">
     <span class="si-icon">👤</span><span class="si-label">Clientes</span>
-  </button>
-  <button class="sidebar-item" id="si-agenda" onclick="navTo('agenda')">
-    <span class="si-icon">🗓️</span><span class="si-label">Agenda</span>
-    <span class="si-badge" id="si-agenda-badge" style="display:none">0</span>
   </button>
 
   <div class="sidebar-section-label">HERRAMIENTAS</div>
@@ -505,15 +493,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <span class="firebase-badge off" id="fb-badge">● Local</span>
 </header>
 
-<!-- TABS -->
-<nav class="nav-tabs">
-  <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 Inicio</button>
-  <button class="tab-btn" onclick="showTab('ordenes',this)">📋 Órdenes</button>
-  <button class="tab-btn" onclick="showTab('nueva',this)">➕ Nueva</button>
-  <button class="tab-btn" onclick="showTab('cotizaciones',this)">📄 Cotizar</button>
-  <button class="tab-btn" onclick="showTab('clientes',this)">👤 Clientes</button>
-  <button class="tab-btn" onclick="showTab('agenda',this)">🗓️ Agenda</button>
-</nav>
+<!-- Barra de navegación superior (nav-tabs) eliminada — el sidebar ya cubre
+     toda la navegación (Inicio, Órdenes, Nueva Orden, Cotizar, Clientes). -->
 
 <div class="offline-banner" id="offline-banner">📴 Sin conexión — los cambios se guardarán local y sincronizarán al reconectar</div>
 
@@ -543,8 +524,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <div class="stat-card yellow"><div class="stat-label">Facturado</div><div class="stat-value" id="stat-total">$0</div></div>
     <div class="stat-card red"><div class="stat-label">Órdenes Pend.</div><div class="stat-value" id="stat-ordpend">0</div></div>
   </div>
-  <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Últimas órdenes</div>
-  <div id="recientes-lista"></div>
   <div class="historial-section" id="historial-section" style="display:none">
     <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📦 Historial de meses</div>
     <div id="historial-lista"></div>
@@ -588,12 +567,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <div id="clientes-lista"></div>
 </div>
 
-<!-- AGENDA (CITAS) -->
-<div class="view" id="tab-agenda">
-  <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="abrirModalCita()">+ Nueva cita</button>
-  <div id="agenda-lista"></div>
-</div>
-
 <!-- FAB -->
 <button class="fab" onclick="abrirModalNueva()">+</button>
 
@@ -605,17 +578,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <button class="modal-close" onclick="cerrarModalCliente()">✕</button>
     </div>
     <div class="modal-body" id="modal-cliente-body"></div>
-  </div>
-</div>
-
-<!-- MODAL CITA -->
-<div class="modal-overlay" id="modal-cita">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="modal-cita-title">Nueva cita</div>
-      <button class="modal-close" onclick="cerrarModalCita()">✕</button>
-    </div>
-    <div class="modal-body" id="modal-cita-body"></div>
   </div>
 </div>
 
@@ -753,22 +715,20 @@ var ordenes = [];
 const ORDENES_LIMIT_SEGURIDAD = 1500;
 window.ORDENES_LIMIT_SEGURIDAD = ORDENES_LIMIT_SEGURIDAD;
 var clientes = [];
-var citas = [];
+// Agenda/citas se eliminó definitivamente (ago-2026) — antes vivía aquí
+// 'var citas = []' junto con su estado asociado.
 let filtroEstado = 'todos';
 let vistaAgrupada = true;
 let editandoId = null;
 let editandoClienteId = null;
-let editandoCitaId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 let cotFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 // fsListenerStarted / _unsubOrdenes se movieron a js/data-ordenes.js.
 // clientesListenerStarted / _unsubClientes se movieron a js/data-clientes.js.
-// citasListenerStarted / _unsubCitas se movieron a js/data-citas.js.
 let _autoExportChecked = false;
 const ESTADO_LABELS = { PENDIENTE: 'Pendiente', PAGADO: 'Pagado', TERMO: 'Termo', EN_PROCESO: 'En proceso' };
-const AGENDA_ESTADO_LABELS = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
 
 // ═══════════════════════════════════════
 // RUTAS FIRESTORE — ahora en js/firestore-paths.js (ver <script> arriba).
@@ -882,7 +842,6 @@ function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg
 function renderAll(){
   renderDashboard(); renderOrdenes(); updateSidebarStatus();
   if (document.getElementById('tab-clientes')?.classList.contains('active')) renderClientes();
-  if (document.getElementById('tab-agenda')?.classList.contains('active')) renderAgenda();
   if (!_autoExportChecked && ordenes.length > 0) {
     _autoExportChecked = true;
     setTimeout(intentarAutoExportM365, 800);
@@ -1166,55 +1125,16 @@ async function resolverClienteId(nombre, telefono) {
   return await guardarCliente({ nombre: nombreN, telefono: telefono||'', email: '', notas: '', fecha_creacion: Date.now() });
 }
 
-// ═══════════════════════════════════════
-// AGENDA — CITAS (usuarios/{uid}/citas)
-// ═══════════════════════════════════════
-// ═══════════════════════════════════════
-// cargarCitasLocal(), guardarCitasLocal(), cargarCitas(), guardarCita(),
-// eliminarCita() ahora viven en js/data-citas.js. Siguen expuestas en
-// window, mismo comportamiento de siempre.
-// ═══════════════════════════════════════
-
-async function cambiarEstadoCita(id, estado) {
-  const cita = citas.find(c=>c.id===id);
-  if (!cita) return;
-  const estadoAnterior = cita.estado;
-  cita.estado = estado;
-  if (window._useFirebase && window._firebaseDb && window._uid) {
-    try {
-      const { updateDoc } = window._firebaseModules;
-      await updateDoc(docCita(id), { estado });
-      toast('✅ Cita: ' + AGENDA_ESTADO_LABELS[estado]);
-      return;
-    } catch(e) {
-      console.error(e);
-      cita.estado = estadoAnterior;
-      renderAgenda();
-      toast('⚠️ Error al actualizar: ' + (e.message || e));
-      return;
-    }
-  }
-  guardarCitasLocal();
-  renderAgenda();
-  toast('✅ Cita: ' + AGENDA_ESTADO_LABELS[estado]);
-}
-
-// Construye el link "Agregar a Google Calendar" — no requiere OAuth ni configuración.
-function linkGoogleCalendar(cita) {
-  const inicio = new Date(cita.fecha + 'T' + (cita.hora||'09:00') + ':00');
-  const fin = new Date(inicio.getTime() + 60*60*1000);
-  const fmtUTC = d => d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
-  const texto = encodeURIComponent('Cita: ' + (cita.cliente||'Cliente') + (cita.vehiculo?' — '+cita.vehiculo:''));
-  const detalles = encodeURIComponent((cita.tipo_servicio||'') + (cita.notas?'\n'+cita.notas:''));
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${texto}&dates=${fmtUTC(inicio)}/${fmtUTC(fin)}&details=${detalles}`;
-}
+// Agenda/citas se eliminó definitivamente (ago-2026): cambiarEstadoCita(),
+// linkGoogleCalendar(), renderAgenda(), citaCard(), abrirModalCita(),
+// cerrarModalCita(), buildCitaFormHTML(), submitCita() y todo el módulo
+// js/data-citas.js se quitaron de la app.
 
 // ═══════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════
 function showTab(id, btn) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   if (btn) btn.classList.add('active');
   if (id !== 'nueva') {
@@ -1230,7 +1150,6 @@ function showTab(id, btn) {
     setTimeout(recalcCot, 0);
   }
   if (id==='clientes') renderClientes();
-  if (id==='agenda') renderAgenda();
 }
 
 // ═══════════════════════════════════════
@@ -1245,29 +1164,10 @@ function renderDashboard() {
   document.getElementById('stat-total').textContent=fmt(totalFac);
   document.getElementById('stat-ordpend').textContent=pend;
   renderHistorialOrdenes();
-  const cont=document.getElementById('recientes-lista');
-  const rec=ordenes.slice(0,5);
-  if(!rec.length){cont.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin órdenes aún</div></div>';return;}
-  cont.innerHTML=rec.map(o=>{
-    const est=(o.estado||'PENDIENTE').toUpperCase();
-    return `<div class="orden-card" onclick="irAOrden('${o.id}')">
-      <div class="orden-header">
-        <div><div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
-        <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div></div>
-        <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
-      </div></div>`;
-  }).join('');
 }
 
-function irAOrden(id) {
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('tab-ordenes').classList.add('active');
-  const ordenesBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Órdenes'));
-  if (ordenesBtn) ordenesBtn.classList.add('active');
-  filtroEstado='todos'; renderOrdenes();
-  setTimeout(()=>{ const el=document.getElementById('ord-'+id); if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.borderColor='var(--accent)';} },100);
-}
+// irAOrden() se quitó — solo la usaba la tarjeta "Últimas órdenes" del
+// dashboard, que ya no existe (dashboard ahora solo muestra números).
 
 // ═══════════════════════════════════════
 // LISTA ÓRDENES
@@ -1515,128 +1415,6 @@ function verClienteDetalle(id) {
     ${ords.length ? ords.map(o=>ordenCard(o)).join('') : '<div class="empty" style="padding:24px"><div class="empty-text">Sin órdenes aún</div></div>'}
   `;
   document.getElementById('modal-cliente').classList.add('open');
-}
-
-// ═══════════════════════════════════════
-// AGENDA — RENDER CITAS
-// ═══════════════════════════════════════
-function fechaLabel(fechaStr) {
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const manana = new Date(hoy.getTime()+86400000);
-  const [y,m,d] = fechaStr.split('-').map(Number);
-  const fecha = new Date(y, m-1, d);
-  if (fecha.getTime() === hoy.getTime()) return 'Hoy';
-  if (fecha.getTime() === manana.getTime()) return 'Mañana';
-  return fecha.toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
-}
-
-function renderAgenda() {
-  const cont = document.getElementById('agenda-lista');
-  if (!cont) return;
-  const pendientes = citas.filter(c => c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA').length;
-  const badge = document.getElementById('si-agenda-badge');
-  if (badge) { badge.textContent = pendientes; badge.style.display = pendientes>0 ? '' : 'none'; }
-
-  if (!citas.length) {
-    cont.innerHTML = '<div class="empty"><div class="empty-icon">🗓️</div><div class="empty-text">Aún no tienes citas agendadas</div></div>';
-    return;
-  }
-  const ordenadas = [...citas].sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
-  const grupos = {};
-  ordenadas.forEach(c => { (grupos[c.fecha] = grupos[c.fecha]||[]).push(c); });
-  cont.innerHTML = Object.keys(grupos).map(fecha => `
-    <div class="cliente-group">
-      <div class="cliente-group-header" style="cursor:default">
-        <div class="cliente-group-name"><span class="icon">📅</span><span class="nombre">${fechaLabel(fecha)}</span></div>
-        <div class="cliente-group-stats"><span class="cg-badge count">${grupos[fecha].length}</span></div>
-      </div>
-      <div class="cliente-group-body">${grupos[fecha].map(c=>citaCard(c)).join('')}</div>
-    </div>`).join('');
-}
-
-function citaCard(c) {
-  const est = c.estado || 'AGENDADA';
-  const estColorClass = { AGENDADA:'pendiente', CONFIRMADA:'en_proceso', COMPLETADA:'pagado', CANCELADA:'termo' }[est] || 'pendiente';
-  return `<div class="orden-card">
-    <div class="orden-header">
-      <div><div class="orden-title">🕐 ${esc(c.hora||'--:--')} · ${esc(c.cliente||'—')}</div>
-      <div class="orden-sub">${esc(c.vehiculo||'')}${c.vehiculo&&c.tipo_servicio?' · ':''}${esc(c.tipo_servicio||'')}</div></div>
-      <span class="estado-badge ${estColorClass}">${AGENDA_ESTADO_LABELS[est]||est}</span>
-    </div>
-    <div class="orden-body open">
-      ${c.notas?`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">📌 ${esc(c.notas)}</div>`:''}
-      <div class="orden-actions">
-        <a class="btn btn-ghost btn-sm" href="${linkGoogleCalendar(c)}" target="_blank" rel="noopener">📅 Agregar a Google Calendar</a>
-        ${est!=='COMPLETADA'?`<button class="btn btn-green btn-sm" onclick="cambiarEstadoCita('${c.id}','COMPLETADA')">✅ Completada</button>`:''}
-        ${est!=='CANCELADA'?`<button class="btn btn-ghost btn-sm" onclick="cambiarEstadoCita('${c.id}','CANCELADA')">✕ Cancelar</button>`:''}
-        <button class="btn btn-ghost btn-sm" onclick="abrirModalCita('${c.id}')">✏️ Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="eliminarCita('${c.id}')">🗑️ Borrar</button>
-      </div>
-    </div>
-  </div>`;
-}
-
-function abrirModalCita(id) {
-  editandoCitaId = id || null;
-  const c = id ? citas.find(x=>x.id===id) : null;
-  document.getElementById('modal-cita-title').textContent = c ? 'Editar cita' : 'Nueva cita';
-  document.getElementById('modal-cita-body').innerHTML = buildCitaFormHTML(c);
-  document.getElementById('modal-cita').classList.add('open');
-}
-
-function cerrarModalCita() {
-  document.getElementById('modal-cita').classList.remove('open');
-  document.getElementById('modal-cita-body').innerHTML = '';
-  editandoCitaId = null;
-}
-
-function buildCitaFormHTML(c) {
-  const o = c || {};
-  const hoy = new Date().toISOString().split('T')[0];
-  return `
-  <div class="form-row cols-2">
-    <div class="form-group"><label class="form-label">Fecha *</label>
-      <input class="form-input" type="date" id="ci-fecha" value="${esc(o.fecha||hoy)}"></div>
-    <div class="form-group"><label class="form-label">Hora *</label>
-      <input class="form-input" type="time" id="ci-hora" value="${esc(o.hora||'09:00')}"></div>
-  </div>
-  <div class="form-row cols-2">
-    <div class="form-group"><label class="form-label">Cliente *</label>
-      <input class="form-input" id="ci-cliente" placeholder="Nombre del cliente" list="clientes-datalist-cita" value="${esc(o.cliente||'')}"></div>
-    <div class="form-group"><label class="form-label">Vehículo</label>
-      <input class="form-input" id="ci-vehiculo" placeholder="Ej: Chevrolet Beat" value="${esc(o.vehiculo||'')}"></div>
-  </div>
-  <datalist id="clientes-datalist-cita">${clientes.map(cl=>`<option value="${esc(cl.nombre||'')}">`).join('')}</datalist>
-  <div class="form-row">
-    <div class="form-group"><label class="form-label">Tipo de servicio</label>
-      <input class="form-input" id="ci-servicio" placeholder="Ej: Instalación de alarma" value="${esc(o.tipo_servicio||'')}"></div>
-  </div>
-  <div class="form-row" style="margin-bottom:20px">
-    <div class="form-group"><label class="form-label">Notas</label>
-      <input class="form-input" id="ci-notas" placeholder="Notas de la cita..." value="${esc(o.notas||'')}"></div>
-  </div>
-  <div style="display:flex;gap:10px">
-    <button class="btn btn-primary" style="flex:1" onclick="submitCita()">💾 Guardar</button>
-    <button class="btn btn-ghost" onclick="cerrarModalCita()">Cancelar</button>
-  </div>`;
-}
-
-async function submitCita() {
-  const fecha = document.getElementById('ci-fecha')?.value;
-  const hora = document.getElementById('ci-hora')?.value;
-  const cliente = document.getElementById('ci-cliente')?.value?.trim();
-  if (!fecha || !hora || !cliente) { toast('⚠️ Fecha, hora y cliente son obligatorios'); return; }
-  const cita = {
-    fecha, hora, cliente,
-    vehiculo: document.getElementById('ci-vehiculo')?.value?.trim() || '',
-    tipo_servicio: document.getElementById('ci-servicio')?.value?.trim() || '',
-    notas: document.getElementById('ci-notas')?.value?.trim() || '',
-    estado: (editandoCitaId && citas.find(c=>c.id===editandoCitaId)?.estado) || 'AGENDADA'
-  };
-  if (editandoCitaId) cita.id = editandoCitaId;
-  await guardarCita(cita);
-  toast('✅ Cita guardada');
-  cerrarModalCita();
 }
 
 // ═══════════════════════════════════════
@@ -1951,7 +1729,7 @@ async function submitOrden() {
     else {
       document.getElementById('form-nueva-wrapper').innerHTML = '';
       activeFormMount = null;
-      showTab('ordenes', document.querySelectorAll('.tab-btn')[1]);
+      showTab('ordenes');
     }
     toast('✅ Orden guardada');
     editandoId = null;
@@ -2224,16 +2002,14 @@ function verCotizacion() {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();cerrarModalCliente();cerrarModalCita();_confirmCancel();} });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){cerrarModal();cerrarDoc();closeSidebar();cerrarModalM365();cerrarModalCliente();_confirmCancel();} });
 document.getElementById('modal-orden').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-orden'))cerrarModal(); });
 document.getElementById('modal-cliente').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-cliente'))cerrarModalCliente(); });
-document.getElementById('modal-cita').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-cita'))cerrarModalCita(); });
 
 function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   cargarClientes();
-  cargarCitas();
   setTimeout(checkAndRotateMonthOrders, 1200);
   setTimeout(initOnboarding, 800);
   // Capturar resultado de loginRedirect de MSAL (iOS Safari)
@@ -2873,9 +2649,7 @@ async function forzarActualizacion() {
 
 function navTo(tab) {
   closeSidebar();
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabMap = { dashboard: 0, ordenes: 1, nueva: 2, cotizaciones: 3, clientes: 4, agenda: 5 };
-  showTab(tab, tabBtns[tabMap[tab]]);
+  showTab(tab);
   document.querySelectorAll('.sidebar-item[id^="si-"]').forEach(b => b.classList.remove('active'));
   const si = document.getElementById('si-' + tab);
   if (si) si.classList.add('active');
@@ -3160,7 +2934,7 @@ window.showTab = showTab;
 window.setFilter = setFilter;
 window.toggleOrden = toggleOrden;
 window.verBoleta = verBoleta;
-window.irAOrden = irAOrden;
+// irAOrden ya no existe (ver comentario en renderDashboard).
 window.setIvaCot = setIvaCot;
 window.agregarPartida = agregarPartida;
 window.quitarPartida = quitarPartida;
