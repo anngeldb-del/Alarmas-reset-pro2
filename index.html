@@ -3153,7 +3153,9 @@ window.submitOrden = submitOrden;
 window.abrirModalNueva = abrirModalNueva;
 window.editarOrden = editarOrden;
 window.cerrarModal = cerrarModal;
-window.eliminarOrden = eliminarOrden;
+// eliminarOrden ya se expone en window desde js/data-ordenes.js —
+// esta línea sobraba (y rompía todo lo que seguía abajo, porque
+// 'eliminarOrden' ya no existe como función local en este script).
 window.showTab = showTab;
 window.setFilter = setFilter;
 window.toggleOrden = toggleOrden;
