@@ -414,6 +414,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
   <button class="sidebar-item" id="si-cotizaciones" onclick="navTo('cotizaciones')">
     <span class="si-icon">📄</span><span class="si-label">Cotizar</span>
   </button>
+  <button class="sidebar-item" id="si-diagnostico" onclick="navTo('diagnostico')">
+    <span class="si-icon">🩺</span><span class="si-label">Diagnóstico</span>
+  </button>
   <button class="sidebar-item" id="si-clientes" onclick="navTo('clientes')">
     <span class="si-icon">👤</span><span class="si-label">Clientes</span>
   </button>
@@ -536,6 +539,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- COTIZACIONES -->
 <div class="view" id="tab-cotizaciones">
   <div id="cot-form-wrapper"></div>
+</div>
+
+<!-- DIAGNÓSTICO (reporte de escáner OBD) -->
+<div class="view" id="tab-diagnostico">
+  <div id="diag-form-wrapper"></div>
 </div>
 
 <!-- CLIENTES (CRM) -->
@@ -704,6 +712,8 @@ let editandoId = null;
 let editandoClienteId = null;
 let cotFolioNum = parseInt(localStorage.getItem('cot_folio') || '1');
 let cotFolioRegistrado = false;
+let diagFolioNum = parseInt(localStorage.getItem('diag_folio') || '1');
+let diagFolioRegistrado = false;
 /** 'modal' | 'nueva' — evita IDs duplicados entre pestaña y modal */
 let activeFormMount = null;
 // fsListenerStarted / _unsubOrdenes se movieron a js/data-ordenes.js.
@@ -758,6 +768,12 @@ const DOC_CSS = `
   .total-row.verde{color:#06d6a0}
   .total-row.rojo{color:#e63946}
   .nota-box{padding:10px 14px;background:#f8f8f8;border-left:3px solid #ff6b35;margin-top:12px;font-size:12px}
+  .ok-box{padding:10px 14px;background:#f2fbf7;border-left:3px solid #06d6a0;margin-top:12px;font-size:12px}
+  .sys-row td{background:#fff1e8 !important;font-weight:700;border-bottom:1px solid #f0c9ab;padding:7px 8px}
+  .sys-row .sys-count{color:#ff6b35}
+  .status-activo{color:#e63946;font-weight:700}
+  .status-guardado{color:#999;font-weight:600}
+  .status-pendiente{color:#f4a300;font-weight:700}
   .condiciones td{padding:5px 8px;border-bottom:1px solid #eee}
   .condiciones td:first-child{color:#999;font-weight:700;font-size:10px;width:140px;text-transform:uppercase;white-space:nowrap}
   .firmas{display:flex;gap:24px;margin-top:36px}
@@ -1129,6 +1145,9 @@ function showTab(id, btn) {
   if (id==='cotizaciones') {
     document.getElementById('cot-form-wrapper').innerHTML=buildCotFormHTML();
     setTimeout(recalcCot, 0);
+  }
+  if (id==='diagnostico') {
+    document.getElementById('diag-form-wrapper').innerHTML=buildDiagFormHTML();
   }
   if (id==='clientes') renderClientes();
 }
@@ -1978,6 +1997,213 @@ function verCotizacion() {
     + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+'</div>';
 
   abrirDoc('Cotización '+folio, bodyHTML);
+}
+
+// ═══════════════════════════════════════
+// DIAGNÓSTICO — reporte de escáner OBD (ej. XTOOL Anyscan A30M)
+// ═══════════════════════════════════════
+function buildDiagFormHTML() {
+  diagFolioRegistrado = false;
+  const folio='RD-'+new Date().getFullYear()+'-'+String(diagFolioNum).padStart(3,'0');
+  const hoy=new Date().toISOString().split('T')[0];
+  return `
+  <div class="form-section">Datos del vehículo</div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Cliente</label>
+      <input class="form-input" id="d-cliente" placeholder="Nombre del cliente"></div>
+    <div class="form-group"><label class="form-label">Vehículo *</label>
+      <input class="form-input" id="d-vehiculo" placeholder="Ej: Dodge Charger"></div>
+  </div>
+  <div class="form-row cols-3">
+    <div class="form-group"><label class="form-label">Año</label>
+      <input class="form-input" id="d-anio" placeholder="2016"></div>
+    <div class="form-group"><label class="form-label">VIN</label>
+      <input class="form-input" id="d-vin" placeholder="Número de serie del vehículo"></div>
+    <div class="form-group"><label class="form-label">Kilometraje</label>
+      <input class="form-input" id="d-km" placeholder="Ej: 86,418 km"></div>
+  </div>
+  <div class="form-row cols-3">
+    <div class="form-group"><label class="form-label">No. de serie (SN)</label>
+      <input class="form-input" id="d-sn" placeholder="SN reportado por el escáner"></div>
+    <div class="form-group"><label class="form-label">Marca / Ruta de diagnóstico</label>
+      <input class="form-input" id="d-marca" placeholder="Ej: DODGE"></div>
+    <div class="form-group"><label class="form-label">Sistemas escaneados</label>
+      <input class="form-input" type="number" id="d-sistemas" value="17" min="1"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">No. Reporte</label>
+      <input class="form-input" id="d-folio" value="${folio}"></div>
+    <div class="form-group"><label class="form-label">Fecha</label>
+      <input class="form-input" type="date" id="d-fecha" value="${hoy}"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Equipo de escaneo</label>
+      <input class="form-input" id="d-equipo" value="Escáner OBD2 Bluetooth XTOOL Anyscan A30M"></div>
+    <div class="form-group"><label class="form-label">Técnico responsable</label>
+      <input class="form-input" id="d-tecnico" value="${esc(EMPRESA.contacto)}"></div>
+  </div>
+
+  <div class="form-section">Pegar códigos de falla (opcional)</div>
+  <div class="form-group" style="margin-bottom:8px">
+    <textarea class="form-textarea" id="d-pegado" rows="4" style="resize:vertical" placeholder="Un código por línea → Sistema | Código | Descripción | Estado&#10;Ej: BCM | B230311 | Wiper Park Switch Input-Circuit Short to Ground | Activo&#10;(también acepta solo: Código | Descripción)"></textarea>
+  </div>
+  <button class="btn btn-ghost" style="width:100%;margin-bottom:16px" onclick="diagProcesarPegado()">📋 Agregar de la lista pegada</button>
+
+  <div class="form-section">Códigos de falla detectados</div>
+  <div id="diag-codigos">${diagCodigoHTML({},0)}</div>
+  <button class="btn btn-ghost" style="width:100%;margin-bottom:16px" onclick="agregarCodigoDiag()">+ Agregar código</button>
+
+  <div class="form-section">Sistemas sin códigos de falla (opcional)</div>
+  <div class="form-group" style="margin-bottom:12px">
+    <input class="form-input" id="d-sinfallas" placeholder="Ej: TCM, ORC, EPS, ESM, IPC, RFH, SCCM, TPMS, HSM, ICS"></div>
+
+  <div class="form-section">Observaciones y recomendaciones</div>
+  <div class="form-group" style="margin-bottom:20px">
+    <textarea class="form-textarea" id="d-observaciones" rows="3" style="resize:vertical" placeholder="Recomendaciones para el cliente..."></textarea></div>
+
+  <div style="display:flex;gap:10px;padding-top:4px;padding-bottom:40px">
+    <button class="btn btn-primary" style="flex:1" onclick="verDiagnostico()">🩺 Ver reporte de diagnóstico</button>
+  </div>`;
+}
+
+function diagCodigoHTML(c,i) {
+  return `<div class="partida-row" id="diag-c-${i}">
+    <button class="remove-btn" onclick="quitarCodigoDiag(${i})">✕</button>
+    <div class="form-row cols-2" style="margin-bottom:6px">
+      <div class="form-group"><label class="form-label">Sistema</label>
+        <input class="form-input diag-sistema" placeholder="Ej: BCM / Body Controller" value="${esc(c.sistema||'')}"></div>
+      <div class="form-group"><label class="form-label">Código</label>
+        <input class="form-input diag-codigo" placeholder="Ej: B230311" value="${esc(c.codigo||'')}"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Descripción de la falla</label>
+        <input class="form-input diag-descripcion" placeholder="Descripción del código" value="${esc(c.descripcion||'')}"></div>
+      <div class="form-group"><label class="form-label">Estado</label>
+        <select class="form-select diag-estado">
+          <option value="Activo" ${(!c.estado||c.estado==='Activo')?'selected':''}>Activo</option>
+          <option value="Guardado" ${c.estado==='Guardado'?'selected':''}>Guardado</option>
+          <option value="Pendiente" ${c.estado==='Pendiente'?'selected':''}>Pendiente</option>
+        </select></div>
+    </div>
+  </div>`;
+}
+
+let _diagRowSeq = 0;
+function agregarCodigoDiag(c){ const cont=document.getElementById('diag-codigos'); if(!cont)return; const i=Date.now()+(_diagRowSeq++); const div=document.createElement('div'); div.innerHTML=diagCodigoHTML(c||{},i); cont.appendChild(div.firstElementChild); }
+function quitarCodigoDiag(i){
+  const cont = document.getElementById('diag-codigos');
+  if (!cont) return;
+  if (cont.querySelectorAll('.partida-row').length <= 1) { toast('⚠️ Debe haber al menos un código'); return; }
+  const r = document.getElementById('diag-c-'+i);
+  if(r){ r.remove(); }
+}
+
+function leerCodigosDiag() {
+  return Array.from(document.querySelectorAll('#diag-codigos .partida-row')).map(r=>({
+    sistema:r.querySelector('.diag-sistema')?.value?.trim()||'',
+    codigo:r.querySelector('.diag-codigo')?.value?.trim()||'',
+    descripcion:r.querySelector('.diag-descripcion')?.value?.trim()||'',
+    estado:r.querySelector('.diag-estado')?.value||'Guardado'
+  })).filter(c=>c.codigo || c.descripcion);
+}
+
+// Pega líneas tipo "Sistema | Código | Descripción | Estado" (o solo "Código | Descripción")
+// y las convierte en filas de la tabla de códigos — así no hay que teclear cada uno a mano.
+function diagProcesarPegado() {
+  const ta=document.getElementById('d-pegado');
+  if(!ta || !ta.value.trim()){ toast('⚠️ Pega al menos una línea con códigos'); return; }
+  const lineas=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const cont=document.getElementById('diag-codigos');
+  const filas=Array.from(cont.querySelectorAll('.partida-row'));
+  const vacia = filas.length===1 && !filas[0].querySelector('.diag-codigo').value.trim() && !filas[0].querySelector('.diag-descripcion').value.trim();
+  if (vacia) filas[0].remove();
+  let agregados=0;
+  lineas.forEach(linea=>{
+    const partes=linea.split('|').map(p=>p.trim());
+    if(partes.length<2) return;
+    let sistema='', codigo='', descripcion='', estado='Guardado';
+    if(partes.length>=4){ [sistema,codigo,descripcion,estado]=partes; }
+    else if(partes.length===3){ [codigo,descripcion,estado]=partes; }
+    else { [codigo,descripcion]=partes; }
+    if(!codigo && !descripcion) return;
+    estado = /activ/i.test(estado) ? 'Activo' : /pendient/i.test(estado) ? 'Pendiente' : 'Guardado';
+    agregarCodigoDiag({sistema,codigo,descripcion,estado});
+    agregados++;
+  });
+  if(!cont.querySelectorAll('.partida-row').length) agregarCodigoDiag();
+  ta.value='';
+  toast(agregados ? '✅ '+agregados+' código(s) agregado(s)' : '⚠️ No se reconoció ningún código válido — usa Código | Descripción');
+}
+
+function verDiagnostico() {
+  const vehiculo=document.getElementById('d-vehiculo')?.value?.trim();
+  if(!vehiculo){toast('⚠️ El vehículo es obligatorio');return;}
+  const codigos=leerCodigosDiag();
+  const folio=document.getElementById('d-folio')?.value||'';
+  const fechaInput=document.getElementById('d-fecha')?.value||'';
+  const fecha = fechaInput
+    ? new Date(fechaInput+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})
+    : new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  if (!diagFolioRegistrado) {
+    diagFolioRegistrado = true;
+    diagFolioNum++; localStorage.setItem('diag_folio', diagFolioNum);
+  }
+
+  const activos = codigos.filter(c=>c.estado==='Activo').length;
+  const cliente = document.getElementById('d-cliente')?.value?.trim()||'';
+  const tecnico = document.getElementById('d-tecnico')?.value?.trim()||EMPRESA.contacto;
+  const totalSistemas = parseInt(document.getElementById('d-sistemas')?.value)||codigos.length||0;
+
+  // Agrupa los códigos por sistema en el orden en que se capturaron.
+  const grupos = [];
+  codigos.forEach(c=>{
+    const nombreSis = c.sistema || '—';
+    let g = grupos.find(x=>x.sistema===nombreSis);
+    if(!g){ g={sistema:nombreSis, items:[]}; grupos.push(g); }
+    g.items.push(c);
+  });
+
+  let n=0;
+  const tablaHTML = grupos.map((g,gi)=>{
+    const filas = g.items.map(c=>{
+      n++;
+      const claseEstado = c.estado==='Activo'?'status-activo':(c.estado==='Pendiente'?'status-pendiente':'status-guardado');
+      return '<tr><td style="color:#999">'+n+'</td><td>'+esc(g.sistema)+'</td><td>'+esc(c.codigo)+'</td><td>'+esc(c.descripcion)+'</td><td style="text-align:center" class="'+claseEstado+'">'+esc((c.estado||'').toUpperCase())+'</td></tr>';
+    }).join('');
+    return '<tr class="sys-row"><td colspan="5">'+(gi+1)+'&nbsp;&nbsp;'+esc(g.sistema)+' &nbsp;<span class="sys-count">▲ '+g.items.length+' código'+(g.items.length!==1?'s':'')+'</span></td></tr>'+filas;
+  }).join('');
+
+  const sinFallas = document.getElementById('d-sinfallas')?.value?.trim();
+
+  const bodyHTML =
+    headerEmpresa('REPORTE DE DIAGNÓSTICO', folio, fecha)
+    + '<div class="info-grid">'
+    +   '<div><div class="info-label">Cliente</div><div class="info-val">'+esc(cliente||'—')+'</div></div>'
+    +   '<div><div class="info-label">Vehículo</div><div class="info-val">'+esc(vehiculo)+'</div></div>'
+    +   '<div><div class="info-label">Año</div><div class="info-val">'+esc(document.getElementById('d-anio')?.value||'—')+'</div></div>'
+    +   '<div><div class="info-label">VIN</div><div class="info-val">'+esc(document.getElementById('d-vin')?.value||'—')+'</div></div>'
+    +   '<div><div class="info-label">Kilometraje</div><div class="info-val">'+esc(document.getElementById('d-km')?.value||'—')+'</div></div>'
+    +   '<div><div class="info-label">No. de serie (SN)</div><div class="info-val">'+esc(document.getElementById('d-sn')?.value||'—')+'</div></div>'
+    +   '<div><div class="info-label">Marca / Ruta de diagnóstico</div><div class="info-val">'+esc(document.getElementById('d-marca')?.value||'—')+'</div></div>'
+    +   '<div><div class="info-label">Equipo de escaneo</div><div class="info-val">'+esc(document.getElementById('d-equipo')?.value||'—')+'</div></div>'
+    +   '<div><div class="info-label">Técnico responsable</div><div class="info-val">'+esc(tecnico)+'</div></div>'
+    + '</div>'
+    + '<div class="desc-box"><div class="desc-label">Resumen del diagnóstico</div>'
+    +   'Se escanearon <strong>'+totalSistemas+' sistema(s)</strong> del vehículo. Se detectaron códigos de falla en <strong>'+grupos.length+' sistema(s)</strong>, con un total de <strong>'+codigos.length+' código(s) de falla</strong>'+(activos?' ('+activos+' en estado activo)':'')+'.'
+    + '</div>'
+    + (codigos.length
+        ? '<table><thead><tr><th style="width:22px">#</th><th style="width:170px">Sistema</th><th style="width:75px">Código</th><th>Descripción de la falla</th><th style="width:70px;text-align:center">Estado</th></tr></thead><tbody>'+tablaHTML+'</tbody></table>'
+        : '<div class="ok-box">✅ No se registraron códigos de falla en este diagnóstico.</div>')
+    + (sinFallas ? '<div class="ok-box"><strong>✅ Sistemas sin códigos de falla:</strong> '+esc(sinFallas)+'</div>' : '')
+    + (document.getElementById('d-observaciones')?.value?.trim() ? '<div class="nota-box"><strong>Observaciones:</strong> '+esc(document.getElementById('d-observaciones').value)+'</div>' : '')
+    + '<div class="nota-box" style="margin-top:8px"><strong>Nota:</strong> Este reporte es responsable únicamente de los resultados de esta detección, realizada con el equipo de diagnóstico el día y hora indicados. No sustituye una inspección física complementaria de los componentes reportados.</div>'
+    + '<div class="firmas">'
+    +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">'+esc(tecnico)+'<br>'+EMPRESA.nombre+' — '+EMPRESA.subtitulo+'</div></div>'
+    +   '<div class="firma"><div class="firma-line"></div><div class="firma-label">Nombre y firma de recibido'+(cliente?'<br>'+esc(cliente):'')+'</div></div>'
+    + '</div>'
+    + '<div class="footer">'+EMPRESA.nombre+' &nbsp;|&nbsp; '+EMPRESA.subtitulo+' &nbsp;|&nbsp; '+EMPRESA.contacto+' &nbsp;|&nbsp; '+EMPRESA.email+' &nbsp;|&nbsp; '+EMPRESA.tel+'<br>📍 '+EMPRESA.dir+'</div>';
+
+  abrirDoc('Reporte de Diagnóstico '+folio, bodyHTML);
 }
 
 // ═══════════════════════════════════════
