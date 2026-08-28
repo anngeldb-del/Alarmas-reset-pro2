@@ -11,7 +11,7 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('sw.js?v=15');
+        const reg = await navigator.serviceWorker.register('sw.js?v=16');
 
         // Detect SW update available
         reg.addEventListener('updatefound', () => {
@@ -1165,6 +1165,16 @@ function setVista(agrupada) {
 function filtrarLista() {
   const q=(document.getElementById('search-input')?.value||'').toLowerCase();
   let lista=ordenes;
+  // Al escribir algo en el buscador, se suman también las órdenes ya
+  // archivadas por el cambio de mes (deduplicando por id) — así una orden
+  // vieja se puede encontrar para atender una garantía aunque ya no esté
+  // en la lista activa. Sin texto de búsqueda, la lista se comporta igual
+  // que antes (solo activas), para no saturar el listado normal.
+  if (q) {
+    const idsActivas = new Set(ordenes.map(o=>o.id));
+    const archivadas = _ordenesArchivadasFlat().filter(o => !idsActivas.has(o.id));
+    lista = ordenes.concat(archivadas);
+  }
   if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
   if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q)));
   return lista;
@@ -1237,12 +1247,36 @@ function ordenCard(o) {
   const est=(o.estado||'PENDIENTE').toUpperCase();
   const prods=o.productos||[];
   const total=o.total||0, aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
+  const archivada = !!o._archivada;
   const rec=o.recordatorios?`<div style="margin-top:8px;padding:8px 10px;background:rgba(255,209,102,.08);border-left:2px solid var(--accent2);border-radius:4px;font-size:12px;color:var(--accent2)">📌 ${esc(o.recordatorios)}</div>`:'';
+  // Resultado de búsqueda que viene del historial mensual: su documento en
+  // Firestore ya no existe (se borró al archivar), así que solo se puede
+  // consultar/imprimir — editar, borrar, cambiar estado o abonar fallarían.
+  const badgeArchivada = archivada ? `<span class="estado-badge" style="background:rgba(148,163,184,.18);color:var(--muted)">📦 Archivada</span>` : '';
+  const estadoPicker = archivada ? '' : `
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;margin-top:12px">Cambiar estado</div>
+      <div class="estado-picker">
+        <button class="estado-opt pendiente ${est==='PENDIENTE'?'sel':''}" onclick="cambiarEstado('${o.id}','PENDIENTE')">Pendiente</button>
+        <button class="estado-opt en_proceso ${est==='EN_PROCESO'?'sel':''}" onclick="cambiarEstado('${o.id}','EN_PROCESO')">En proceso</button>
+        <button class="estado-opt pagado ${est==='PAGADO'?'sel':''}" onclick="cambiarEstado('${o.id}','PAGADO')">Pagado</button>
+        <button class="estado-opt termo ${est==='TERMO'?'sel':''}" onclick="cambiarEstado('${o.id}','TERMO')">Termo</button>
+      </div>`;
+  const acciones = archivada
+    ? `<div class="orden-actions"><button class="btn btn-green btn-sm" onclick="verBoleta('${o.id}')">🧾 Boleta</button></div>`
+    : `<div class="orden-actions">
+        <button class="btn btn-green btn-sm" onclick="verBoleta('${o.id}')">🧾 Boleta</button>
+        ${saldo>0 ? `<button class="btn btn-primary btn-sm" onclick="abrirModalAbono('${o.id}')">💰 Abonar</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="editarOrden('${o.id}')">✏️ Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarOrden('${o.id}')">🗑️ Borrar</button>
+      </div>`;
   return `<div class="orden-card" id="ord-${o.id}">
     <div class="orden-header" onclick="toggleOrden('${o.id}')">
       <div><div class="orden-title">${esc(o.vehiculo||'—')} · <span style="color:var(--muted)">${esc(o.cliente||'—')}</span></div>
       <div class="orden-sub">${prods.length} servicio(s) · 📅 ${esc(o.fecha_instalacion||'sin fecha')}</div></div>
-      <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
+        ${badgeArchivada}
+      </div>
     </div>
     <div class="orden-body" id="body-${o.id}">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Servicios</div>
@@ -1254,18 +1288,8 @@ function ordenCard(o) {
         <div class="total-item"><div class="total-label">F. Pago</div><div class="total-val" style="font-size:13px">${esc(o.fecha_pago||'—')}</div></div>
       </div>
       ${rec}
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;margin-top:12px">Cambiar estado</div>
-      <div class="estado-picker">
-        <button class="estado-opt pendiente ${est==='PENDIENTE'?'sel':''}" onclick="cambiarEstado('${o.id}','PENDIENTE')">Pendiente</button>
-        <button class="estado-opt en_proceso ${est==='EN_PROCESO'?'sel':''}" onclick="cambiarEstado('${o.id}','EN_PROCESO')">En proceso</button>
-        <button class="estado-opt pagado ${est==='PAGADO'?'sel':''}" onclick="cambiarEstado('${o.id}','PAGADO')">Pagado</button>
-        <button class="estado-opt termo ${est==='TERMO'?'sel':''}" onclick="cambiarEstado('${o.id}','TERMO')">Termo</button>
-      </div>
-      <div class="orden-actions">
-        <button class="btn btn-green btn-sm" onclick="verBoleta('${o.id}')">🧾 Boleta</button>
-        <button class="btn btn-ghost btn-sm" onclick="editarOrden('${o.id}')">✏️ Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="eliminarOrden('${o.id}')">🗑️ Borrar</button>
-      </div>
+      ${estadoPicker}
+      ${acciones}
     </div></div>`;
 }
 
@@ -1402,7 +1426,7 @@ function verClienteDetalle(id) {
 // BOLETA
 // ═══════════════════════════════════════
 function verBoleta(id) {
-  const o=ordenes.find(x=>x.id===id); if(!o) return;
+  const o=_buscarOrdenPorId(id); if(!o) return;
   const prods=o.productos||[];
   const total=o.total||prods.reduce((s,p)=>s+(parseFloat(p.costo)||0),0);
   const aCuenta=o.a_cuenta_total||0, saldo=total-aCuenta;
@@ -2538,6 +2562,90 @@ async function cambiarEstado(id, nuevoEstado) {
   }, 40);
 }
 
+// ═══════════════════════════════════════
+// ABONOS (pagos parciales a crédito)
+// ═══════════════════════════════════════
+function abrirModalAbono(id) {
+  const o = ordenes.find(x=>x.id===id);
+  if (!o) return;
+  const total = o.total||0, aCuenta = o.a_cuenta_total||0, saldo = total-aCuenta;
+  if (saldo <= 0) { toast('✅ Esta orden ya está saldada'); return; }
+  const abonosPrevios = (o.abonos||[]).slice().reverse().map(a =>
+    `<div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--muted)">${new Date(a.fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</span>
+      <span style="color:var(--green);font-weight:600">${fmt(a.monto)}</span>
+    </div>`
+  ).join('');
+  document.getElementById('modal-cliente-title').textContent = '💰 Abonar a cuenta';
+  document.getElementById('modal-cliente-body').innerHTML = `
+    <div style="margin-bottom:16px;font-size:14px">
+      <div style="color:var(--muted)">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
+      <div style="margin-top:4px">Saldo pendiente: <strong style="color:var(--red)">${fmt(saldo)}</strong></div>
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label class="form-label">Monto del abono</label>
+      <input class="form-input" id="abono-monto" type="number" step="0.01" min="0.01" max="${saldo}" placeholder="0" value="${saldo}">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:${abonosPrevios?'20px':'0'}">
+      <button class="btn btn-primary" style="flex:1" onclick="submitAbono('${id}')">💰 Registrar abono</button>
+      <button class="btn btn-ghost" onclick="cerrarModalCliente()">Cancelar</button>
+    </div>
+    ${abonosPrevios ? `<div class="form-section">Abonos anteriores</div>${abonosPrevios}` : ''}
+  `;
+  document.getElementById('modal-cliente').classList.add('open');
+}
+
+async function submitAbono(id) {
+  const monto = parseFloat(document.getElementById('abono-monto')?.value);
+  const ok = await abonarOrden(id, monto);
+  if (ok) cerrarModalCliente();
+}
+
+async function abonarOrden(id, monto) {
+  const orden = ordenes.find(o => o.id === id);
+  if (!orden) return false;
+  monto = parseFloat(monto);
+  if (!monto || monto <= 0) { toast('⚠️ Ingresa un monto válido'); return false; }
+  const total = orden.total || 0;
+  const aCuentaPrevio = orden.a_cuenta_total || 0;
+  const abonosPrevios = orden.abonos || [];
+  const saldoPrevio = total - aCuentaPrevio;
+  if (monto > saldoPrevio + 0.01) { toast('⚠️ El monto excede el saldo pendiente (' + fmt(saldoPrevio) + ')'); return false; }
+
+  const estadoAnterior = orden.estado;
+  const nuevoACuenta = aCuentaPrevio + monto;
+  const pasaAPagado = (total - nuevoACuenta) <= 0.01 && (estadoAnterior||'').toUpperCase() !== 'PAGADO';
+
+  orden.a_cuenta_total = nuevoACuenta;
+  orden.abonos = [...abonosPrevios, { monto, fecha: Date.now() }];
+  if (pasaAPagado) { orden.estado = 'PAGADO'; _registrarIngresoOrden(orden); }
+
+  const mensaje = '💰 Abono registrado: ' + fmt(monto) + (pasaAPagado ? ' — orden PAGADA' : '');
+
+  if (window._useFirebase && window._firebaseDb && window._uid) {
+    try {
+      const { updateDoc } = window._firebaseModules;
+      const data = { a_cuenta_total: orden.a_cuenta_total, abonos: orden.abonos };
+      if (pasaAPagado) data.estado = 'PAGADO';
+      await updateDoc(docOrden(id), data);
+      toast(mensaje);
+      return true;
+    } catch(e) {
+      console.error(e);
+      orden.a_cuenta_total = aCuentaPrevio;
+      orden.abonos = abonosPrevios;
+      orden.estado = estadoAnterior;
+      renderAll();
+      toast('⚠️ No se pudo guardar el abono — sin conexión');
+      return false;
+    }
+  }
+  await guardarLocal();
+  renderAll();
+  toast(mensaje);
+  return true;
+}
+
 function _registrarIngresoOrden(orden) {
   try {
     const mesKey = _getMesActual();
@@ -2883,6 +2991,24 @@ function _historialActual() {
   return window._historialFusionado || JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
 }
 
+// Aplana el historial mensual (array de {mes, ordenes:[...]}) en una sola
+// lista de órdenes, marcadas con _archivada/_archivadaMes — para poder
+// buscarlas junto con las activas sin importar en qué mes quedaron guardadas
+// (ej. localizar una orden vieja para atender una garantía).
+function _ordenesArchivadasFlat() {
+  const hist = _historialActual();
+  const flat = [];
+  hist.forEach(h => (h.ordenes||[]).forEach(o => flat.push({...o, _archivada: true, _archivadaMes: h.mes})));
+  return flat;
+}
+
+// Busca una orden por id primero entre las activas y, si no está ahí,
+// entre las archivadas — para que acciones de solo-lectura (ej. la boleta)
+// funcionen también sobre resultados de búsqueda que vienen del historial.
+function _buscarOrdenPorId(id) {
+  return ordenes.find(x=>x.id===id) || _ordenesArchivadasFlat().find(x=>x.id===id);
+}
+
 function renderHistorialOrdenes() {
   const hist = _historialActual();
   const sec = document.getElementById('historial-section');
@@ -2976,6 +3102,9 @@ window.exportarM365 = exportarM365;
 window.cerrarBannerExport = cerrarBannerExport;
 window.intentarAutoExportM365 = intentarAutoExportM365;
 window.cambiarEstado = cambiarEstado;
+window.abrirModalAbono = abrirModalAbono;
+window.submitAbono = submitAbono;
+window.abonarOrden = abonarOrden;
 window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;
 window.skipOnboarding = skipOnboarding;
