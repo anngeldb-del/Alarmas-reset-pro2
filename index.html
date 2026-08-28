@@ -11,7 +11,7 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('sw.js?v=14');
+        const reg = await navigator.serviceWorker.register('sw.js?v=15');
 
         // Detect SW update available
         reg.addEventListener('updatefound', () => {
@@ -1991,6 +1991,7 @@ function initAppData() {
   updateFirebaseBadge();
   cargarOrdenes();
   cargarClientes();
+  cargarHistorialOrdenes();
   setTimeout(checkAndRotateMonthOrders, 1200);
   setTimeout(initOnboarding, 800);
   // Capturar resultado de loginRedirect de MSAL (iOS Safari)
@@ -2846,8 +2847,44 @@ async function archivarOrdenesDelMes(mes, archivables) {
   toast('📦 ' + archivables.length + ' órdenes archivadas');
 }
 
+// FIX (ago-2026): el historial de órdenes archivadas (Pagado/Termo de meses
+// anteriores) se guardaba SOLO en localStorage del dispositivo donde ocurrió
+// el archivado mensual. En cualquier otro celular/PC la sección aparecía
+// vacía y no había forma de ver esas órdenes, aunque sí seguían existiendo
+// en Firestore (colArchivados() las escribe pero nada las leía de vuelta).
+// cargarHistorialOrdenes() trae esos documentos y los fusiona por mes con
+// lo que ya hay en localStorage, para que el historial se vea igual en
+// todos los dispositivos y siga funcionando offline con la última copia.
+async function cargarHistorialOrdenes() {
+  if (window._useFirebase && window._firebaseDb && window._firebaseModules && window._uid) {
+    try {
+      const { getDocs, query, orderBy } = window._firebaseModules;
+      const snap = await getDocs(query(colArchivados(), orderBy('mes','desc')));
+      const remotos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      const local = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+      const porMes = {};
+      [...local, ...remotos].forEach(h => {
+        if (!h.mes) return;
+        if (!porMes[h.mes]) porMes[h.mes] = { mes: h.mes, ordenes: [], archivadasEn: h.archivadasEn };
+        const idsExistentes = new Set(porMes[h.mes].ordenes.map(o=>o.id));
+        (h.ordenes||[]).forEach(o => { if (!idsExistentes.has(o.id)) { porMes[h.mes].ordenes.push(o); idsExistentes.add(o.id); } });
+      });
+      const fusion = Object.values(porMes)
+        .map(h => ({...h, total: h.ordenes.reduce((s,o)=>s+(o.total||0),0)}))
+        .sort((a,b)=> b.mes.localeCompare(a.mes));
+      window._historialFusionado = fusion;
+      localStorage.setItem(ORDENES_HIST_KEY, JSON.stringify(fusion));
+    } catch(e) { console.error('historial cloud:', e); }
+  }
+  renderHistorialOrdenes();
+}
+
+function _historialActual() {
+  return window._historialFusionado || JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+}
+
 function renderHistorialOrdenes() {
-  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const hist = _historialActual();
   const sec = document.getElementById('historial-section');
   const lista = document.getElementById('historial-lista');
   if (!sec || !lista) return;
@@ -2868,7 +2905,7 @@ function renderHistorialOrdenes() {
 }
 
 function verHistorialMes(mes) {
-  const hist = JSON.parse(localStorage.getItem(ORDENES_HIST_KEY)||'[]');
+  const hist = _historialActual();
   const entrada = hist.find(h=>h.mes===mes);
   if (!entrada) return;
   const label = new Date(mes+'-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
@@ -2945,6 +2982,7 @@ window.skipOnboarding = skipOnboarding;
 window.verHistorialMes = verHistorialMes;
 window.cerrarHistorialModal = cerrarHistorialModal;
 window.checkAndRotateMonthOrders = checkAndRotateMonthOrders;
+window.cargarHistorialOrdenes = cargarHistorialOrdenes;
 </script>
 </body>
 </html>
