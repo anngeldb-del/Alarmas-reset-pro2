@@ -6,7 +6,7 @@
 // del código (aún en index.html) siga funcionando sin cambios.
 // ═══════════════════════════════════════
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit, getDocs, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit, getDocs, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 // ══════════════════════════════════════════════════
@@ -45,7 +45,7 @@ if (fbConfigured) {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
     window._firebaseDb = db;
-    window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit, getDocs };
+    window._firebaseModules = { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit, getDocs, runTransaction };
     window._useFirebase = true;
 
     // 🔔 Notificaciones push (FCM) — requiere VAPID_KEY configurada arriba.
