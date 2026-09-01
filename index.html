@@ -3037,25 +3037,36 @@ function verHistorialMes(mes) {
   const label = new Date(mes+'-02').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
   document.getElementById('historial-modal-title').textContent = '📦 ' + label;
   const ords = entrada.ordenes || [];
+  const GARANTIA_LABELS = {'GARANTIA 6 MESES':'garantía 6 meses','GARANTIA 1 AÑO':'garantía 1 año'};
   document.getElementById('historial-modal-body').innerHTML = ords.length
     ? ords.map(o=>{
         const est=(o.estado||'PENDIENTE').toUpperCase();
+        const prods=o.productos||[];
+        const servicios = prods.length
+          ? prods.map(p=>`<div class="producto-row"><span class="producto-nombre">${esc(p.nombre||'—')}${p.garantia?` <span style="color:var(--muted);font-size:11px">(${esc(GARANTIA_LABELS[p.garantia]||p.garantia)})</span>`:''}</span><span class="producto-costo">${fmt(p.costo)}</span></div>`).join('')
+          : '<div style="font-size:12px;color:var(--muted)">Sin servicios registrados</div>';
         return `<div class="orden-card" style="margin-bottom:8px">
-          <div class="orden-header">
+          <div class="orden-header" onclick="toggleOrdenHistorial('${o.id}')">
             <div>
               <div class="orden-title">${esc(o.vehiculo||'—')} · ${esc(o.cliente||'—')}</div>
-              <div class="orden-sub">${(o.productos||[]).length} servicio(s) · ${esc(o.fecha_instalacion||'')}</div>
+              <div class="orden-sub">${prods.length} servicio(s) · ${esc(o.fecha_instalacion||'')} · <span style="color:var(--accent)">toca para ver los servicios</span></div>
             </div>
             <div style="text-align:right">
               <span class="estado-badge ${est.toLowerCase()}">${ESTADO_LABELS[est]||est}</span>
               <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--green);margin-top:4px">${fmt(o.total||0)}</div>
             </div>
           </div>
+          <div class="orden-body" id="hist-body-${o.id}">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Servicios realizados</div>
+            ${servicios}
+          </div>
         </div>`;
       }).join('')
     : '<div class="empty"><div class="empty-text">Sin órdenes archivadas</div></div>';
   document.getElementById('modal-historial').classList.add('open');
 }
+
+function toggleOrdenHistorial(id){ document.getElementById('hist-body-'+id).classList.toggle('open'); }
 
 function cerrarHistorialModal() {
   document.getElementById('modal-historial').classList.remove('open');
@@ -3109,6 +3120,7 @@ window.confirmarAccion = confirmarAccion;
 window.nextOnboardStep = nextOnboardStep;
 window.skipOnboarding = skipOnboarding;
 window.verHistorialMes = verHistorialMes;
+window.toggleOrdenHistorial = toggleOrdenHistorial;
 window.cerrarHistorialModal = cerrarHistorialModal;
 window.checkAndRotateMonthOrders = checkAndRotateMonthOrders;
 window.cargarHistorialOrdenes = cargarHistorialOrdenes;
