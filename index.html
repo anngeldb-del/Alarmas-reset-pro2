@@ -140,7 +140,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
 /* DASHBOARD */
 .dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .2s,transform .1s}
+.stat-card:hover{border-color:var(--accent)}
+.stat-card:active{transform:scale(.97)}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
 .stat-card.green::before{background:var(--green)}
 .stat-card.orange::before{background:var(--accent)}
@@ -500,10 +502,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- DASHBOARD -->
 <div class="view active" id="tab-dashboard">
   <div class="dash-grid">
-    <div class="stat-card green"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
-    <div class="stat-card orange"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
-    <div class="stat-card yellow"><div class="stat-label">Facturado</div><div class="stat-value" id="stat-total">$0</div></div>
-    <div class="stat-card red"><div class="stat-label">Órdenes Pend.</div><div class="stat-value" id="stat-ordpend">0</div></div>
+    <div class="stat-card green" onclick="irADashCard('todos')"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
+    <div class="stat-card orange" onclick="irADashCard('POR_COBRAR')"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
+    <div class="stat-card yellow" onclick="irADashCard('todos')"><div class="stat-label">Facturado</div><div class="stat-value" id="stat-total">$0</div></div>
+    <div class="stat-card red" onclick="irADashCard('POR_COBRAR')"><div class="stat-label">Órdenes Pend.</div><div class="stat-value" id="stat-ordpend">0</div></div>
   </div>
   <div class="historial-section" id="historial-section" style="display:none">
     <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📦 Historial de meses</div>
@@ -519,11 +521,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <button class="view-mode-btn" id="btn-vista-lista" onclick="setVista(false)">📋 Cronológico</button>
   </div>
   <div class="filter-row">
-    <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
-    <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
-    <button class="filter-btn" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
-    <button class="filter-btn" onclick="setFilter('TERMO',this)">Termo</button>
-    <button class="filter-btn" onclick="setFilter('EN_PROCESO',this)">En proceso</button>
+    <button class="filter-btn active" data-filtro="todos" onclick="setFilter('todos',this)">Todos</button>
+    <button class="filter-btn" data-filtro="PAGADO" onclick="setFilter('PAGADO',this)">Pagados</button>
+    <button class="filter-btn" data-filtro="POR_COBRAR" onclick="setFilter('POR_COBRAR',this)">Por cobrar</button>
+    <button class="filter-btn" data-filtro="PENDIENTE" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
+    <button class="filter-btn" data-filtro="TERMO" onclick="setFilter('TERMO',this)">Termo</button>
+    <button class="filter-btn" data-filtro="EN_PROCESO" onclick="setFilter('EN_PROCESO',this)">En proceso</button>
   </div>
   <div id="ordenes-lista"></div>
 </div>
@@ -1150,10 +1153,30 @@ function renderDashboard() {
 // irAOrden() se quitó — solo la usaba la tarjeta "Últimas órdenes" del
 // dashboard, que ya no existe (dashboard ahora solo muestra números).
 
+// Ficha del dashboard -> lista de órdenes filtrada según lo que esa ficha
+// representa. "Ganancia Total" y "Facturado" salen de TODAS las órdenes
+// (no de un subconjunto), así que van a la lista completa; "Por Cobrar" y
+// "Órdenes Pend." sí corresponden a un filtro concreto (POR_COBRAR).
+function irADashCard(filtro) {
+  const buscador = document.getElementById('search-input');
+  if (buscador) buscador.value = '';
+  navTo('ordenes');
+  setFilter(filtro);
+}
+
 // ═══════════════════════════════════════
 // LISTA ÓRDENES
 // ═══════════════════════════════════════
-function setFilter(f,btn){ filtroEstado=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
+function setFilter(f,btn){
+  filtroEstado=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  // btn llega siempre que se hace clic en un botón del filter-row (pasan
+  // 'this'); cuando se llama programáticamente (ej. desde una ficha del
+  // dashboard) no hay botón concreto, así que se busca el que corresponde
+  // a ese filtro por su data-filtro para que quede resaltado igual.
+  (btn || document.querySelector('.filter-btn[data-filtro="'+f+'"]'))?.classList.add('active');
+  renderOrdenes();
+}
 
 function setVista(agrupada) {
   vistaAgrupada = agrupada;
@@ -1175,7 +1198,13 @@ function filtrarLista() {
     const archivadas = _ordenesArchivadasFlat().filter(o => !idsActivas.has(o.id));
     lista = ordenes.concat(archivadas);
   }
-  if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
+  if (filtroEstado==='POR_COBRAR') {
+    // Mismo criterio que usa el dashboard para "Por Cobrar"/"Órdenes Pend.":
+    // toda orden con saldo pendiente (Pendiente o En proceso), no un solo estado.
+    lista=lista.filter(o=>{ const e=(o.estado||'').toUpperCase(); return e==='PENDIENTE'||e==='EN_PROCESO'; });
+  } else if(filtroEstado!=='todos') {
+    lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
+  }
   if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q)));
   return lista;
 }
@@ -3151,6 +3180,7 @@ window.cerrarModal = cerrarModal;
 // 'eliminarOrden' ya no existe como función local en este script).
 window.showTab = showTab;
 window.setFilter = setFilter;
+window.irADashCard = irADashCard;
 window.toggleOrden = toggleOrden;
 window.verBoleta = verBoleta;
 // irAOrden ya no existe (ver comentario en renderDashboard).
