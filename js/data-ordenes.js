@@ -23,12 +23,12 @@ async function cargarOrdenesLocal() {
       const data = await window.IDB.getAll();
       if (data && data.length > 0) {
         window.ordenes = data.sort((a,b)=>(b.fecha_creacion||0)-(a.fecha_creacion||0));
-        window.renderAll(); return;
+        window.renderAll(); window._ordenesListas = true; return;
       }
       const ls = localStorage.getItem('alarmas_ordenes');
       if (ls) {
         try { window.ordenes = JSON.parse(ls); await window.IDB.putAll(window.ordenes); } catch(e) { window.ordenes = []; }
-        window.renderAll(); return;
+        window.renderAll(); window._ordenesListas = true; return;
       }
     }
     const data = localStorage.getItem('alarmas_ordenes');
@@ -38,6 +38,7 @@ async function cargarOrdenesLocal() {
     console.error(e);
   }
   window.renderAll();
+  window._ordenesListas = true;
 }
 
 async function cargarOrdenes() {
@@ -54,6 +55,7 @@ async function cargarOrdenes() {
         _unsubOrdenes = onSnapshot(q, snap => {
           window.ordenes = snap.docs.map(d=>({id:d.id,...d.data()}));
           window.renderAll();
+          window._ordenesListas = true;
         }, err => {
           console.error(err);
           if (!window._uid) return; // sesión ya cerrada — listener obsoleto, ignorar

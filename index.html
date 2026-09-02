@@ -140,7 +140,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
 /* DASHBOARD */
 .dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .2s,transform .1s}
+.stat-card:hover{border-color:var(--accent)}
+.stat-card:active{transform:scale(.97)}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
 .stat-card.green::before{background:var(--green)}
 .stat-card.orange::before{background:var(--accent)}
@@ -500,10 +502,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <!-- DASHBOARD -->
 <div class="view active" id="tab-dashboard">
   <div class="dash-grid">
-    <div class="stat-card green"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
-    <div class="stat-card orange"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
-    <div class="stat-card yellow"><div class="stat-label">Facturado</div><div class="stat-value" id="stat-total">$0</div></div>
-    <div class="stat-card red"><div class="stat-label">Órdenes Pend.</div><div class="stat-value" id="stat-ordpend">0</div></div>
+    <div class="stat-card green" onclick="irADashCard('todos')"><div class="stat-label">Ganancia Total</div><div class="stat-value" id="stat-ganancia">$0</div></div>
+    <div class="stat-card orange" onclick="irADashCard('POR_COBRAR')"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-pendiente">$0</div></div>
+    <div class="stat-card yellow" onclick="irADashCard('todos')"><div class="stat-label">Facturado</div><div class="stat-value" id="stat-total">$0</div></div>
+    <div class="stat-card red" onclick="irADashCard('POR_COBRAR')"><div class="stat-label">Órdenes Pend.</div><div class="stat-value" id="stat-ordpend">0</div></div>
   </div>
   <div class="historial-section" id="historial-section" style="display:none">
     <div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📦 Historial de meses</div>
@@ -519,11 +521,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <button class="view-mode-btn" id="btn-vista-lista" onclick="setVista(false)">📋 Cronológico</button>
   </div>
   <div class="filter-row">
-    <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
-    <button class="filter-btn" onclick="setFilter('PAGADO',this)">Pagados</button>
-    <button class="filter-btn" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
-    <button class="filter-btn" onclick="setFilter('TERMO',this)">Termo</button>
-    <button class="filter-btn" onclick="setFilter('EN_PROCESO',this)">En proceso</button>
+    <button class="filter-btn active" data-filtro="todos" onclick="setFilter('todos',this)">Todos</button>
+    <button class="filter-btn" data-filtro="PAGADO" onclick="setFilter('PAGADO',this)">Pagados</button>
+    <button class="filter-btn" data-filtro="POR_COBRAR" onclick="setFilter('POR_COBRAR',this)">Por cobrar</button>
+    <button class="filter-btn" data-filtro="PENDIENTE" onclick="setFilter('PENDIENTE',this)">Pendientes</button>
+    <button class="filter-btn" data-filtro="TERMO" onclick="setFilter('TERMO',this)">Termo</button>
+    <button class="filter-btn" data-filtro="EN_PROCESO" onclick="setFilter('EN_PROCESO',this)">En proceso</button>
   </div>
   <div id="ordenes-lista"></div>
 </div>
@@ -1150,10 +1153,30 @@ function renderDashboard() {
 // irAOrden() se quitó — solo la usaba la tarjeta "Últimas órdenes" del
 // dashboard, que ya no existe (dashboard ahora solo muestra números).
 
+// Ficha del dashboard -> lista de órdenes filtrada según lo que esa ficha
+// representa. "Ganancia Total" y "Facturado" salen de TODAS las órdenes
+// (no de un subconjunto), así que van a la lista completa; "Por Cobrar" y
+// "Órdenes Pend." sí corresponden a un filtro concreto (POR_COBRAR).
+function irADashCard(filtro) {
+  const buscador = document.getElementById('search-input');
+  if (buscador) buscador.value = '';
+  navTo('ordenes');
+  setFilter(filtro);
+}
+
 // ═══════════════════════════════════════
 // LISTA ÓRDENES
 // ═══════════════════════════════════════
-function setFilter(f,btn){ filtroEstado=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrdenes(); }
+function setFilter(f,btn){
+  filtroEstado=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  // btn llega siempre que se hace clic en un botón del filter-row (pasan
+  // 'this'); cuando se llama programáticamente (ej. desde una ficha del
+  // dashboard) no hay botón concreto, así que se busca el que corresponde
+  // a ese filtro por su data-filtro para que quede resaltado igual.
+  (btn || document.querySelector('.filter-btn[data-filtro="'+f+'"]'))?.classList.add('active');
+  renderOrdenes();
+}
 
 function setVista(agrupada) {
   vistaAgrupada = agrupada;
@@ -1175,7 +1198,13 @@ function filtrarLista() {
     const archivadas = _ordenesArchivadasFlat().filter(o => !idsActivas.has(o.id));
     lista = ordenes.concat(archivadas);
   }
-  if(filtroEstado!=='todos') lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
+  if (filtroEstado==='POR_COBRAR') {
+    // Mismo criterio que usa el dashboard para "Por Cobrar"/"Órdenes Pend.":
+    // toda orden con saldo pendiente (Pendiente o En proceso), no un solo estado.
+    lista=lista.filter(o=>{ const e=(o.estado||'').toUpperCase(); return e==='PENDIENTE'||e==='EN_PROCESO'; });
+  } else if(filtroEstado!=='todos') {
+    lista=lista.filter(o=>(o.estado||'').toUpperCase()===filtroEstado);
+  }
   if(q) lista=lista.filter(o=>(o.cliente||'').toLowerCase().includes(q)||(o.vehiculo||'').toLowerCase().includes(q)||(o.productos||[]).some(p=>(p.nombre||'').toLowerCase().includes(q)));
   return lista;
 }
@@ -2075,7 +2104,21 @@ window.addEventListener('firebaseReady', () => {
   // Con o sin Firebase configurado, la app arranca directo — ya no requiere
   // iniciar sesión para ver/editar los datos (ruta compartida abierta)
   showApp();
-  if (!_appInitialized) { _appInitialized = true; _runInitAppData(); }
+  if (!_appInitialized) {
+    _appInitialized = true;
+    _runInitAppData();
+  } else if (window._useFirebase) {
+    // El respaldo de 300ms de más abajo ya arrancó la app en modo local
+    // porque Firebase tardó más que eso en cargar desde gstatic.com. Sin
+    // esto, cargarOrdenes()/cargarClientes() se hubieran quedado leyendo
+    // solo la copia local el resto de la sesión, sin listener en tiempo
+    // real — aunque Firebase sí terminó de cargar un momento después.
+    // cargarOrdenes()/cargarClientes() tienen su propio guard interno
+    // (fsListenerStarted/clientesListenerStarted) así que llamarlas de
+    // nuevo aquí es seguro, no duplica listeners.
+    cargarOrdenes();
+    cargarClientes();
+  }
 });
 document.addEventListener('DOMContentLoaded', () => {
   // Respaldo: si por algún motivo 'firebaseReady' no llegó en 300ms, arranca igual
@@ -2608,41 +2651,80 @@ async function abonarOrden(id, monto) {
   if (!monto || monto <= 0) { toast('⚠️ Ingresa un monto válido'); return false; }
   const total = orden.total || 0;
   const aCuentaPrevio = orden.a_cuenta_total || 0;
-  const abonosPrevios = orden.abonos || [];
   const saldoPrevio = total - aCuentaPrevio;
   if (monto > saldoPrevio + 0.01) { toast('⚠️ El monto excede el saldo pendiente (' + fmt(saldoPrevio) + ')'); return false; }
 
-  const estadoAnterior = orden.estado;
-  const nuevoACuenta = aCuentaPrevio + monto;
-  const pasaAPagado = (total - nuevoACuenta) <= 0.01 && (estadoAnterior||'').toUpperCase() !== 'PAGADO';
+  const abono = { monto, fecha: Date.now() };
 
-  orden.a_cuenta_total = nuevoACuenta;
-  orden.abonos = [...abonosPrevios, { monto, fecha: Date.now() }];
-  if (pasaAPagado) { orden.estado = 'PAGADO'; _registrarIngresoOrden(orden); }
-
-  const mensaje = '💰 Abono registrado: ' + fmt(monto) + (pasaAPagado ? ' — orden PAGADA' : '');
+  // Aplica el abono localmente (optimista) y registra el ingreso solo si
+  // esta llamada es la que efectivamente salda la orden — se hace una vez
+  // aquí y nunca se revierte, para que 'fin_current' nunca quede
+  // desincronizado del estado real de la orden (antes: si fallaba el
+  // guardado se revertía el estado pero el ingreso ya escrito quedaba, y si
+  // el usuario reintentaba se contaba dos veces).
+  function _aplicarLocal(nuevoACuenta, estadoServer) {
+    orden.a_cuenta_total = nuevoACuenta;
+    orden.abonos = [...(orden.abonos||[]), abono];
+    const pasaAPagado = (estadoServer||'').toUpperCase() === 'PAGADO' && (orden.estado||'').toUpperCase() !== 'PAGADO';
+    orden.estado = estadoServer || orden.estado;
+    if (pasaAPagado) _registrarIngresoOrden(orden);
+    return pasaAPagado;
+  }
 
   if (window._useFirebase && window._firebaseDb && window._uid) {
     try {
-      const { updateDoc } = window._firebaseModules;
-      const data = { a_cuenta_total: orden.a_cuenta_total, abonos: orden.abonos };
-      if (pasaAPagado) data.estado = 'PAGADO';
-      await updateDoc(docOrden(id), data);
-      toast(mensaje);
+      const { runTransaction } = window._firebaseModules;
+      const ref = docOrden(id);
+      let nuevoACuenta = 0, estadoFinal = orden.estado;
+      // Transacción en vez de updateDoc plano: Firestore relee el documento
+      // y reintenta automáticamente si otro dispositivo escribió al mismo
+      // tiempo, así que dos abonos simultáneos a la misma orden se suman en
+      // vez de que uno pise al otro.
+      await runTransaction(window._firebaseDb, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('ORDEN_NO_EXISTE');
+        const data = snap.data();
+        const totalSrv = data.total || 0;
+        const aCuentaSrv = data.a_cuenta_total || 0;
+        const saldoSrv = totalSrv - aCuentaSrv;
+        if (monto > saldoSrv + 0.01) throw Object.assign(new Error('SALDO_EXCEDIDO'), { saldoSrv });
+        nuevoACuenta = aCuentaSrv + monto;
+        const pasaAPagadoSrv = (totalSrv - nuevoACuenta) <= 0.01 && (data.estado||'').toUpperCase() !== 'PAGADO';
+        estadoFinal = pasaAPagadoSrv ? 'PAGADO' : (data.estado || orden.estado);
+        const update = { a_cuenta_total: nuevoACuenta, abonos: [...(data.abonos||[]), abono] };
+        if (pasaAPagadoSrv) update.estado = 'PAGADO';
+        tx.update(ref, update);
+      });
+      const pasaAPagado = _aplicarLocal(nuevoACuenta, estadoFinal);
+      renderAll();
+      toast('💰 Abono registrado: ' + fmt(monto) + (pasaAPagado ? ' — orden PAGADA' : ''));
       return true;
     } catch(e) {
+      if (e.message === 'SALDO_EXCEDIDO') {
+        toast('⚠️ El monto excede el saldo pendiente (' + fmt(e.saldoSrv) + ')');
+        return false;
+      }
+      if (e.message === 'ORDEN_NO_EXISTE') {
+        toast('⚠️ Esta orden ya no existe');
+        return false;
+      }
       console.error(e);
-      orden.a_cuenta_total = aCuentaPrevio;
-      orden.abonos = abonosPrevios;
-      orden.estado = estadoAnterior;
+      // Sin conexión / falla de red: aplica el abono local igual que
+      // guardarOrden() y lo encola para reintentar cuando vuelva la señal,
+      // en vez de perderlo (antes el catch revertía el estado y el abono
+      // desaparecía sin quedar en ninguna cola).
+      const pasaAPagado = _aplicarLocal(aCuentaPrevio + monto, (total - (aCuentaPrevio + monto)) <= 0.01 ? 'PAGADO' : orden.estado);
+      _addToOfflineQueue({ tipo: 'guardar', orden: {...orden} });
+      await guardarLocal();
       renderAll();
-      toast('⚠️ No se pudo guardar el abono — sin conexión');
-      return false;
+      toast('☁️ Sin conexión — abono guardado en este dispositivo, se sincronizará solo' + (pasaAPagado?' (orden PAGADA)':''));
+      return true;
     }
   }
+  const pasaAPagado = _aplicarLocal(aCuentaPrevio + monto, (total - (aCuentaPrevio + monto)) <= 0.01 ? 'PAGADO' : orden.estado);
   await guardarLocal();
   renderAll();
-  toast(mensaje);
+  toast('💰 Abono registrado: ' + fmt(monto) + (pasaAPagado ? ' — orden PAGADA' : ''));
   return true;
 }
 
@@ -2897,7 +2979,18 @@ function mostrarInfoFirebase() {
 const ORDENES_HIST_KEY = 'ordenes_historial';
 const ORDENES_MES_KEY  = 'ordenes_ultimo_reset_mes';
 
-async function checkAndRotateMonthOrders() {
+async function checkAndRotateMonthOrders(_intentos) {
+  _intentos = _intentos || 0;
+  // Espera a que 'ordenes' realmente haya cargado (Firestore o local) antes
+  // de decidir qué archivar — con cache fría / red lenta, el listener puede
+  // no haber entregado su primer snapshot todavía a los 1200ms del arranque,
+  // y antes eso hacía que se marcara el mes como "ya procesado" sin haber
+  // archivado nada, dejando las órdenes viejas mezcladas con las activas.
+  if (!window._ordenesListas) {
+    if (_intentos > 60) { console.warn('checkAndRotateMonthOrders: ordenes nunca cargó, se omite este intento'); return; }
+    setTimeout(() => checkAndRotateMonthOrders(_intentos + 1), 1000);
+    return;
+  }
   const mesActual = _getMesActual();
   const ultimoMes = localStorage.getItem(ORDENES_MES_KEY);
   if (ultimoMes === mesActual) return;
@@ -3087,6 +3180,7 @@ window.cerrarModal = cerrarModal;
 // 'eliminarOrden' ya no existe como función local en este script).
 window.showTab = showTab;
 window.setFilter = setFilter;
+window.irADashCard = irADashCard;
 window.toggleOrden = toggleOrden;
 window.verBoleta = verBoleta;
 // irAOrden ya no existe (ver comentario en renderDashboard).
