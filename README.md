@@ -7,6 +7,29 @@ Por decisión explícita del dueño de los datos, esta app **ya no pide iniciar 
 
 **Importante:** con esto, cualquier persona que conozca la configuración de Firebase de este proyecto puede leer y editar los datos. Se optó por esto deliberadamente para evitar los problemas de inicio de sesión (ventana emergente que se cerraba sola sin completar el login en el celular). El código de Firebase Authentication (Google Sign-In) fue eliminado por completo del proyecto — no queda ningún rastro de esa integración.
 
+## Seguridad — pasos pendientes en consola (no se pueden hacer desde el código)
+
+El código ya trae protecciones listas pero **inactivas hasta que las configures** (para no romper nada por sorpresa). Ninguna de estas requiere volver a pedir login:
+
+1. **App Check (recomendado, es el reemplazo real del login para bloquear acceso ajeno)**
+   - Firebase Console → Project Settings → App Check → Apps → esta app web → Registrar → proveedor **reCAPTCHA v3** → copiar la site key.
+   - Pegarla en `js/firebase-init.js`, constante `APP_CHECK_SITE_KEY` (reemplaza `PEGA_AQUI_TU_RECAPTCHA_SITE_KEY`).
+   - Desplegar la app y esperar unos días viendo en Firebase Console → App Check → Apps cómo sube el % de peticiones "verificadas".
+   - Solo cuando ese % esté alto, activar App Check → APIs → Cloud Firestore → **Enforce**. Esto es lo que realmente bloquea a cualquiera que no use esta app — y se puede revertir con un clic desde ahí mismo si algo falla. Firestore rules no se toca para esto.
+
+2. **Endpoint `exportManual` protegido con secreto** (ya en el código)
+   - `firebase functions:secrets:set EXPORT_MANUAL_TOKEN` (cualquier valor largo/aleatorio).
+   - Llamar al endpoint con el header `X-Export-Token: <ese valor>`. Sin este secreto configurado, el endpoint responde 403 a cualquiera — cerrado por defecto, no abierto.
+
+3. **Backups de Firestore** (ningún cambio de código; 1 clic en consola)
+   - Firebase Console → Firestore Database → Backups → crear un programa de backups diario/semanal. Protege contra un borrado accidental o malicioso mientras la ruta siga abierta.
+
+4. **Alertas de presupuesto** (evita sorpresas de facturación si alguien abusa de la API)
+   - Google Cloud Console → Billing → Budgets & Alerts → crear un presupuesto mensual con aviso al 50/90/100%.
+
+5. **Restringir la API key de Firebase** (reduce abuso de cuota, opcional/adicional a App Check)
+   - Google Cloud Console → APIs & Services → Credentials → la key de este proyecto → restringirla a las APIs que realmente usa la app (Firestore, Cloud Messaging).
+
 ## Modo offline
 
 La app funciona normalmente sin internet: lee la última copia conocida de los datos guardada en el dispositivo (persistencia offline nativa de Firestore, además de la cola de sincronización propia para las escrituras). Los cambios hechos sin conexión se suben solos en cuanto vuelve la señal.

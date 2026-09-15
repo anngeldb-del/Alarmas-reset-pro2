@@ -19,6 +19,11 @@
  *    firebase functions:secrets:set AZURE_CLIENT_ID
  *    firebase functions:secrets:set AZURE_CLIENT_SECRET
  *    firebase functions:secrets:set ONEDRIVE_USER_EMAIL
+ *    firebase functions:secrets:set EXPORT_MANUAL_TOKEN   ← protege el
+ *      trigger manual (ver exportManual más abajo); usa cualquier valor
+ *      largo y aleatorio, y llama al endpoint con el header
+ *      "X-Export-Token: <ese-valor>". Sin este secreto configurado, el
+ *      endpoint responde 403 a cualquier llamada (cerrado por defecto).
  *
  * 4. Desplegar:
  *    cd functions && npm install
@@ -50,6 +55,12 @@ const AZURE_TENANT_ID    = defineSecret('AZURE_TENANT_ID');
 const AZURE_CLIENT_ID    = defineSecret('AZURE_CLIENT_ID');
 const AZURE_CLIENT_SECRET = defineSecret('AZURE_CLIENT_SECRET');
 const ONEDRIVE_USER_EMAIL = defineSecret('ONEDRIVE_USER_EMAIL');
+// Protege exportManual (ver más abajo): sin esto, cualquiera que encontrara
+// la URL podía disparar la exportación a voluntad (gasto de Graph API/
+// Functions y fuga del link de OneDrive en la respuesta). Configúralo con:
+//   firebase functions:secrets:set EXPORT_MANUAL_TOKEN
+// y luego llama al endpoint con el header "X-Export-Token: <ese-valor>".
+const EXPORT_MANUAL_TOKEN = defineSecret('EXPORT_MANUAL_TOKEN');
 
 const ESTADO_LABELS = {
   PENDIENTE: 'Pendiente',
@@ -156,12 +167,21 @@ exports.exportMensualM365 = onSchedule({
 // Llamar con: POST /exportManual (solo desde Firebase Console o curl)
 // ════════════════════════════════════════════════════════
 exports.exportManual = require('firebase-functions/v2/https').onRequest({
-  secrets: [AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, ONEDRIVE_USER_EMAIL],
+  secrets: [AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, ONEDRIVE_USER_EMAIL, EXPORT_MANUAL_TOKEN],
   cors: false
 }, async (req, res) => {
-  // Verificar que la petición viene de localhost o del mismo proyecto
   if (req.method !== 'POST') {
     res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  // Requiere el secreto EXPORT_MANUAL_TOKEN (ver definición arriba). Si aún
+  // no lo configuraste, el endpoint queda cerrado por defecto — seguro,
+  // no abierto — hasta que corras el comando indicado en ese comentario.
+  const tokenEsperado = process.env.EXPORT_MANUAL_TOKEN;
+  const tokenRecibido = req.get('X-Export-Token');
+  if (!tokenEsperado || tokenRecibido !== tokenEsperado) {
+    res.status(403).json({ error: 'No autorizado' });
     return;
   }
 

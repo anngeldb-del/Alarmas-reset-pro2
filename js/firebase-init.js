@@ -8,6 +8,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, orderBy, query, limit, getDocs, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, isSupported, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 
 // ══════════════════════════════════════════════════
 // 🔥 CONFIGURACIÓN FIREBASE — REEMPLAZA CON TUS DATOS
@@ -25,6 +26,15 @@ const firebaseConfig = {
 // Firebase Console → Configuración del proyecto → Cloud Messaging →
 // "Certificados push web" → Generar par de claves. Pega aquí la clave pública.
 const VAPID_KEY = 'PEGA_AQUI_TU_VAPID_KEY';
+// 🛡️ APP CHECK — evita que scripts ajenos usen esta config de Firebase fuera
+// de esta app. Genera la clave en: Firebase Console → Project Settings →
+// App Check → Apps → esta app web → Registrar → reCAPTCHA v3. Mientras esta
+// clave siga con el valor de abajo, App Check NO se inicializa — cero riesgo de
+// romper la app hasta que la configures a propósito. Configurarla sola no
+// bloquea nada: el bloqueo real solo empieza cuando actives "Enforce" para
+// Firestore en Firebase Console → App Check → APIs, paso que puedes revertir
+// en cualquier momento desde ahí mismo si algo falla.
+const APP_CHECK_SITE_KEY = 'PEGA_AQUI_TU_RECAPTCHA_SITE_KEY';
 const fbConfigured = firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('TU_')
   && firebaseConfig.projectId && !String(firebaseConfig.projectId).includes('TU_');
 window._useFirebase = false;
@@ -36,6 +46,20 @@ window._uid = 'compartido';
 if (fbConfigured) {
   try {
     const app = initializeApp(firebaseConfig);
+    // Solo se activa si ya pegaste tu clave real arriba — ver comentario de
+    // APP_CHECK_SITE_KEY. Envuelto en su propio try/catch para que, si algo
+    // sale mal (clave inválida, red, etc.), el resto de la app siga
+    // funcionando exactamente igual que hoy.
+    if (!String(APP_CHECK_SITE_KEY).includes('PEGA_AQUI')) {
+      try {
+        initializeAppCheck(app, {
+          provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY),
+          isTokenAutoRefreshEnabled: true
+        });
+      } catch(e) {
+        console.warn('App Check no inicializado:', e);
+      }
+    }
     // Persistencia offline nativa de Firestore: además de la cola propia que
     // ya reintenta las escrituras fallidas, esto hace que las LECTURAS
     // también funcionen sin internet (antes, si no había red al abrir la
